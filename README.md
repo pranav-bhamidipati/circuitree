@@ -1,2 +1,2 @@
-# grandmaster
-Gene circuit design using Monte Carlo tree search
+# CircuiTree
+Genetic circuit design using Monte Carlo tree search
