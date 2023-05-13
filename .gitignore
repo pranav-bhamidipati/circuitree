@@ -4,7 +4,7 @@ scratch
 figures
 sacred
 
-# Interactive notebooks for initial testing
+# Interactive notebooks 
 morph_circuits/*.ipynb
 
 # VS Code
@@ -12,6 +12,9 @@ morph_circuits/*.ipynb
 
 # Line profiler
 .lprof/
+
+# Vim
+.swp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
