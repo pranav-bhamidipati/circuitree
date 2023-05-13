@@ -1,0 +1,9 @@
+{
+    "outcome_code": "00001111",
+    "N": 1000,
+    "method": "mcts",
+    "seed": 2023,
+    "exploration_constant": 1.4142135623730951,
+    "estimate_modularity": false,
+    "save": true
+}

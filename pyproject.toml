@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "circuitree"
+version = "0.1.0"
+description = "Genetic circuit design using Monte Carlo tree search"
+authors = ["pranav-bhamidipati <pbhamidi@usc.edu>"]
+license = "GPLv3"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "~3.10"
+numpy = "^1.23.0"
+scipy = "^1.10.1"
+pandas = "^2.0.0"
+matplotlib = "^3.7.1"
+tqdm = "^4.65.0"
+networkx = "^3.1"
+numba = "^0.56.4"
+scikit-image = "^0.20.0"
+datashader = "^0.14.4"
+psutil = "^5.9.4"
+pygraphviz = "~1.10"
+hiveplotlib = "^0.21"
+h5py = "^3.8.0"
+more-itertools = "^9.1.0"
+signac = "^2.0.0"
+sacred = "^0.8.4"
+signac-flow = "^0.25.0"
+seaborn = "^0.12.2"
+biocircuits = "^0.1.11"
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.12.0"
+black = "^23.3.0"
+line-profiler = {extras = ["python"], version = "^4.0.3"}
+fastapi = "^0.95.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[virtualenvs]
+in-project = true
+prefer-active-python = true
+

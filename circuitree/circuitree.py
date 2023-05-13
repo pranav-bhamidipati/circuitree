@@ -1,0 +1,505 @@
+from functools import cached_property
+from itertools import cycle, product, chain
+from typing import Callable, Literal, Mapping, Optional, Iterable, Any
+import numpy as np
+import networkx as nx
+
+from tqdm import trange, tqdm
+
+from .modularity import tree_modularity, tree_modularity_estimate
+
+
+__all__ = ["MCTS", "CircuiTree"]
+
+
+class MCTS:
+    def __init__(
+        self,
+        root: str,
+        exploration_constant: Optional[float] = None,
+        variance_constant: float = 0.0,
+        seed: int = 2023,
+        rg: Optional[np.random.Generator] = None,
+        search_method: str = "mcts",
+        graph: Optional[nx.DiGraph] = None,
+    ):
+        if exploration_constant is None:
+            self.exploration_constant = np.sqrt(2)
+        else:
+            self.exploration_constant = exploration_constant
+
+        self.variance_constant = variance_constant
+
+        if rg is None:
+            if seed is None:
+                raise ValueError("Must specify seed if rg is not specified")
+            else:
+                rg = np.random.default_rng(seed)
+
+        self.rg = rg
+        self.seed = self.rg.bit_generator._seed_seq.entropy
+
+        if graph is None:
+            self.graph = nx.DiGraph()
+        else:
+            self.graph = graph
+
+        self.root = root
+
+        self.search_method = search_method
+        if self.search_method.lower() == "sp-mcts":
+            self._score_func = self.ucb_single_player
+        elif self.search_method.lower() == "mcts":
+            self._score_func = self.ucb_score
+
+    def select(self, node, **kwargs):
+        selection_path = [node]
+        while not self.is_leaf(node):
+            best_child = self.best_child(node, **kwargs)
+            node = best_child
+            selection_path.append(node)
+        return node, selection_path
+
+    def expand(self, node):
+        actions = self.get_actions(node)
+        for action in actions:
+            child = self.do_action(node, action)
+            self.graph.add_node(child, visits=0, reward=0, ssq_reward=0)
+            self.graph.add_edge(
+                node, child, action=action, visits=0, reward=0, ssq_reward=0
+            )
+
+    def simulate(self, node):
+        while not self.is_terminal(node):
+            action = self.rg.choice(self.get_actions(node))
+            node = self.do_action(node, action)
+        return node, self.get_reward(node)
+
+    def backpropagate(
+        self, selection_path: list, reward: float | int, accumulate: bool = True
+    ):
+        node = selection_path.pop()
+        while selection_path:
+            parent = selection_path.pop()
+
+            self.graph.edges[parent, node]["visits"] += 1
+            self.graph.edges[parent, node]["reward"] += reward
+            self.graph.edges[parent, node]["ssq_reward"] += reward**2
+
+            if accumulate:
+                self.graph.nodes[node]["visits"] += 1
+                self.graph.nodes[node]["reward"] += reward
+                self.graph.nodes[node]["ssq_reward"] += reward**2
+
+            node = parent
+
+        # Root
+        self.graph.nodes[node]["visits"] += 1
+        self.graph.nodes[node]["reward"] += reward
+        self.graph.nodes[node]["ssq_reward"] += reward**2
+
+    def is_leaf(self, node):
+        return self.graph.out_degree(node) == 0
+
+    def best_child(self, node, **kw):
+        children = list(self.graph.neighbors(node))
+        self.rg.shuffle(children)
+        scores = [self.score_func(node, child, **kw) for child in children]
+        best_child = children[np.argmax(scores)]
+        return best_child
+
+    @property
+    def score_func(self):
+        return self._score_func
+
+    def ucb_score(
+        self, parent, node, exploration_constant: Optional[float] = np.sqrt(2), **kw
+    ):
+        if exploration_constant is None:
+            exploration_constant = self.exploration_constant
+
+        attrs = self.graph.edges[parent, node]
+
+        visits = attrs["visits"]
+        if visits == 0:
+            return np.inf
+
+        reward = attrs["reward"]
+        parent_in_edges = self.graph.in_edges(parent, data="visits")
+        if parent_in_edges:
+            parent_visits = sum(v for _, _, v in parent_in_edges)
+        else:
+            parent_visits = self.graph.nodes[parent]["visits"]
+
+        mean_reward = reward / visits
+        exploration_term = exploration_constant * np.sqrt(
+            np.log(parent_visits) / visits
+        )
+
+        ucb = mean_reward + exploration_term
+        return ucb
+
+    def ucb_single_player(
+        self,
+        parent,
+        node,
+        exploration_constant: Optional[float] = np.sqrt(2),
+        variance_constant: Optional[float] = 0.0,
+        **kw,
+    ):
+        if variance_constant is None:
+            variance_constant = self.variance_constant
+
+        if exploration_constant is None:
+            exploration_constant = self.exploration_constant
+
+        attrs = self.graph.edges[parent, node]
+
+        visits = attrs["visits"]
+        if visits == 0:
+            return np.inf
+
+        reward = attrs["reward"]
+        parent_in_edges = self.graph.in_edges(parent, data="visits")
+        if parent_in_edges:
+            parent_visits = sum(v for _, _, v in parent_in_edges)
+        else:
+            parent_visits = self.graph.nodes[parent]["visits"]
+
+        mean_reward = reward / visits
+        exploration_term = exploration_constant * np.sqrt(
+            np.log(parent_visits) / visits
+        )
+
+        ssq_reward = attrs["ssq_reward"]
+        ssq_difference = ssq_reward - mean_reward**2
+        variance_term = np.sqrt((ssq_difference + variance_constant) / visits)
+
+        ucb = mean_reward + exploration_term + variance_term
+        return ucb
+
+    def get_actions(self, state):
+        pass
+
+    def do_action(self, state, action):
+        pass
+
+    def get_state(self, node):
+        pass
+
+    def is_terminal(self, state) -> bool:
+        pass
+
+    def get_reward(self, state) -> float | int:
+        pass
+
+    def is_success(self, state) -> bool:
+        pass
+
+    # def get_parent(self, node):
+    #     pass
+
+    def traverse(self, root, accumulate: bool = True, **selection_kw):
+        node, selection_path = self.select(root, **selection_kw)
+
+        if self.is_terminal(node):
+            sim_node = node
+            reward = self.get_reward(node)
+
+        else:
+            self.expand(node)
+            child_node = self.rg.choice(list(self.graph.neighbors(node)))
+            selection_path.append(child_node)
+            sim_node, reward = self.simulate(child_node)
+
+        spath_backup = selection_path.copy()
+
+        self.backpropagate(selection_path, reward, accumulate=accumulate)
+
+        return spath_backup, reward, sim_node
+
+    def search_mcts(
+        self,
+        n_steps: int,
+        root: Optional[Any] = None,
+        metric_func: Optional[Callable] = None,
+        save_every: int = 1,
+        exploration_constant: Optional[float] = None,
+        accumulate: bool = True,
+        accumulate_post: bool = False,
+        **kwargs,
+    ):
+        if accumulate and accumulate_post:
+            raise ValueError(
+                "Cannot set accumulate=True and accumulate_post=True."
+                "Accumulation should occur either during or after search."
+            )
+
+        if exploration_constant is None:
+            exploration_constant = self.exploration_constant
+        if root is None:
+            root = self.root
+            self.graph.add_node(root, visits=0, reward=0, ssq_reward=0)
+
+        if metric_func is None:
+            metric_func = lambda *a, **kw: None
+
+        metrics = [metric_func(self.graph, [], root, None, **kwargs)]
+        for i in trange(n_steps):
+            selection_path, reward, sim_node = self.traverse(
+                root, accumulate=accumulate, **kwargs
+            )
+            if not i % save_every:
+                m = metric_func(self.graph, selection_path, sim_node, reward, **kwargs)
+                metrics.append(m)
+
+        # Accumulate results on nodes post-hoc rather than at each step
+        if accumulate_post:
+            self.graph = accumulate_visits_and_rewards(self.graph)
+
+        return metrics
+
+    def grow_tree(
+        self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
+    ):
+        if root is None:
+            root = self.root
+            if print_updates:
+                print(f"Adding root: {root}")
+            self.graph.add_node(root, visits=n_visits, reward=0, ssq_reward=0)
+
+        stack = [(root, action) for action in self.get_actions(root)]
+        n_added = 1
+        while stack:
+            node, action = stack.pop()
+            if not self.is_terminal(node):
+                next_node = self.do_action(node, action)
+                if next_node not in self.graph.nodes:
+                    n_added += 1
+                    self.graph.add_node(
+                        next_node, visits=n_visits, reward=0, ssq_reward=0
+                    )
+                    stack.extend([(next_node, a) for a in self.get_actions(next_node)])
+                    if print_updates:
+                        if n_added % print_every == 0:
+                            print(f"Graph size: {n_added} nodes.")
+
+                self.graph.add_edge(
+                    node, next_node, visits=n_visits, reward=0, ssq_reward=0
+                )
+
+    def grow_tree_recursive(self, root=None):
+        if root is None:
+            root = self.root
+            self.graph.add_node(root, visits=0, reward=0, ssq_reward=0)
+
+        def _grow_tree_recursive(node, action):
+            if self.is_terminal(node):
+                return
+            next_node = self.do_action(node, action)
+            if next_node not in self.graph:
+                self.graph.add_node(next_node, visits=0, reward=0, ssq_reward=0)
+                for action in self.get_actions(next_node):
+                    _grow_tree_recursive(next_node, action)
+            self.graph.add_edge(node, next_node, visits=0, reward=0, ssq_reward=0)
+
+        def _grow_tree(root):
+            for action in self.get_actions(root):
+                _grow_tree_recursive(root, action)
+
+        _grow_tree(root)
+
+    def bfs_iterator(self, root, shuffle=False):
+        layers = (l for l in nx.bfs_layers(self.graph, root))
+
+        if shuffle:
+            layers = list(layers)
+            for l in layers:
+                self.rg.shuffle(l)
+
+        return chain(*layers)
+
+    def search_bfs(
+        self,
+        n_steps_per_node: int,
+        n_repeats: int = 1,
+        max_steps: int = np.inf,
+        root: Optional[Any] = None,
+        metric_func: Optional[Callable] = None,
+        shuffle: bool = False,
+        progress: bool = True,
+        **kwargs,
+    ):
+        if root is None:
+            root = self.root
+
+        if metric_func is None:
+            metric_func = lambda *a, **kw: None
+
+        if self.graph.number_of_nodes() < 2:
+            self.graph.add_node(root, visits=0, reward=0, ssq_reward=0)
+            self.grow_tree(root=root, n_visits=0)
+
+        metrics = [metric_func(self.graph, root, None, **kwargs)]
+
+        self.batch_size = n_steps_per_node
+        k = 0
+        leaves = [
+            n for n in self.bfs_iterator(root, shuffle=shuffle) if self.is_terminal(n)
+        ]
+        bfs = cycle(leaves)
+        n_steps = min(n_repeats * len(leaves), max_steps)
+        iterator = range(n_steps)
+        if progress:
+            iterator = tqdm(iterator)
+        for i in iterator:
+            n = next(bfs)
+            reward = self.get_reward(n)
+            self.graph.nodes[n]["reward"] += reward
+            self.graph.nodes[n]["visits"] += n_steps_per_node
+            # self.graph.nodes[n]["history"].append(reward)
+            metrics.append(metric_func(self.graph, n, reward, **kwargs))
+
+        return metrics
+
+    @property
+    def modularity(self) -> float:
+        return tree_modularity(self.graph, self.root, self.is_terminal, self.is_success)
+
+
+class CircuiTree(MCTS):
+    def __init__(
+        self,
+        components: Iterable[Iterable[str]],
+        interactions: Iterable[str],
+        batch_size: int = 5,
+        tree_shape: Literal["tree", "dag"] = "dag",
+        **kwargs,
+    ):
+        if len(set(c[0] for c in components)) < len(components):
+            raise ValueError("First character of each component must be unique")
+        if len(set(c[0] for c in interactions)) < len(interactions):
+            raise ValueError("First character of each interaction must be unique")
+
+        super().__init__(**kwargs)
+        self.components = components
+        self.component_map = {c[0]: c for c in self.components}
+        self.interactions = interactions
+        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
+
+        self.batch_size = batch_size
+
+        if tree_shape not in ("tree", "dag"):
+            raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
+        self._tree_shape = tree_shape
+
+        # self.node_options = tuple(c[0] for c in self.components)
+        # self.edge_options = self._get_edge_options()
+
+    @cached_property
+    def node_options(self):
+        return self._get_node_options()
+
+    @cached_property
+    def edge_options(self):
+        return self._get_edge_options()
+
+    def do_action(self, state: Any, action: Any):
+        new_state = self._do_action(state, action)
+        if self._tree_shape == "dag":
+            new_state = self.get_unique_state(new_state)
+        return new_state
+
+    @staticmethod
+    def complexity_graph_from_mcts(
+        search_graph: nx.DiGraph,
+        selection_path: Optional[Iterable[str]] = None,
+        sim_node: Optional[str] = None,
+        reward: Optional[int | float] = None,
+    ) -> nx.DiGraph:
+        graph = search_graph.copy()
+        nodes_to_remove = []
+        for n in graph.nodes:
+            if n[0] == "*":
+                p = n[1:]
+                nodes_to_remove.append(n)
+                data = graph.edges[p, n]
+                graph.nodes[p]["visits"] = data.get("visits", 0)
+                graph.nodes[p]["reward"] = data.get("reward", 0)
+                # graph.nodes[p]["history"] = data.get("history", ())
+        graph.remove_nodes_from(nodes_to_remove)
+        empty_nodes = [n for n, v in graph.nodes("visits") if v is None]
+        graph.remove_nodes_from(empty_nodes)
+
+        return graph, selection_path, sim_node, reward
+
+    @staticmethod
+    def complexity_graph_from_bfs(
+        search_graph: nx.DiGraph,
+        node: Optional[Iterable[str]] = None,
+        reward: Optional[float | int] = None,
+    ) -> nx.DiGraph:
+        graph: nx.DiGraph = search_graph.copy()
+        nodes_to_remove = []
+        for n, d in graph.nodes(data=True):
+            if n[0] == "*":
+                nodes_to_remove.append(n)
+                if d.get("visits", 0) == 0:
+                    nodes_to_remove.append(n[1:])
+                else:
+                    graph.nodes[n[1:]].update(d)
+            else:
+                if d.get("visits") is None:
+                    nodes_to_remove.append(n)
+
+        graph.remove_nodes_from(nodes_to_remove)
+
+        for n1, n2 in graph.edges:
+            graph.edges[n1, n2].update(graph.nodes[n2])
+
+        return graph, node, reward
+
+    def _get_node_options(self):
+        return
+
+    def _get_edge_options(self):
+        return
+
+    def get_actions(self, state: Any) -> Iterable[Any]:
+        return
+
+    def _do_action(self, state: Any, action: Any) -> Any:
+        return
+
+    def is_terminal(self, state: Any) -> bool:
+        return
+
+    def is_success(self, state: Any) -> bool:
+        return
+
+    @staticmethod
+    def get_edge_code(state: Any) -> Any:
+        return
+
+    @staticmethod
+    def get_unique_state(genotype: str) -> str:
+        return
+
+
+def accumulate_visits_and_rewards(
+    graph: nx.DiGraph, visits_attr: Any = "visits", reward_attr: Any = "reward"
+):
+    """Accumulate results on nodes post-hoc"""
+    for n in graph.nodes:
+        total_visits = sum([v for _, _, v in graph.in_edges(n, data=visits_attr)])
+        total_reward = sum([r for _, _, r in graph.in_edges(n, data=reward_attr)])
+        graph.nodes[n]["visits"] = total_visits
+        graph.nodes[n]["reward"] = total_reward
+
+    for n in graph.nodes:
+        graph.nodes[n][visits_attr] = 0
+        graph.nodes[n][reward_attr] = 0
+
+    for parent, child, data in graph.edges(data=True):
+        graph.nodes[parent][visits_attr] += data[visits_attr]
+        graph.nodes[parent][reward_attr] += data[reward_attr]
