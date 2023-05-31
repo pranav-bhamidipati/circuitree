@@ -14,7 +14,7 @@ morph_circuits/*.ipynb
 .lprof/
 
 # Vim
-.swp
+*.swp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
