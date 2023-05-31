@@ -1,65 +1,403 @@
 from functools import cached_property, partial
-import h5py
-from itertools import product, permutations
-from math import ceil
-from pathlib import Path
-from typing import Any, Literal, Optional, Iterable, Mapping
-from biocircuits import gillespie_ssa
-from numba import njit
+from itertools import permutations
+from typing import Callable, Optional, Iterable
+from numba import stencil, njit
 import numpy as np
-from numpy.typing import NDArray
-from sacred import Experiment
 from scipy.signal import correlate
 
 from circuitree import SimpleNetworkTree
-from circuitree.rewards import (
-    sequential_reward,
-    sequential_reward_and_modularity_estimate,
-    mcts_reward,
-    mcts_reward_and_modularity_estimate,
-)
+from circuitree.parallel import DefaultFactoryDict, ParallelTree
 
-_default_parameters = dict(
-    k_on=1.0,
-    k_off_1=224.0,
-    k_off_2=9.0,
-    km_unbound=0.5,
-    km_act=1.0,
-    km_rep=5e-4,
-    km_act_rep=0.5,
-    kp=0.167,
-    gamma_m=0.005776,
-    gamma_p=0.001155,
-)
 
-_param_ranges = dict(
-    log10_k_on=(-1, 2),
-    log10_k_off_1=(0, 3),
-    k_off_2_1_ratio=(0, 1),
-    km_unbound=(0, 1),
-    km_act=(1, 10),
-    nlog10_km_rep_unbound_ratio=(0, 5),
-    kp=(0.015, 0.25),
-    nlog10_gamma_m=(1, 3),
-    nlog10_gamma_p=(1, 3),
+from models.oscillation.gillespie import (
+    GillespieSSA,
+    make_matrices_for_ssa,
+    PARAM_RANGES,
+    DEFAULT_PARAMS,
 )
 
 
-class OscillationTree(SimpleNetworkTree):
+class TFNetworkModel:
+    """
+    Model of a transcription factor network.
+    =============
+
+    10 parameters
+        TF-promoter binding rates:
+            k_on
+            k_off_1
+            k_off_2
+
+            \\ NOTE: k_off_2 less than k_off_1 indicates cooperative binding)
+
+        Transcription rates:
+            km_unbound
+            km_act
+            km_rep
+            km_act_rep
+
+        Translation rate:
+            kp
+
+        Degradation rates:
+            gamma_m
+            gamma_p
+
+    """
+
     def __init__(
         self,
-        time_points: NDArray[np.float64],
+        genotype: str,
+        initialize: bool = False,
+        dt: Optional[float] = None,
+        nt: Optional[int] = None,
+        **kwargs,
+    ):
+        self.genotype = genotype
+
+        (
+            self.components,
+            self.activations,
+            self.inhibitions,
+        ) = SimpleNetworkTree.parse_genotype(genotype)
+        self.m = len(self.components)
+        self.a = len(self.activations)
+        self.r = len(self.inhibitions)
+
+        # self._params_dict = _default_parameters
+        # self.update_params(params or param_updates or {})
+
+        # self.population = self.get_initial_population(
+        #     init_method=init_method,
+        #     init_params=init_params,
+        #     **kwargs,
+        # )
+
+        self.dt: Optional[float] = None
+        self.nt: Optional[int] = None
+        self.t: Optional[Iterable[float]] = None
+
+        self.ssa: GillespieSSA | None = None
+        self.dt = dt
+        self.nt = nt
+        if initialize:
+            self.initialize_ssa(dt, nt)
+
+    def initialize_ssa(
+        self,
+        dt: Optional[float] = None,
+        nt: Optional[int] = None,
+        init_mean: float = 10.0,
+    ):
+        dt = dt or self.dt
+        nt = nt or self.nt
+        t = dt * np.arange(nt)
+        self.dt = dt
+        self.nt = nt
+        self.t = t
+
+        Am, Rm, U = make_matrices_for_ssa(self.m, self.activations, self.inhibitions)
+        self.ssa = GillespieSSA(
+            self.m,
+            Am,
+            Rm,
+            U,
+            dt,
+            nt,
+            init_mean,
+            PARAM_RANGES,
+            DEFAULT_PARAMS,
+        )
+
+    def run_ssa_with_params(self, pop0, params, tau_leap=False):
+        if tau_leap:
+            return self.ssa.run_with_params_tau_leap(pop0, params)
+        else:
+            return self.ssa.run_with_params(pop0, params)
+
+    def run_batch_with_params(self, pop0, params, n, tau_leap=False):
+        pop0 = np.asarray(pop0)
+        params = np.asarray(params)
+        is_vectorized = pop0.ndim == 2 and params.ndim == 2
+        if tau_leap:
+            if is_vectorized:
+                return self.ssa.run_batch_with_params_tau_leap_vector(pop0, params, n)
+            else:
+                return self.ssa.run_batch_with_params_tau_leap(pop0, params, n)
+        else:
+            if is_vectorized:
+                return self.ssa.run_batch_with_params_vector(pop0, params, n)
+            else:
+                return self.ssa.run_batch_with_params(pop0, params, n)
+
+    def run_ssa_random_params(self, tau_leap=False):
+        if tau_leap:
+            pop0, params, y_t = self.ssa.run_random_sample_tau_leap()
+        else:
+            pop0, params, y_t = self.ssa.run_random_sample()
+        pop0 = pop0[self.m : self.m * 2]
+        return pop0, params, y_t
+
+    def run_batch_random(self, n_samples, tau_leap=False):
+        if tau_leap:
+            return self.ssa.run_batch_tau_leap(n_samples)
+        else:
+            return self.ssa.run_batch(n_samples)
+
+    def run_job(self, **kwargs):
+        """
+        Run the simulation with random parameters and default time-stepping.
+        For convenience, this returns the genotype ("state") and visit number in addition
+        to simulation results.
+        """
+        pop0, params, peak_height = self.run_ssa_and_get_acf_extrema(
+            self.dt, self.nt, size=1, freqs=False, indices=False, **kwargs
+        )
+        return peak_height, pop0, params
+
+    def run_batch_job(self, batch_size: int, **kwargs):
+        """
+        Run the simulation with random parameters and default time-stepping.
+        For convenience, this returns the genotype ("state") and visit number in addition
+        to simulation results.
+        """
+        pop0s, param_sets, peak_heights = self.run_ssa_and_get_acf_extrema(
+            self.dt, self.nt, size=batch_size, freqs=False, indices=False, **kwargs
+        )
+        return pop0s, param_sets, peak_heights
+
+    # def run_batch(self, size, **kwargs):
+    #     """Run the simulation with random parameters and default time-stepping."""
+    #     return self.run_ssa_and_get_secondary_autocorrelation_peaks(
+    #         self.dt, self.nt, size=size, freqs=False, indices=False, **kwargs
+    #     )
+
+    # def get_secondary_autocorrelation_peaks(
+    #     self,
+    #     t: np.ndarray,
+    #     pop: np.ndarray,
+    #     freqs: bool = True,
+    #     indices: bool = False,
+    #     **kwargs,
+    # ):
+    #     """
+    #     Get the location and height of the secondary autocorrelation peaks.
+    #     """
+
+    #     # Compute autocorrelation
+    #     acorr = self.get_autocorrelation(pop)
+    #     acorr = acorr.reshape(-1, *acorr.shape[-2:])
+    #     n_traj, nt, m = acorr.shape
+
+    #     # Compute the location and height of the second peak
+    #     second_peaks = np.apply_along_axis(find_secondary_peak, -2, acorr)
+    #     has_peak = np.any(second_peaks[:, 0, :] > 0, axis=-1)
+    #     where_peak = np.where(has_peak, np.argmax(second_peaks[:, 1, :], axis=-1), -1)
+
+    #     second_peak_loc = np.where(
+    #         has_peak, second_peaks[np.arange(n_traj), 0, where_peak], -1
+    #     ).astype(int)
+    #     second_peak_val = np.where(
+    #         has_peak, second_peaks[np.arange(n_traj), 1, where_peak], 0.0
+    #     )
+    #     second_peak_freq = np.where(has_peak, 1 / t[second_peak_loc], 0.0)
+
+    #     if freqs and indices:
+    #         return second_peak_loc, second_peak_freq, second_peak_val
+    #     elif freqs:
+    #         return second_peak_freq, second_peak_val
+    #     elif indices:
+    #         return second_peak_loc, second_peak_val
+    #     else:
+    #         return second_peak_val
+
+    @staticmethod
+    def largest_acf_extremum(y_t: np.ndarray[np.float64 | np.int64]):
+        acorrs = autocorrelate_vectorized(y_t)
+        return compute_largest_extremum(acorrs)
+
+    @staticmethod
+    def get_acf_extrema(
+        self,
+        t: np.ndarray,
+        pop_t: np.ndarray,
+        freqs: bool = True,
+        indices: bool = False,
+    ):
+        """
+        Get the location and height of the largest extremum of the autocorrelation
+        function, excluding the bounds.
+        """
+
+        # Compute autocorrelation
+        acorrs = autocorrelate_vectorized(pop_t)
+
+        # Compute the location and size of the largest interior extremum over
+        # all species
+        where_extrema, extrema = compute_largest_extremum_and_loc(acorrs)
+        if freqs:
+            extrema_freqs = np.where(where_extrema > 0, 1 / t[where_extrema], 0.0)
+
+        squeeze = where_extrema.size == 1
+        if squeeze:
+            where_extrema = where_extrema.flat[0]
+            extrema = extrema.flat[0]
+            if freqs:
+                extrema_freqs = extrema_freqs.flat[0]
+
+        if freqs:
+            if indices:
+                return where_extrema, extrema_freqs, extrema
+            else:
+                return extrema_freqs, extrema
+        elif indices:
+            return where_extrema, extrema
+        else:
+            return extrema
+
+    def run_ssa_and_get_acf_extrema(
+        self,
+        dt: Optional[float] = None,
+        nt: Optional[int] = None,
+        size: int = 1,
+        freqs: bool = False,
+        indices: bool = False,
+        init_mean: float = 10.0,
+        tau_leap: bool = False,
+        **kwargs,
+    ):
+        """
+        Run the stochastic simulation algorithm for the system and get the
+        secondary autocorrelation peaks.
+        """
+
+        if (dt is not None) and (nt is not None):
+            self.initialize_ssa(dt, nt, init_mean)
+            t = self.t
+
+        if size > 1:
+            pop0, params, y_t = self.run_batch_random(size, tau_leap=tau_leap)
+        else:
+            pop0, params, y_t = self.run_ssa_random_params(tau_leap=tau_leap)
+        pop0 = pop0[..., self.m : self.m * 2]
+        y_t = y_t[..., self.m : self.m * 2]
+
+        if not (freqs or indices):
+            results = self.largest_acf_extremum(y_t)
+        else:
+            results = self.get_acf_extrema(t, y_t, freqs=freqs, indices=indices)
+
+        return pop0, params, results
+
+
+def autocorrelate(data: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    norm = data - data.mean()
+    acorr = correlate(norm, norm, mode="same")[len(norm) // 2 :]
+    acorr = acorr / acorr.max()
+    return acorr
+
+
+def autocorrelate_vectorized(data: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    return np.apply_along_axis(autocorrelate, -2, data)
+
+
+@stencil(cval=False)
+def extremum_kernel(a):
+    """
+    Returns a 1D mask that is True at local extrema, excluding the bounds.
+    Computes when the finite difference changes sign (or is zero).
+    """
+    return (a[0] - a[-1]) * (a[1] - a[0]) <= 0
+
+
+@njit
+def find_extremum(seq: np.ndarray[np.float_]) -> int:
+    """
+    Find the extremum in a sequence of values with the greatest absolute
+    value, excluding the bounds.
+    """
+    extrema_mask = extremum_kernel(seq)
+    if not extrema_mask.any():
+        return -1
+    else:
+        extrema = np.where(extrema_mask)[0]
+        return extrema[np.argmax(np.abs(seq[extrema]))]
+
+
+@njit
+def compute_extremum(arr1d: np.ndarray[np.float_]) -> float:
+    where_extrema = find_extremum(arr1d)
+    if where_extrema < 0:
+        return where_extrema, 0.0  # No interior extremum
+    else:
+        return where_extrema, arr1d[where_extrema]
+
+
+@njit
+def compute_largest_extremum(ndarr: np.ndarray) -> float:
+    """
+    Get the largest interior extremum of a batch of n 1d arrays, each of length m.
+    Vectorizes over arbitrary leading axes. For an input of shape (k, l, m, n),
+    k x l x n extrema are calculated, and the max-of-abs is taken over the last axis
+    to return an array of shape (k, l).
+    """
+    nd_shape = ndarr.shape[:-2]
+    largest_extrema = np.zeros(nd_shape, dtype=np.float64)
+    for leading_index in np.ndindex(nd_shape):
+        extrema = np.array([compute_extremum(a)[1] for a in ndarr[leading_index].T])
+        largest_extrema[leading_index] = np.max(np.abs(extrema))
+    return largest_extrema
+
+
+@njit
+def compute_largest_extremum_and_loc(ndarr: np.ndarray) -> float:
+    """
+    Get the largest interior extremum of a batch of n 1d arrays, each of length m.
+    Vectorizes over arbitrary leading axes. For an input of shape (k, l, m, n),
+    k x l x n extrema are calculated, and the max-of-abs is taken over the last axis
+    to return an array of shape (k, l).
+    Also returns the index of the extremum if it exists, otherwise -1.
+    """
+    nd_shape = ndarr.shape[:-2]
+    where_largest_extrema = np.zeros(nd_shape, dtype=np.int64)
+    largest_extrema = np.zeros(nd_shape, dtype=np.float64)
+    for leading_index in np.ndindex(nd_shape):
+        argmaxval = -1
+        maxval = 0.0
+        abs_maxval = 0.0
+        for a in ndarr[leading_index].T:
+            where_extrema, extremum = compute_extremum(a)
+            if np.abs(extremum) > abs_maxval:
+                argmaxval = where_extrema
+                maxval = extremum
+                abs_maxval = np.abs(extremum)
+        where_largest_extrema[leading_index] = argmaxval
+        largest_extrema[leading_index] = maxval
+    return where_largest_extrema, largest_extrema
+
+
+class OscillationTreeBase(SimpleNetworkTree):
+    def __init__(
+        self,
+        time_points: Optional[np.ndarray[np.float64]] = None,
         success_threshold: float = 0.005,
-        autocorr_threshold: float = 0.3,
-        init_params: tuple[float, ...] = (10.0,),
+        autocorr_threshold: float = 0.5,
+        init_mean: float = 10.0,
+        dt: Optional[float] = None,
+        nt: Optional[int] = None,
+        tau_leap: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
         self.time_points = time_points
-        self.init_params = init_params
         self.autocorr_threshold = autocorr_threshold
         self.success_threshold = success_threshold
+
+        self.dt = dt
+        self.nt = nt
+        self.init_mean = init_mean
+        self.tau_leap = tau_leap
 
     @cached_property
     def _recolor(self):
@@ -107,662 +445,39 @@ class OscillationTree(SimpleNetworkTree):
         return recolorings
 
     def get_unique_state(self, genotype: str) -> str:
-        components, interactions = genotype.split("::")
-        recolorings = self.get_recolorings(genotype)
-        genotype_unique = min(recolorings)
-
-        return genotype_unique
-
-    def get_reward(self, state) -> float | int:
-        params = self.draw_param_set()
-        mod = TFNetworkModel(
-            genotype=state,
-            params=tuple(params.values()),
-            init_method="poisson",
-            init_params=self.init_params,
-        )
-        frequencies, second_peaks = mod.run_ssa_and_get_secondary_autocorrelation_peaks(
-            t=self.time_points,
-            n_threads=self.batch_size,
-        )
-
-        win = max(second_peaks) > self.autocorr_threshold
-
-        return int(win)
+        return min(self.get_recolorings(genotype))
 
     def is_success(self, state: str) -> bool:
         payout = self.graph.nodes[state]["reward"]
         visits = self.graph.nodes[state]["visits"]
         return visits > 0 and payout / visits > self.success_threshold
 
-    def draw_param_set(
-        self, param_ranges: Optional[dict[str, tuple[float | int]]] = None
-    ) -> tuple[float]:
-        if param_ranges is None:
-            param_ranges = _param_ranges
 
-        # Make random draws for each quantity needed to define a parameter set
-        draws = {q: self.rg.uniform(l, h) for q, (l, h) in param_ranges.items()}
-
-        # Calculate derived parameters
-        params = {
-            "k_on": 10 ** draws["log10_k_on"],
-            "k_off_1": 10 ** draws["log10_k_off_1"],
-            "k_off_2": draws["log10_k_off_1"] * draws["k_off_2_1_ratio"],
-            "km_unbound": draws["km_unbound"],
-            "km_act": draws["km_act"],
-            "km_rep": draws["km_unbound"] * 10 ** -draws["nlog10_km_rep_unbound_ratio"],
-            "km_act_rep": draws[
-                "km_unbound"
-            ],  # Act and rep together lead to no net effect
-            "kp": draws["kp"],
-            "gamma_m": 10 ** -draws["nlog10_gamma_m"],
-            "gamma_p": 10 ** -draws["nlog10_gamma_p"],
-        }
-
-        return params
-
-
-def autocorrelate(data: NDArray[np.float_]) -> NDArray[np.float_]:
-    norm = data - data.mean()
-    acorr = correlate(norm, norm, mode="same")[len(norm) // 2 :]
-    acorr = acorr / acorr.max()
-    return acorr
-
-
-def find_secondary_peak(acorr: NDArray[np.float_]) -> float:
-    """Find the secondary peak in the autocorrelation function."""
-    nt = len(acorr)
-    cross_generator = (
-        i + 1 for i in range(nt - 1) if np.sign(acorr[i]) != np.sign(acorr[i + 1])
-    )
-    where_neg = next(cross_generator, -1)
-    if where_neg == -1:
-        return -1, 0.0
-    where_pos = next(cross_generator, -1)
-    if where_pos == -1:
-        return -1, 0.0
-    else:
-        where_max = where_pos
-        where_max += np.argmax(acorr[where_pos:])
-        return where_max, acorr[where_max]
-
-
-def parse_genotype(genotype: str):
-    if not genotype.startswith("*"):
-        raise ValueError(
-            f"Assembly incomplete. Genotype {genotype} is not a terminal genotype."
-        )
-    components, interaction_codes = genotype.strip("*").split("::")
-    component_indices = {c: i for i, c in enumerate(components)}
-
-    interactions = interaction_codes.split("_")
-
-    activations = []
-    inhbitions = []
-    for left, ixn, right in interactions:
-        if ixn.lower() == "a":
-            activations.append((component_indices[left], component_indices[right]))
-        elif ixn.lower() == "i":
-            inhbitions.append((component_indices[left], component_indices[right]))
-
-    activations = np.array(activations, dtype=int)
-    inhbitions = np.array(inhbitions, dtype=int)
-
-    return components, activations, inhbitions
-
-
-class TFNetworkModel:
-    """
-
-    10 parameters
-    =============
-        TF-promoter binding rates:
-            k_on
-            k_off_1
-            k_off_2
-
-            \\ NOTE: k_off_2 less than k_off_1 indicates cooperative binding)
-
-        Transcription rates:
-            km_unbound
-            km_act
-            km_rep
-            km_act_rep
-
-        Translation rate:
-            kp
-
-        Degradation rates:
-            gamma_m
-            gamma_p
-
+class OscillationTree(OscillationTreeBase):
+    """Searches the space of TF networks for oscillatory topologies.
+    Searches independently, not in parallel.
     """
 
     def __init__(
         self,
-        genotype: str,
-        params: Optional[tuple[float]] = None,
-        rg: np.random.BitGenerator = None,
-        seed: int = 2023,
-        init_method: str = "poisson",
-        init_params: tuple[float] = (10.0,),
+        *args,
+        model_table: DefaultFactoryDict = None,
+        model_factory: Callable = None,
         **kwargs,
     ):
-        self.genotype = genotype
-
-        components, activations, inhibitions = parse_genotype(genotype)
-        self.components = components
-        self.activations = activations
-        self.inhibitions = inhibitions
-        self.n_components = len(components)
-        self.n_activations = len(activations)
-        self.n_inhibitions = len(inhibitions)
-
-        if params is None:
-            self.param_dict = _default_parameters
-            self.params = tuple(self.param_dict.values())
-        else:
-            self.params = params
-            self.param_dict = dict(zip(_default_parameters.keys(), self.params))
-
-        if rg is None:
-            self.rg = np.random.default_rng(seed)
-        else:
-            self.rg = rg
-
-        self.population = self.get_initial_population(
-            init_method=init_method,
-            init_params=init_params,
-            **kwargs,
+        super().__init__(*args, **kwargs)
+        self._model_table = model_table or DefaultFactoryDict(
+            default_factory=model_factory
         )
-
-        if activations.size > 0:
-            activations_left = activations[:, 0]
-            activations_right = activations[:, 1]
-        else:
-            activations_left = np.array([], dtype=int)
-            activations_right = np.array([], dtype=int)
-
-        if inhibitions.size > 0:
-            inhibitions_left = inhibitions[:, 0]
-            inhibitions_right = inhibitions[:, 1]
-        else:
-            inhibitions_left = np.array([], dtype=int)
-            inhibitions_right = np.array([], dtype=int)
-
-        self._result: Optional[tuple[Any]] = None
-
-        @njit
-        def _propensity_func(
-            propensities,
-            population,
-            t,
-            *params,
-        ):
-            """
-            The propensity function returns an array of propensities for each reaction.
-            For M TFs, and A activation interactions, and R repression interactions,
-            there are 6M + 2A + 2R elementary reactions.
-            The ordering and indexing of the reactions is as follows:
-                - Transcription of mRNA (0, M)
-                - Translation of mRNA (M, 2M)
-                - Degradation of bound activator (2M, 3M)
-                - Degradation of bound inhibitor (3M, 4M)
-                - Degradation of mRNA (4M, 5M)
-                - Degradation of unbound TF (5M, 6M)
-                - Binding of activator to promoter (6M, 6M + A)
-                - Unbinding of activator from promoter (6M + A, 6M + 2A)
-                - Binding of inhibitor to promoter (6M + 2A, 6M + 2A + R)
-                - Unbinding of inhibitor from promoter (6M + 2A + R, 6M + 2A + 2R)
-            """
-            (
-                k_on,
-                k_off_1,
-                k_off_2,
-                km_unbound,
-                km_act,
-                km_rep,
-                km_act_rep,
-                kp,
-                gamma_m,
-                gamma_p,
-            ) = params
-
-            m = len(population) // 4
-            a = len(activations)
-            r = len(inhibitions)
-            m6 = 6 * m
-            a2 = 2 * a
-            r2 = 2 * r
-
-            # Get bound activators, bound repressors, mRNA, protein for each TF
-            pop = np.reshape(population, (m, 4))
-            a_s, r_s, m_s, p_s = pop.T
-            n_bound = a_s + r_s
-
-            # Transcription rates are stored in a nested list
-            # First layer is number of activators and second layer is number of repressors
-            k_tx = [[km_unbound, km_rep, km_rep], [km_act, km_act_rep], [km_act]]
-
-            # Transcription of mRNA
-            propensities[:m] = [k_tx[a][r] for a, r, m, p in pop]
-
-            # Translation of mRNA
-            propensities[m : 2 * m] = kp * m_s
-
-            # Degradation of bound activator
-            propensities[2 * m : 3 * m] = gamma_m * a_s
-
-            # Degradation of bound inhibitor
-            propensities[3 * m : 4 * m] = gamma_p * r_s
-
-            # Degradation of mRNA
-            propensities[4 * m : 5 * m] = gamma_m * m_s
-
-            # Degradation of unbound TF
-            propensities[5 * m : 6 * m] = gamma_p * p_s
-
-            # Binding of activator to promoter
-            if activations.size > 0:
-                propensities[m6 : m6 + a] = (
-                    k_on * p_s[activations_left] * (n_bound[activations_right] < 2)
-                )
-
-                # Unbinding of activator from promoter
-                # (different rates for 1 or 2 activators bound)
-                propensities[m6 + a : m6 + a2] = (
-                    k_off_1 * (a_s[activations_right] == 1)
-                ) + (k_off_2 * (a_s[activations_right] == 2))
-
-            if inhibitions.size > 0:
-                # Binding of inhibitor to promoter
-                propensities[m6 + a2 : m6 + a2 + r] = (
-                    k_on * p_s[inhibitions_left] * (n_bound[inhibitions_right] < 2)
-                )
-                # Unbinding of inhibitor from promoter
-                propensities[m6 + a2 + r : m6 + a2 + r2] = (
-                    k_off_1 * (r_s[inhibitions_right] == 1)
-                ) + (k_off_2 * (r_s[inhibitions_right] == 2))
-
-            return propensities
-
-        self.propensity_func = _propensity_func
-        self.update_matrix = self.get_update_matrix()
 
     @property
-    def result(self):
-        return self._result
+    def model_table(self):
+        return self._model_table
 
-    def get_initial_population(
-        self,
-        init_method: Literal["poisson", "equal"] = "poisson",
-        init_params: tuple[Any] = (10.0,),
-        init_num: int = 10,
-        **kwargs,
-    ):
-        """
-        The population is a tuple of with 4 entries for each component:
-            - activators bound to its promoter
-            - repressors bound to its promoter
-            - mRNAs
-            - proteins
-        """
-        population = np.zeros(4 * self.n_components, dtype=int)
-        if init_method == "poisson":
-            population[2::4] = self.rg.poisson(*init_params, size=self.n_components)
-            population[3::4] = self.rg.poisson(*init_params, size=self.n_components)
-        elif init_method == "equal":
-            population[2::4] = init_num
-            population[3::4] = init_num
-        else:
-            raise NotImplementedError(f"init_method {init_method} not implemented")
-
-        return population
-
-    def get_update_matrix(self):
-        """
-        Generate the update matrix for the system. Describes the change in each
-        species for each reaction.
-        """
-        m = self.n_components
-        a = len(self.activations)
-        r = len(self.inhibitions)
-        m6 = 6 * m
-        a2 = 2 * a
-        r2 = 2 * r
-        U = np.zeros((m6 + a2 + r2, 4 * m), dtype=int)
-
-        for i in range(m):
-            U[0 * m + i, 2 + 4 * i] = 1  # transcription
-            U[1 * m + i, 3 + 4 * i] = 1  # translation
-            U[2 * m + i, 0 + 4 * i] = -1  # bound activator degradation
-            U[3 * m + i, 1 + 4 * i] = -1  # bound inhibitor degradation
-            U[4 * m + i, 2 + 4 * i] = -1  # mRNA degradation
-            U[5 * m + i, 3 + 4 * i] = -1  # unbound protein degradation
-
-        for j, (left, right) in enumerate(self.activations):
-            U[m6 + j, 3 + 4 * left] = -1  # activator binding
-            U[m6 + j, 0 + 4 * right] = 1  # activator binding
-
-            U[m6 + a + j, 0 + 4 * right] = -1  # activator unbinding
-            U[m6 + a + j, 3 + 4 * left] = 1  # activator unbinding
-
-        for k, (left, right) in enumerate(self.inhibitions):
-            U[m6 + a2 + k, 3 + 4 * left] = -1  # inhibitor binding
-            U[m6 + a2 + k, 1 + 4 * right] = 1  # inhibitor binding
-
-            U[m6 + a2 + r + k, 1 + 4 * right] = -1  # inhibitor unbinding
-            U[m6 + a2 + r + k, 3 + 4 * left] = 1  # inhibitor unbinding
-
-        return U
-
-    def run_ssa(
-        self,
-        t: Iterable[float],
-        params: Optional[tuple[float]] = None,
-        param_updates: Optional[dict] = None,
-        size: int = 1,
-        n_threads: int = 1,
-        progress_bar: bool = False,
-        **kwargs,
-    ):
-        """
-        Run the stochastic simulation algorithm for the system.
-
-        Parameters
-        ----------
-        t : array-like
-            Time points to evaluate the system at.
-        params: tuple, optional
-            Parameters to use for the simulation.
-        param_updates : dict, optional
-            Dictionary of parameters to update for the simulation. Used to update
-            the `params` variable.
-        kwargs : dict, optional
-            Keyword arguments to pass to the simulation.
-
-        Returns
-        -------
-        t : array-like
-            Time points evaluated at.
-        x : array-like
-            Species values at each time point.
-        """
-
-        params = self.params if params is None else params
-
-        if param_updates is not None:
-            params = tuple(
-                param_updates.get(p, v) for p, v in zip(self.param_dict.keys(), params)
-            )
-
-        pop = gillespie_ssa(
-            self.propensity_func,
-            self.update_matrix,
-            self.population,
-            t,
-            args=params,
-            size=size,
-            n_threads=n_threads,
-            progress_bar=progress_bar,
-            **kwargs,
+    def get_reward(self, state: str, visit_num: int) -> float | int:
+        """Run the model and get a random reward"""
+        model = self.model_table[state]
+        pop0, params, reward = model.run_ssa_and_get_acf_extrema(
+            tau_leap=self.tau_leap, freqs=False, indices=False
         )
-
-        self._result = t, pop
-
-        return t, pop
-
-    def get_autocorrelation(self, pop: Optional[np.ndarray] = None, **kwargs):
-        """
-        Get the autocorrelation of the system.
-        """
-        if pop is None:
-            t, pop = self.result
-        autocorr_func = partial(autocorrelate)
-        return np.apply_along_axis(autocorr_func, 1, pop[:, :, 3::4])
-
-    def get_secondary_autocorrelation_peaks(
-        self,
-        t: Optional[np.ndarray] = None,
-        pop: Optional[np.ndarray] = None,
-        indices: bool = False,
-        **kwargs,
-    ):
-        """
-        Get the location and height of the secondary autocorrelation peaks.
-        """
-
-        if t is None:
-            t, _ = self.result
-
-        # Compute autocorrelation (pulls from self.result if pop is None)
-        acorr = self.get_autocorrelation(pop)
-        nthreads = acorr.shape[0]
-
-        # Compute the location and height of the second peak
-        second_peaks = np.apply_along_axis(find_secondary_peak, 1, acorr)
-        has_peak = np.any(second_peaks[:, 0, :] > 0, axis=-1)
-        where_peak = np.where(has_peak, np.argmax(second_peaks[:, 1, :], axis=-1), -1)
-
-        second_peak_loc = np.where(
-            has_peak, second_peaks[np.arange(nthreads), 0, where_peak], -1
-        ).astype(int)
-        second_peak_val = np.where(
-            has_peak, second_peaks[np.arange(nthreads), 1, where_peak], 0.0
-        )
-
-        second_peak_freq = np.where(has_peak, 1 / t[second_peak_loc], 0.0)
-
-        if indices:
-            return second_peak_loc, second_peak_freq, second_peak_val
-        else:
-            return second_peak_freq, second_peak_val
-
-    def run_ssa_and_get_secondary_autocorrelation_peaks(
-        self,
-        t: Iterable[float],
-        params: Optional[tuple[float]] = None,
-        param_updates: Optional[dict] = None,
-        size: int = 1,
-        n_threads: int = 1,
-        progress_bar: bool = False,
-        indices: bool = False,
-        **kwargs,
-    ):
-        """
-        Run the stochastic simulation algorithm for the system and get the
-        secondary autocorrelation peaks.
-        """
-
-        self.run_ssa(
-            t,
-            params=params,
-            param_updates=param_updates,
-            size=size,
-            n_threads=n_threads,
-            progress_bar=progress_bar,
-            **kwargs,
-        )
-
-        return self.get_secondary_autocorrelation_peaks(indices=indices)
-
-
-def search_sequential(
-    components: Iterable[Iterable[str]],
-    interactions: Iterable[str],
-    time_points: NDArray[np.float64],
-    n_samples_per_topology: int,
-    estimate_modularity: bool = False,
-    success_threshold: float = 0.005,
-    max_samples: int = 10000000,
-    seed: Optional[int] = None,
-    rg: Optional[np.random.Generator] = None,
-    **kwargs,
-):
-    if rg is None:
-        if seed is None:
-            raise ValueError("Must specify random seed if rg is not specified")
-        else:
-            rg = np.random.default_rng(seed)
-    else:
-        if seed is None:
-            seed = rg.bit_generator._seed_seq.entropy
-
-    ot = OscillationTree(
-        components=components,
-        interactions=interactions,
-        time_points=time_points,
-        batch_size=1,
-        success_threshold=success_threshold,
-        **kwargs,
-    )
-
-    if estimate_modularity:
-        metric_func = partial(sequential_reward_and_modularity_estimate, ot.root)
-
-        results = ot.search_bfs(
-            1,
-            n_samples_per_topology,
-            max_steps=max_samples,
-            metric_func=metric_func,
-            shuffle=True,
-        )
-
-        rewards, modularity_estimates = zip(*results[1:])
-        rewards = np.array(rewards, dtype=int)
-        modularity_estimates = np.array(modularity_estimates, dtype=float)
-        data = {"modularity_estimates": modularity_estimates}
-
-    else:
-        metric_func = sequential_reward
-
-        rewards = ot.search_bfs(
-            1,
-            n_samples_per_topology,
-            max_steps=max_samples,
-            metric_func=metric_func,
-            shuffle=True,
-        )[1:]
-
-        data = {}
-
-    data["n_per_topology"] = n_samples_per_topology
-    data["N"] = max_samples
-    data["seed"] = seed
-    data["rewards"] = rewards
-    data["final_modularity"] = ot.modularity
-
-    return data
-
-
-def search_mcts(
-    components: Iterable[Iterable[str]],
-    interactions: Iterable[str],
-    time_points: NDArray[np.float64],
-    N: int,
-    batch_size: int = 5,
-    estimate_modularity: bool = False,
-    success_threshold: float = 0.005,
-    seed: Optional[int] = None,
-    rg: Optional[np.random.Generator] = None,
-    root: str = "ABC::",
-    **kwargs,
-):
-    if rg is None:
-        if seed is None:
-            raise ValueError("Must specify random seed if rg is not specified")
-        else:
-            rg = np.random.default_rng(seed)
-    else:
-        if seed is None:
-            seed = rg.bit_generator._seed_seq.entropy
-
-    ot = OscillationTree(
-        components=components,
-        interactions=interactions,
-        time_points=time_points,
-        batch_size=batch_size,
-        success_threshold=success_threshold,
-        root=root,
-        **kwargs,
-    )
-
-    n_iterations = ceil(N / batch_size)
-
-    if estimate_modularity:
-        metric_func = partial(mcts_reward_and_modularity_estimate, ot.root)
-        results = ot.search_mcts(n_iterations, metric_func=metric_func)[1:]
-
-        rewards, modularity_estimates = zip(*results)
-        rewards = np.array(rewards, dtype=int)
-        modularity_estimates = np.array(modularity_estimates, dtype=float)
-
-        data = {"modularity_estimates": modularity_estimates}
-
-    else:
-        metric_func = mcts_reward
-        rewards = ot.search_mcts(n_iterations, metric_func=metric_func)[1:]
-        data = {}
-
-    data["N"] = N
-    data["batch_size"] = batch_size
-    data["seed"] = seed
-    data["rewards"] = rewards
-    data["final_modularity"] = ot.modularity
-
-    return data
-
-
-def oscillator_search(
-    components: Iterable[Iterable[str]],
-    interactions: Iterable[str],
-    N: int,
-    nt: int,
-    dt: float = 30.0,  # seconds
-    n_samples_per_topology: int = 100,
-    method: Literal["mcts", "sequential"] = "mcts",
-    seed: int = 2023,
-    save: bool = False,
-    estimate_modularity: bool = False,
-    ex: Optional[Experiment] = None,
-    **kwargs,
-):
-    if method == "mcts":
-        search = search_mcts
-    elif method == "sequential":
-        search = search_sequential
-    else:
-        raise ValueError(f"Unknown search method: {method}")
-
-    rg = np.random.default_rng(seed)
-
-    t = np.arange(0, nt * dt, nt)
-    data = search(
-        components,
-        interactions,
-        t,
-        N=N,
-        n_samples_per_topology=n_samples_per_topology,
-        rg=rg,
-        estimate_modularity=estimate_modularity,
-        **kwargs,
-    )
-
-    if ex is not None:
-        artifacts = []
-
-        save_dir = Path(ex.observers[0].dir)
-
-        if save:
-            p = save_dir.joinpath("results.hdf5")
-            # print(f"Writing to: {p.resolve().absolute()}")
-
-            with h5py.File(p, "w") as f:
-                for k, v in data.items():
-                    f.create_dataset(k, data=v)
-
-            artifacts.append(p)
-
-        for a in artifacts:
-            ex.add_artifact(a)
+        return reward
