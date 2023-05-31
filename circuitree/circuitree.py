@@ -1,5 +1,5 @@
 from functools import cached_property
-from itertools import cycle, product, chain
+from itertools import cycle, product, chain, repeat
 from typing import Callable, Literal, Mapping, Optional, Iterable, Any
 import numpy as np
 import networkx as nx
@@ -45,6 +45,7 @@ class MCTS:
             self.graph = graph
 
         self.root = root
+        self.graph.add_node(self.root, visits=0, reward=0)
 
         self.search_method = search_method
         if self.search_method.lower() == "sp-mcts":
@@ -64,10 +65,8 @@ class MCTS:
         actions = self.get_actions(node)
         for action in actions:
             child = self.do_action(node, action)
-            self.graph.add_node(child, visits=0, reward=0, ssq_reward=0)
-            self.graph.add_edge(
-                node, child, action=action, visits=0, reward=0, ssq_reward=0
-            )
+            self.graph.add_node(child, visits=0, reward=0)
+            self.graph.add_edge(node, child, action=action, visits=0, reward=0)
 
     def simulate(self, node):
         while not self.is_terminal(node):
@@ -84,19 +83,16 @@ class MCTS:
 
             self.graph.edges[parent, node]["visits"] += 1
             self.graph.edges[parent, node]["reward"] += reward
-            self.graph.edges[parent, node]["ssq_reward"] += reward**2
 
             if accumulate:
                 self.graph.nodes[node]["visits"] += 1
                 self.graph.nodes[node]["reward"] += reward
-                self.graph.nodes[node]["ssq_reward"] += reward**2
 
             node = parent
 
         # Root
         self.graph.nodes[node]["visits"] += 1
         self.graph.nodes[node]["reward"] += reward
-        self.graph.nodes[node]["ssq_reward"] += reward**2
 
     def is_leaf(self, node):
         return self.graph.out_degree(node) == 0
@@ -139,44 +135,46 @@ class MCTS:
         ucb = mean_reward + exploration_term
         return ucb
 
-    def ucb_single_player(
-        self,
-        parent,
-        node,
-        exploration_constant: Optional[float] = np.sqrt(2),
-        variance_constant: Optional[float] = 0.0,
-        **kw,
-    ):
-        if variance_constant is None:
-            variance_constant = self.variance_constant
+    #### Single-player MCTS requires keeping track of of sum-of-squared rewards, which is
+    #### expensive. If this is desired in the future, it should be a seaprate class.
+    # def ucb_single_player(
+    #     self,
+    #     parent,
+    #     node,
+    #     exploration_constant: Optional[float] = np.sqrt(2),
+    #     variance_constant: Optional[float] = 0.0,
+    #     **kw,
+    # ):
+    #     if variance_constant is None:
+    #         variance_constant = self.variance_constant
 
-        if exploration_constant is None:
-            exploration_constant = self.exploration_constant
+    #     if exploration_constant is None:
+    #         exploration_constant = self.exploration_constant
 
-        attrs = self.graph.edges[parent, node]
+    #     attrs = self.graph.edges[parent, node]
 
-        visits = attrs["visits"]
-        if visits == 0:
-            return np.inf
+    #     visits = attrs["visits"]
+    #     if visits == 0:
+    #         return np.inf
 
-        reward = attrs["reward"]
-        parent_in_edges = self.graph.in_edges(parent, data="visits")
-        if parent_in_edges:
-            parent_visits = sum(v for _, _, v in parent_in_edges)
-        else:
-            parent_visits = self.graph.nodes[parent]["visits"]
+    #     reward = attrs["reward"]
+    #     parent_in_edges = self.graph.in_edges(parent, data="visits")
+    #     if parent_in_edges:
+    #         parent_visits = sum(v for _, _, v in parent_in_edges)
+    #     else:
+    #         parent_visits = self.graph.nodes[parent]["visits"]
 
-        mean_reward = reward / visits
-        exploration_term = exploration_constant * np.sqrt(
-            np.log(parent_visits) / visits
-        )
+    #     mean_reward = reward / visits
+    #     exploration_term = exploration_constant * np.sqrt(
+    #         np.log(parent_visits) / visits
+    #     )
 
-        ssq_reward = attrs["ssq_reward"]
-        ssq_difference = ssq_reward - mean_reward**2
-        variance_term = np.sqrt((ssq_difference + variance_constant) / visits)
+    #     ssq_reward = attrs["ssq_reward"]
+    #     ssq_difference = ssq_reward - mean_reward**2
+    #     variance_term = np.sqrt((ssq_difference + variance_constant) / visits)
 
-        ucb = mean_reward + exploration_term + variance_term
-        return ucb
+    #     ucb = mean_reward + exploration_term + variance_term
+    #     return ucb
 
     def get_actions(self, state):
         pass
@@ -196,10 +194,8 @@ class MCTS:
     def is_success(self, state) -> bool:
         pass
 
-    # def get_parent(self, node):
-    #     pass
-
-    def traverse(self, root, accumulate: bool = True, **selection_kw):
+    def traverse(self, root: Any = None, accumulate: bool = True, **selection_kw):
+        root = self.root if root is None else root
         node, selection_path = self.select(root, **selection_kw)
 
         if self.is_terminal(node):
@@ -218,6 +214,12 @@ class MCTS:
 
         return spath_backup, reward, sim_node
 
+    def accumulate_visits_and_rewards(self, graph: Optional[nx.DiGraph] = None):
+        _accumulated = self.graph if graph is None else graph
+        accumulate_visits_and_rewards(_accumulated)
+        if graph is None:
+            return _accumulated
+
     def search_mcts(
         self,
         n_steps: int,
@@ -227,6 +229,7 @@ class MCTS:
         exploration_constant: Optional[float] = None,
         accumulate: bool = True,
         accumulate_post: bool = False,
+        progress_bar: bool = True,
         **kwargs,
     ):
         if accumulate and accumulate_post:
@@ -239,13 +242,18 @@ class MCTS:
             exploration_constant = self.exploration_constant
         if root is None:
             root = self.root
-            self.graph.add_node(root, visits=0, reward=0, ssq_reward=0)
+        if root not in self.graph.nodes:
+            self.graph.add_node(root, visits=0, reward=0)
 
         if metric_func is None:
             metric_func = lambda *a, **kw: None
 
         metrics = [metric_func(self.graph, [], root, None, **kwargs)]
-        for i in trange(n_steps):
+        if progress_bar:
+            _range = trange
+        else:
+            _range = range
+        for i in _range(n_steps):
             selection_path, reward, sim_node = self.traverse(
                 root, accumulate=accumulate, **kwargs
             )
@@ -255,9 +263,10 @@ class MCTS:
 
         # Accumulate results on nodes post-hoc rather than at each step
         if accumulate_post:
-            self.graph = accumulate_visits_and_rewards(self.graph)
+            self.accumulate_visits_and_rewards()
 
-        return metrics
+        if metric_func is not None:
+            return metrics
 
     def grow_tree(
         self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
@@ -266,7 +275,7 @@ class MCTS:
             root = self.root
             if print_updates:
                 print(f"Adding root: {root}")
-            self.graph.add_node(root, visits=n_visits, reward=0, ssq_reward=0)
+            self.graph.add_node(root, visits=n_visits, reward=0)
 
         stack = [(root, action) for action in self.get_actions(root)]
         n_added = 1
@@ -276,32 +285,33 @@ class MCTS:
                 next_node = self.do_action(node, action)
                 if next_node not in self.graph.nodes:
                     n_added += 1
-                    self.graph.add_node(
-                        next_node, visits=n_visits, reward=0, ssq_reward=0
-                    )
+                    self.graph.add_node(next_node, visits=n_visits, reward=0)
                     stack.extend([(next_node, a) for a in self.get_actions(next_node)])
                     if print_updates:
                         if n_added % print_every == 0:
                             print(f"Graph size: {n_added} nodes.")
-
-                self.graph.add_edge(
-                    node, next_node, visits=n_visits, reward=0, ssq_reward=0
-                )
+                if not self.graph.has_edge(node, next_node):
+                    self.graph.add_edge(node, next_node, visits=n_visits, reward=0)
 
     def grow_tree_recursive(self, root=None):
         if root is None:
             root = self.root
-            self.graph.add_node(root, visits=0, reward=0, ssq_reward=0)
+            self.graph.add_node(root, visits=0, reward=0)
 
         def _grow_tree_recursive(node, action):
             if self.is_terminal(node):
                 return
             next_node = self.do_action(node, action)
             if next_node not in self.graph:
-                self.graph.add_node(next_node, visits=0, reward=0, ssq_reward=0)
+                self.graph.add_node(next_node, visits=0, reward=0)
                 for action in self.get_actions(next_node):
                     _grow_tree_recursive(next_node, action)
-            self.graph.add_edge(node, next_node, visits=0, reward=0, ssq_reward=0)
+            self.graph.add_edge(
+                node,
+                next_node,
+                visits=0,
+                reward=0,
+            )
 
         def _grow_tree(root):
             for action in self.get_actions(root):
@@ -309,7 +319,8 @@ class MCTS:
 
         _grow_tree(root)
 
-    def bfs_iterator(self, root, shuffle=False):
+    def bfs_iterator(self, root=None, shuffle=False):
+        root = self.root if root is None else root
         layers = (l for l in nx.bfs_layers(self.graph, root))
 
         if shuffle:
@@ -318,6 +329,57 @@ class MCTS:
                 self.rg.shuffle(l)
 
         return chain(*layers)
+
+    def make_bfs_search_generator(
+        self,
+        root: Optional[Any] = None,
+        n_steps_per_node: int = 1,
+        metric_func: Optional[Callable] = None,
+        shuffle: bool = False,
+        max_steps: Optional[int] = None,
+        **kwargs,
+    ):
+        """
+        Returns a generator that performs breadth-first search step-wise. Repeats the
+        search indefinitely, or until the maximum number of steps is reached.
+        Should be performed on a tree that has already been grown (all leaves are known)
+        """
+
+        if root is None:
+            root = self.root
+
+        if metric_func is None:
+            metric_func = lambda *a, **kw: None
+
+        if max_steps is None:
+            max_steps = np.inf
+
+        leaf_is_nonterminal = lambda n: (
+            len(self.graph.neighbors(n)) == 0
+        ) and not self.is_terminal(n)
+        if any(leaf_is_nonterminal(n) for n in self.graph.nodes):
+            self.grow_tree(root=root, n_visits=0)
+
+        # Make an iterator that repeats each leaf n_steps_per_node times, cycling
+        # endlessly in BFS order
+        leaves = [
+            repeat(n, n_steps_per_node)
+            for n in self.bfs_iterator(root, shuffle=shuffle)
+            if self.is_terminal(n)
+        ]
+        bfs = cycle(chain(*leaves))
+
+        def bfs_do_one_iteration():
+            k = 0
+            while k < max_steps:
+                n = next(bfs)
+                reward = self.get_reward(n)
+                self.graph.nodes[n]["reward"] += reward
+                self.graph.nodes[n]["visits"] += 1
+                k += 1
+                yield reward
+
+        return bfs_do_one_iteration
 
     def search_bfs(
         self,
@@ -337,13 +399,11 @@ class MCTS:
             metric_func = lambda *a, **kw: None
 
         if self.graph.number_of_nodes() < 2:
-            self.graph.add_node(root, visits=0, reward=0, ssq_reward=0)
+            self.graph.add_node(root, visits=0, reward=0)
             self.grow_tree(root=root, n_visits=0)
 
         metrics = [metric_func(self.graph, root, None, **kwargs)]
 
-        self.batch_size = n_steps_per_node
-        k = 0
         leaves = [
             n for n in self.bfs_iterator(root, shuffle=shuffle) if self.is_terminal(n)
         ]
@@ -354,7 +414,7 @@ class MCTS:
             iterator = tqdm(iterator)
         for i in iterator:
             n = next(bfs)
-            reward = self.get_reward(n)
+            reward = sum(self.get_reward(n) for _ in range(n_steps_per_node))
             self.graph.nodes[n]["reward"] += reward
             self.graph.nodes[n]["visits"] += n_steps_per_node
             # self.graph.nodes[n]["history"].append(reward)
@@ -372,7 +432,6 @@ class CircuiTree(MCTS):
         self,
         components: Iterable[Iterable[str]],
         interactions: Iterable[str],
-        batch_size: int = 5,
         tree_shape: Literal["tree", "dag"] = "dag",
         **kwargs,
     ):
@@ -387,11 +446,9 @@ class CircuiTree(MCTS):
         self.interactions = interactions
         self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
 
-        self.batch_size = batch_size
-
         if tree_shape not in ("tree", "dag"):
             raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
-        self._tree_shape = tree_shape
+        self.tree_shape = tree_shape
 
         # self.node_options = tuple(c[0] for c in self.components)
         # self.edge_options = self._get_edge_options()
@@ -406,7 +463,7 @@ class CircuiTree(MCTS):
 
     def do_action(self, state: Any, action: Any):
         new_state = self._do_action(state, action)
-        if self._tree_shape == "dag":
+        if self.tree_shape == "dag":
             new_state = self.get_unique_state(new_state)
         return new_state
 

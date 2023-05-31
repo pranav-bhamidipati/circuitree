@@ -33,6 +33,15 @@ ipython = "^8.12.0"
 black = "^23.3.0"
 line-profiler = {extras = ["python"], version = "^4.0.3"}
 fastapi = "^0.95.0"
+ipykernel = "^6.23.1"
+tuna = "^0.5.11"
+jupyterlab = "^4.0.0"
+ipywidgets = "^8.0.6"
+dask = {extras = ["distributed"], version = "^2023.5.0"}
+nodejs = "^0.1.1"
+ipympl = "^0.9.3"
+dask-labextension = "^6.1.0"
+ray = {extras = ["default"], version = "^2.4.0"}
 
 [build-system]
 requires = ["poetry-core"]

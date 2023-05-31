@@ -1,5 +1,4 @@
 from functools import lru_cache, partial
-from itertools import chain
 from typing import Any, Callable, Optional
 import networkx as nx
 import numpy as np
