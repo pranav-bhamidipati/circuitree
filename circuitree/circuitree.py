@@ -1,18 +1,44 @@
-from functools import cached_property
-from itertools import cycle, product, chain, repeat
-from typing import Callable, Literal, Mapping, Optional, Iterable, Any
+from abc import ABC, abstractmethod
+from itertools import cycle, chain, repeat
+from typing import Callable, Literal, Optional, Iterable, Any
 import numpy as np
 import networkx as nx
-
 from tqdm import trange, tqdm
 
 from .modularity import tree_modularity, tree_modularity_estimate
 
 
-__all__ = ["MCTS", "CircuiTree"]
+__all__ = ["CircuiTree"]
 
 
-class MCTS:
+def ucb_score(
+    graph: nx.DiGraph,
+    parent,
+    node,
+    exploration_constant: Optional[float] = np.sqrt(2),
+    **kw,
+):
+    attrs = graph.edges[parent, node]
+
+    visits = attrs["visits"]
+    if visits == 0:
+        return np.inf
+
+    reward = attrs["reward"]
+    parent_in_edges = graph.in_edges(parent, data="visits")
+    if parent_in_edges:
+        parent_visits = sum(v for _, _, v in parent_in_edges)
+    else:
+        parent_visits = graph.nodes[parent]["visits"]
+
+    mean_reward = reward / visits
+    exploration_term = exploration_constant * np.sqrt(np.log(parent_visits) / visits)
+
+    ucb = mean_reward + exploration_term
+    return ucb
+
+
+class CircuiTree(ABC):
     def __init__(
         self,
         root: str,
@@ -20,8 +46,9 @@ class MCTS:
         variance_constant: float = 0.0,
         seed: int = 2023,
         rg: Optional[np.random.Generator] = None,
-        search_method: str = "mcts",
         graph: Optional[nx.DiGraph] = None,
+        tree_shape: Literal["tree", "dag"] = "dag",
+        score_func: Optional[Callable] = None,
     ):
         if exploration_constant is None:
             self.exploration_constant = np.sqrt(2)
@@ -47,11 +74,41 @@ class MCTS:
         self.root = root
         self.graph.add_node(self.root, visits=0, reward=0)
 
-        self.search_method = search_method
-        if self.search_method.lower() == "sp-mcts":
-            self._score_func = self.ucb_single_player
-        elif self.search_method.lower() == "mcts":
-            self._score_func = self.ucb_score
+        if tree_shape not in ("tree", "dag"):
+            raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
+        self.tree_shape = tree_shape
+
+        if score_func is None:
+            self._score_func = ucb_score
+        else:
+            self._score_func = score_func
+
+    def _do_action(self, state: Any, action: Any):
+        new_state = self.do_action(state, action)
+        if self.tree_shape == "dag":
+            new_state = self.get_unique_state(new_state)
+        return new_state
+
+    @abstractmethod
+    def get_actions(self, state: Any) -> Iterable[Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def do_action(self, state: Any, action: Any) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def is_terminal(self, state) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_reward(self, state) -> float | int:
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def get_unique_state(genotype: str) -> str:
+        raise NotImplementedError
 
     def select(self, node, **kwargs):
         selection_path = [node]
@@ -64,14 +121,14 @@ class MCTS:
     def expand(self, node):
         actions = self.get_actions(node)
         for action in actions:
-            child = self.do_action(node, action)
+            child = self._do_action(node, action)
             self.graph.add_node(child, visits=0, reward=0)
             self.graph.add_edge(node, child, action=action, visits=0, reward=0)
 
     def simulate(self, node):
         while not self.is_terminal(node):
             action = self.rg.choice(self.get_actions(node))
-            node = self.do_action(node, action)
+            node = self._do_action(node, action)
         return node, self.get_reward(node)
 
     def backpropagate(
@@ -97,102 +154,15 @@ class MCTS:
     def is_leaf(self, node):
         return self.graph.out_degree(node) == 0
 
+    def score_func(self, node, child, *args, **kwargs):
+        return self._score_func(self.graph, node, child, *args, **kwargs)
+
     def best_child(self, node, **kw):
         children = list(self.graph.neighbors(node))
         self.rg.shuffle(children)
         scores = [self.score_func(node, child, **kw) for child in children]
-        best_child = children[np.argmax(scores)]
-        return best_child
-
-    @property
-    def score_func(self):
-        return self._score_func
-
-    def ucb_score(
-        self, parent, node, exploration_constant: Optional[float] = np.sqrt(2), **kw
-    ):
-        if exploration_constant is None:
-            exploration_constant = self.exploration_constant
-
-        attrs = self.graph.edges[parent, node]
-
-        visits = attrs["visits"]
-        if visits == 0:
-            return np.inf
-
-        reward = attrs["reward"]
-        parent_in_edges = self.graph.in_edges(parent, data="visits")
-        if parent_in_edges:
-            parent_visits = sum(v for _, _, v in parent_in_edges)
-        else:
-            parent_visits = self.graph.nodes[parent]["visits"]
-
-        mean_reward = reward / visits
-        exploration_term = exploration_constant * np.sqrt(
-            np.log(parent_visits) / visits
-        )
-
-        ucb = mean_reward + exploration_term
-        return ucb
-
-    #### Single-player MCTS requires keeping track of of sum-of-squared rewards, which is
-    #### expensive. If this is desired in the future, it should be a seaprate class.
-    # def ucb_single_player(
-    #     self,
-    #     parent,
-    #     node,
-    #     exploration_constant: Optional[float] = np.sqrt(2),
-    #     variance_constant: Optional[float] = 0.0,
-    #     **kw,
-    # ):
-    #     if variance_constant is None:
-    #         variance_constant = self.variance_constant
-
-    #     if exploration_constant is None:
-    #         exploration_constant = self.exploration_constant
-
-    #     attrs = self.graph.edges[parent, node]
-
-    #     visits = attrs["visits"]
-    #     if visits == 0:
-    #         return np.inf
-
-    #     reward = attrs["reward"]
-    #     parent_in_edges = self.graph.in_edges(parent, data="visits")
-    #     if parent_in_edges:
-    #         parent_visits = sum(v for _, _, v in parent_in_edges)
-    #     else:
-    #         parent_visits = self.graph.nodes[parent]["visits"]
-
-    #     mean_reward = reward / visits
-    #     exploration_term = exploration_constant * np.sqrt(
-    #         np.log(parent_visits) / visits
-    #     )
-
-    #     ssq_reward = attrs["ssq_reward"]
-    #     ssq_difference = ssq_reward - mean_reward**2
-    #     variance_term = np.sqrt((ssq_difference + variance_constant) / visits)
-
-    #     ucb = mean_reward + exploration_term + variance_term
-    #     return ucb
-
-    def get_actions(self, state):
-        pass
-
-    def do_action(self, state, action):
-        pass
-
-    def get_state(self, node):
-        pass
-
-    def is_terminal(self, state) -> bool:
-        pass
-
-    def get_reward(self, state) -> float | int:
-        pass
-
-    def is_success(self, state) -> bool:
-        pass
+        best = children[np.argmax(scores)]
+        return best
 
     def traverse(self, root: Any = None, accumulate: bool = True, **selection_kw):
         root = self.root if root is None else root
@@ -282,7 +252,7 @@ class MCTS:
         while stack:
             node, action = stack.pop()
             if not self.is_terminal(node):
-                next_node = self.do_action(node, action)
+                next_node = self._do_action(node, action)
                 if next_node not in self.graph.nodes:
                     n_added += 1
                     self.graph.add_node(next_node, visits=n_visits, reward=0)
@@ -301,7 +271,7 @@ class MCTS:
         def _grow_tree_recursive(node, action):
             if self.is_terminal(node):
                 return
-            next_node = self.do_action(node, action)
+            next_node = self._do_action(node, action)
             if next_node not in self.graph:
                 self.graph.add_node(next_node, visits=0, reward=0)
                 for action in self.get_actions(next_node):
@@ -422,50 +392,17 @@ class MCTS:
 
         return metrics
 
+    def is_success(self, state) -> bool:
+        """Must be defined to calculate modularity."""
+        raise NotImplementedError
+
     @property
     def modularity(self) -> float:
         return tree_modularity(self.graph, self.root, self.is_terminal, self.is_success)
 
-
-class CircuiTree(MCTS):
-    def __init__(
-        self,
-        components: Iterable[Iterable[str]],
-        interactions: Iterable[str],
-        tree_shape: Literal["tree", "dag"] = "dag",
-        **kwargs,
-    ):
-        if len(set(c[0] for c in components)) < len(components):
-            raise ValueError("First character of each component must be unique")
-        if len(set(c[0] for c in interactions)) < len(interactions):
-            raise ValueError("First character of each interaction must be unique")
-
-        super().__init__(**kwargs)
-        self.components = components
-        self.component_map = {c[0]: c for c in self.components}
-        self.interactions = interactions
-        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
-
-        if tree_shape not in ("tree", "dag"):
-            raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
-        self.tree_shape = tree_shape
-
-        # self.node_options = tuple(c[0] for c in self.components)
-        # self.edge_options = self._get_edge_options()
-
-    @cached_property
-    def node_options(self):
-        return self._get_node_options()
-
-    @cached_property
-    def edge_options(self):
-        return self._get_edge_options()
-
-    def do_action(self, state: Any, action: Any):
-        new_state = self._do_action(state, action)
-        if self.tree_shape == "dag":
-            new_state = self.get_unique_state(new_state)
-        return new_state
+    @property
+    def modularity_estimate(self) -> float:
+        return tree_modularity_estimate(self.graph, self.root)
 
     @staticmethod
     def complexity_graph_from_mcts(
@@ -515,32 +452,6 @@ class CircuiTree(MCTS):
             graph.edges[n1, n2].update(graph.nodes[n2])
 
         return graph, node, reward
-
-    def _get_node_options(self):
-        return
-
-    def _get_edge_options(self):
-        return
-
-    def get_actions(self, state: Any) -> Iterable[Any]:
-        return
-
-    def _do_action(self, state: Any, action: Any) -> Any:
-        return
-
-    def is_terminal(self, state: Any) -> bool:
-        return
-
-    def is_success(self, state: Any) -> bool:
-        return
-
-    @staticmethod
-    def get_edge_code(state: Any) -> Any:
-        return
-
-    @staticmethod
-    def get_unique_state(genotype: str) -> str:
-        return
 
 
 def accumulate_visits_and_rewards(

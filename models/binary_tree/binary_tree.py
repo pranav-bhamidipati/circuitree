@@ -10,7 +10,7 @@ from typing import Literal, Optional, Iterable, Mapping
 
 from sacred import Experiment
 
-from circuitree import MCTS
+from circuitree import CircuiTree
 from circuitree.rewards import (
     sequential_reward,
     sequential_reward_and_modularity_estimate,
@@ -96,7 +96,7 @@ def build_binary_tree(
     return G
 
 
-class BinaryTree(MCTS):
+class BinaryTree(CircuiTree):
     def __init__(
         self,
         success_codes: Optional[Iterable[str]] = None,
@@ -170,7 +170,7 @@ class BinaryTree(MCTS):
             extend_from_graph=self_graph,
         )
 
-    def do_action(self, state: str, action: str):
+    def _do_action(self, state: str, action: str):
         if action == "left":
             new_state = state + "0"
         elif action == "right":

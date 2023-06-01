@@ -1,3 +1,4 @@
+from functools import cached_property
 from itertools import product
 import numpy as np
 from typing import Iterable
@@ -31,13 +32,24 @@ string representation with the following rules:
 
 
 class SimpleNetworkTree(CircuiTree):
-    def __init__(self, **kwargs):
+    def __init__(
+        self, components: Iterable[Iterable[str]], interactions: Iterable[str], **kwargs
+    ):
+
+        if len(set(c[0] for c in components)) < len(components):
+            raise ValueError("First character of each component must be unique")
+        if len(set(c[0] for c in interactions)) < len(interactions):
+            raise ValueError("First character of each interaction must be unique")
+
         super().__init__(**kwargs)
 
-    def _get_node_options(self):
-        return tuple(c[0] for c in self.components)
+        self.components = components
+        self.component_map = {c[0]: c for c in self.components}
+        self.interactions = interactions
+        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
 
-    def _get_edge_options(self):
+    @cached_property
+    def edge_options(self):
         return [
             [c1[0] + c2[0] + ixn[0] for ixn in self.interactions]
             for c1, c2 in product(self.components, self.components)
@@ -69,7 +81,7 @@ class SimpleNetworkTree(CircuiTree):
 
         return actions
 
-    def _do_action(self, genotype: str, action: str) -> str:
+    def do_action(self, genotype: str, action: str) -> str:
         if action == "*terminate*":
             new_genotype = "*" + genotype
         else:
@@ -90,10 +102,6 @@ class SimpleNetworkTree(CircuiTree):
 
     def is_terminal(self, genotype: str) -> bool:
         return genotype.startswith("*")
-
-    @staticmethod
-    def get_edge_code(genotype: str) -> str:
-        return genotype.strip("*").split("::")[-1]
 
     @staticmethod
     def get_unique_state(genotype: str) -> str:
