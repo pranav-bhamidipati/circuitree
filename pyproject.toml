@@ -26,6 +26,7 @@ sacred = "^0.8.4"
 signac-flow = "^0.25.0"
 seaborn = "^0.12.2"
 biocircuits = "^0.1.11"
+pyarrow = "^12.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.12.0"
