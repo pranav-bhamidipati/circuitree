@@ -88,6 +88,7 @@ class TFNetworkModel:
         dt: Optional[float] = None,
         nt: Optional[int] = None,
         init_mean: float = 10.0,
+        **kwargs
     ):
         dt = dt or self.dt
         nt = nt or self.nt

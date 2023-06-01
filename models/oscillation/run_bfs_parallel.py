@@ -1,7 +1,9 @@
+from collections import Counter
 from concurrent.futures import as_completed
 from itertools import islice
 import json
 from math import ceil
+from more_itertools import chunked
 from typing import Optional
 import numpy as np
 import pandas as pd
@@ -10,7 +12,8 @@ from psutil import cpu_count
 from uuid import uuid4
 
 
-from models.oscillation.oscillation import TFNetworkModel, OscillationTreeBase
+# from models.oscillation.oscillation import TFNetworkModel, OscillationTreeBase
+from oscillation import TFNetworkModel, OscillationTreeBase
 
 import ray
 
@@ -23,6 +26,7 @@ class Model(object):
         init_columns=None,
         param_names=None,
         save_dir: Path = None,
+        initialize: bool = False,
         **kwargs,
     ):
         self.model = model or TFNetworkModel(**kwargs)
@@ -33,9 +37,12 @@ class Model(object):
 
         self.state_dir.mkdir(exist_ok=True)
 
+        if initialize:
+            self.initialize_ssa(**kwargs)
+
     def initialize_ssa(self, *args, **kwargs):
+        print(f"Initializing SSA for {self.genotype}")
         self.model.initialize_ssa(*args, **kwargs)
-        print(f"Initialized SSA for {self.genotype}")
 
     def run_batch(self, n: int, save: bool = True):
         if self.model.ssa is None:
@@ -52,7 +59,7 @@ class Model(object):
 
         return self.genotype, pop0s, param_sets, rewards
 
-    def save_results(self, pop0s, param_sets, rewards):
+    def save_results(self, pop0s, param_sets, rewards, ext="parquet"):
         data = (
             dict(state=self.genotype, reward=rewards)
             | dict(zip(self.init_columns, np.atleast_2d(pop0s).T))
@@ -61,12 +68,15 @@ class Model(object):
         df = pd.DataFrame(data)
         df["state"] = df["state"].astype("category")
 
-        csv = self.state_dir.joinpath(f"{uuid4()}.csv").resolve().absolute()
-        if csv.exists():
-            raise FileExistsError(f"{csv} already exists")
+        fname = self.state_dir.joinpath(f"{uuid4()}.{ext}").resolve().absolute()
+        if fname.exists():
+            raise FileExistsError(f"{fname} already exists")
 
-        print(f"Writing to: {csv}")
-        df.to_csv(csv, index=False)
+        print(f"Writing to: {fname}")
+        if ext == "csv":
+            df.to_csv(fname, index=False)
+        elif ext == "parquet":
+            df.to_parquet(fname, index=False)
 
 
 def main(
@@ -111,17 +121,28 @@ def main(
         n_workers = cpu_count(logical=True)
 
     n_batches = ceil(n_samples / batchsize)
-
+    
     bfs = (n for n in tree.bfs_iterator() if tree.is_terminal(n))
-    bfs = list(bfs)[: n_workers * 2]  # For testing...
+    job_counter = Counter({g: n_batches for g in islice(bfs, n_workers)})
 
-    def get_jobs():
-        def bfs_iter():
-            for genotype in bfs:
-                for _ in range(n_batches):
-                    yield genotype
+#     def update_job_counter(completed_g):
+#         job_counter[completed_g] -= 1
+#         next_g = None
+#         if job_counter[completed_g] == 0:
+#             del job_counter[completed_g]
+#             next_g = next(bfs, None)
+#             if next_g is not None:
+#                 job_counter[next_g] = n_batches
+#         return next_g
 
-        return bfs_iter()
+#     def get_jobs():
+#         def bfs_iter():
+#             bfs = (n for n in tree.bfs_iterator() if tree.is_terminal(n))
+#             for genotypes in chunked(bfs, n_workers):
+#                 for _ in range(n_batches):
+#                     for g in genotypes:
+#                         yield g
+#         return bfs_iter()
 
     print(
         f"Using {n_workers} workers to make {n_samples} samples for each genotype "
@@ -138,54 +159,64 @@ def main(
         }
     )
 
-    jobs = get_jobs()
-    jobs_to_do = list(islice(jobs, 4))
     models = {
-        g: Model.remote(genotype=g, initialize=True, dt=dt_seconds, nt=nt, **kw)
-        for g in set(jobs_to_do)
+        g: [Model.remote(genotype=g, initialize=True, dt=dt_seconds, nt=nt, **kw)]
+        for g in job_counter
     }
-    sim_refs = [models[g].run_batch.remote(batchsize) for g in jobs_to_do]
+    sim_refs = [models[g][0].run_batch.remote(batchsize) for g in job_counter]
     futures = [ref.future() for ref in sim_refs]
     futures_as_completed = as_completed(futures)
-    while jobs_to_do or futures_as_completed:
-        print(f"To do: {jobs_to_do}")
-        print(f"Models: {list(models.keys())}")
-        print(f"n_futures: {list(models.keys())}")
-
+    print(f"To do: {job_counter}")
+    while (sum(job_counter.values()) > 0) or futures:
+        
         completed = next(futures_as_completed)
-        completed_g, *_ = completed.result()
-
-        print(f"Completed: {completed_g}")
-
-        jobs_to_do.remove(completed_g)
-
-        # If we don't need this genotype anymore, delete it from the models
-        if completed_g not in jobs_to_do:
+        futures.remove(completed)
+        completed_g, *_ = completed.result() 
+        
+        # If this was the last simulation for this genotype, launch the next one 
+        job_counter[completed_g] -= 1
+        if job_counter[completed_g] == 0:
+            print(f"Removing model: {completed_g}")
+            del job_counter[completed_g]
             del models[completed_g]
 
-        next_g = next(jobs, None)
-        if next_g is not None:
-            jobs_to_do.append(next_g)
-            if next_g not in models:
-                models[next_g] = Model.remote(
-                    genotype=next_g, initialize=True, dt=dt_seconds, nt=nt, **kw
-                )
+            new_g = next(bfs, None)
+            if new_g is not None:
+                print(f"Launching model: {new_g}")
+                job_counter[new_g] = n_batches
+                models[new_g] = [Model.remote(
+                    genotype=new_g, initialize=True, dt=dt_seconds, nt=nt, **kw
+                )]
+                next_g = new_g
+            else:
+                # If all topologies have been added to the counter, spawn a new
+                # actor to help wrap up the existing topologies
+                job_to_worker_ratio = {g: job_counter[g] / len(models[g]) for g in models}
+                highest_g = max(job_to_worker_ratio, key=job_to_worker_ratio.get)
+                print(f"Launching additional model: {highest_g}")
+                models[highest_g].append(Model.remote(
+                    genotype=highest_g, initialize=True, dt=dt_seconds, nt=nt, **kw
+                ))
+                next_g = highest_g
 
-            sim_ref = models[next_g].run_batch.remote(batchsize)
+        else:
+            next_g = completed_g
 
-            futures.remove(completed)
-            futures.append(sim_ref.future())
-            futures_as_completed = as_completed(futures)
+        next_ready_model = ray.wait(models[next_g])[0][0]
+        
+        sim_ref = next_ready_model.run_batch.remote(batchsize)
+        futures.append(sim_ref.future())
+        futures_as_completed = as_completed(futures)
+
+    ray.shutdown()
 
 
 if __name__ == "__main__":
-    save_dir = Path("data/oscillation/tmp")
+    save_dir = Path("data/oscillation/bfs")
     save_dir.mkdir(exist_ok=True)
 
     main(
-        n_samples=10,
-        batchsize=5,
-        # n_workers=1,
-        # n_workers=4,
+        n_samples=10_000,
+        batchsize=40,
         save_dir=save_dir,
     )
