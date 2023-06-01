@@ -3,7 +3,6 @@ from concurrent.futures import as_completed
 from itertools import islice
 import json
 from math import ceil
-from more_itertools import chunked
 from typing import Optional
 import numpy as np
 import pandas as pd
@@ -44,7 +43,7 @@ class Model(object):
         print(f"Initializing SSA for {self.genotype}")
         self.model.initialize_ssa(*args, **kwargs)
 
-    def run_batch(self, n: int, save: bool = True):
+    def run_batch(self, model_idx: int, n: int, save: bool = True):
         if self.model.ssa is None:
             self.initialize_ssa()
 
@@ -57,7 +56,7 @@ class Model(object):
         if save:
             self.save_results(pop0s, param_sets, rewards)
 
-        return self.genotype, pop0s, param_sets, rewards
+        return model_idx, self.genotype, pop0s, param_sets, rewards
 
     def save_results(self, pop0s, param_sets, rewards, ext="parquet"):
         data = (
@@ -121,28 +120,9 @@ def main(
         n_workers = cpu_count(logical=True)
 
     n_batches = ceil(n_samples / batchsize)
-    
+
     bfs = (n for n in tree.bfs_iterator() if tree.is_terminal(n))
     job_counter = Counter({g: n_batches for g in islice(bfs, n_workers)})
-
-#     def update_job_counter(completed_g):
-#         job_counter[completed_g] -= 1
-#         next_g = None
-#         if job_counter[completed_g] == 0:
-#             del job_counter[completed_g]
-#             next_g = next(bfs, None)
-#             if next_g is not None:
-#                 job_counter[next_g] = n_batches
-#         return next_g
-
-#     def get_jobs():
-#         def bfs_iter():
-#             bfs = (n for n in tree.bfs_iterator() if tree.is_terminal(n))
-#             for genotypes in chunked(bfs, n_workers):
-#                 for _ in range(n_batches):
-#                     for g in genotypes:
-#                         yield g
-#         return bfs_iter()
 
     print(
         f"Using {n_workers} workers to make {n_samples} samples for each genotype "
@@ -163,17 +143,28 @@ def main(
         g: [Model.remote(genotype=g, initialize=True, dt=dt_seconds, nt=nt, **kw)]
         for g in job_counter
     }
-    sim_refs = [models[g][0].run_batch.remote(batchsize) for g in job_counter]
+    n_models_available = sum(len(m) for m in models.values())
+    print(f"Num. workers: {n_workers}")
+    print(f"Num. models available to run: {n_models_available}")
+    print(f"Num. unique models being simulated: {len(job_counter)}")
+
+    sim_refs = [models[g][0].run_batch.remote(0, batchsize) for g in job_counter]
     futures = [ref.future() for ref in sim_refs]
     futures_as_completed = as_completed(futures)
-    print(f"To do: {job_counter}")
     while (sum(job_counter.values()) > 0) or futures:
-        
+        n_models_available = sum(len(m) for m in models.values())
+        print(f"Num. unique models being simulated: {len(job_counter)}")
+        print(
+            f"Currently {n_workers} workers running {n_models_available} models "
+            f"({len(job_counter)} unique)"
+        )
+        print(f"\t-> est. {min(n_workers / n_models_available, 1):.2%} CPU utilization")
+
         completed = next(futures_as_completed)
         futures.remove(completed)
-        completed_g, *_ = completed.result() 
-        
-        # If this was the last simulation for this genotype, launch the next one 
+        model_idx, completed_g, *_ = completed.result()
+
+        # If this was the last simulation for this genotype, launch the next one
         job_counter[completed_g] -= 1
         if job_counter[completed_g] == 0:
             print(f"Removing model: {completed_g}")
@@ -184,27 +175,40 @@ def main(
             if new_g is not None:
                 print(f"Launching model: {new_g}")
                 job_counter[new_g] = n_batches
-                models[new_g] = [Model.remote(
-                    genotype=new_g, initialize=True, dt=dt_seconds, nt=nt, **kw
-                )]
+                models[new_g] = [
+                    Model.remote(
+                        genotype=new_g, initialize=True, dt=dt_seconds, nt=nt, **kw
+                    )
+                ]
                 next_g = new_g
+                next_model_idx = 0
+
+            # If there are no new topologies left to simulate, add models to help wrap up
+            # the pending ones
             else:
-                # If all topologies have been added to the counter, spawn a new
-                # actor to help wrap up the existing topologies
-                job_to_worker_ratio = {g: job_counter[g] / len(models[g]) for g in models}
-                highest_g = max(job_to_worker_ratio, key=job_to_worker_ratio.get)
-                print(f"Launching additional model: {highest_g}")
-                models[highest_g].append(Model.remote(
-                    genotype=highest_g, initialize=True, dt=dt_seconds, nt=nt, **kw
-                ))
-                next_g = highest_g
+                job_to_worker_ratio = {
+                    g: job_counter[g] / len(models[g]) for g in models
+                }
+                highest_jwr_g = max(job_to_worker_ratio, key=job_to_worker_ratio.get)
+                print(f"Launching duplicate model: {highest_jwr_g}")
+                models[highest_jwr_g].append(
+                    Model.remote(
+                        genotype=highest_jwr_g,
+                        initialize=True,
+                        dt=dt_seconds,
+                        nt=nt,
+                        **kw,
+                    )
+                )
+                next_g = highest_jwr_g
+                next_model_idx = len(models[highest_jwr_g]) - 1
 
         else:
             next_g = completed_g
+            next_model_idx = model_idx
 
-        next_ready_model = ray.wait(models[next_g])[0][0]
-        
-        sim_ref = next_ready_model.run_batch.remote(batchsize)
+        next_model = models[next_g][next_model_idx]
+        sim_ref = next_model.run_batch.remote(next_model_idx, batchsize)
         futures.append(sim_ref.future())
         futures_as_completed = as_completed(futures)
 
@@ -214,7 +218,6 @@ def main(
 if __name__ == "__main__":
     save_dir = Path("data/oscillation/bfs")
     save_dir.mkdir(exist_ok=True)
-
     main(
         n_samples=10_000,
         batchsize=40,
