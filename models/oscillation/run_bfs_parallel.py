@@ -1,6 +1,6 @@
 from collections import Counter
 from concurrent.futures import as_completed
-from itertools import islice
+from itertools import islice, chain, repeat
 import json
 from math import ceil
 from typing import Optional
@@ -80,6 +80,7 @@ class Model(object):
 
 def main(
     n_samples: int = 10000,
+    n_cycles: int = 100,
     nt: int = 2000,
     dt_seconds: float = 20.0,
     batchsize: int = 100,
@@ -119,14 +120,20 @@ def main(
     if n_workers is None:
         n_workers = cpu_count(logical=True)
 
-    n_batches = ceil(n_samples / batchsize)
+    n_batches_per_cycle = ceil(n_samples / batchsize / n_cycles)
 
+    # Cycle through nodes in BFS order, taking n_batches_per_cycle batches of samples
+    # from each node. n_cycles is set by balancing two factors. More cycles (fewer
+    # samples per cycle) allows us to gradually accumulate data on all genotypes, rather
+    # than one-by-one. However, it also means that for every cycle, we will end up JIT-
+    # compiling the models again.
     bfs = (n for n in tree.bfs_iterator() if tree.is_terminal(n))
-    job_counter = Counter({g: n_batches for g in islice(bfs, n_workers)})
+    bfs = chain.from_iterable(repeat(bfs, n_cycles))
+    job_counter = Counter({g: n_batches_per_cycle for g in islice(bfs, n_workers)})
 
     print(
         f"Using {n_workers} workers to make {n_samples} samples for each genotype "
-        f"in {n_batches} batches of size {batchsize}"
+        f"in {n_batches_per_cycle} batches of size {batchsize} over {n_cycles} cycles."
     )
 
     ray.init(
@@ -174,7 +181,7 @@ def main(
             new_g = next(bfs, None)
             if new_g is not None:
                 print(f"Launching model: {new_g}")
-                job_counter[new_g] = n_batches
+                job_counter[new_g] = n_batches_per_cycle
                 models[new_g] = [
                     Model.remote(
                         genotype=new_g, initialize=True, dt=dt_seconds, nt=nt, **kw
@@ -220,6 +227,7 @@ if __name__ == "__main__":
     save_dir.mkdir(exist_ok=True)
     main(
         n_samples=10_000,
-        batchsize=40,
+        n_cycles=100,
+        batchsize=50,
         save_dir=save_dir,
     )
