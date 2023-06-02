@@ -1,5 +1,6 @@
 from collections import Counter
 from concurrent.futures import as_completed
+import h5py
 from itertools import islice, chain, repeat
 import json
 from math import ceil
@@ -33,9 +34,15 @@ class Model(object):
         self.genotype = self.model.genotype
         self.init_columns = init_columns
         self.param_names = param_names
-        self.state_dir = Path(save_dir).joinpath(f"state_{self.genotype.strip('*')}")
 
+        # Directory to save results
+        self.state_dir = Path(save_dir).joinpath(f"state_{self.genotype.strip('*')}")
         self.state_dir.mkdir(exist_ok=True)
+
+        # Directory to save all the data for any exceptional runs
+        self.extras_dir = Path(save_dir).joinpath(f"extras")
+        self.extras_dir.mkdir(exist_ok=True)
+
         self.oscillation_thresh = oscillation_thresh
 
         if initialize:
@@ -45,7 +52,9 @@ class Model(object):
         print(f"Initializing SSA for {self.genotype}")
         self.model.initialize_ssa(*args, **kwargs)
 
-    def run_batch(self, model_idx: int, n: int, save: bool = True, oscillation_thresh=None):
+    def run_batch(
+        self, model_idx: int, n: int, save: bool = True, oscillation_thresh=None
+    ):
         if self.model.ssa is None:
             self.initialize_ssa()
 
@@ -57,9 +66,11 @@ class Model(object):
 
         if save:
             self.save_results(pop0s, param_sets, rewards)
+
+            # Save all the data if any of the runs showed oscillation
             thresh = oscillation_thresh or self.oscillation_thresh
             if (rewards > thresh).any():
-                self.save_oscillation(y_t, pop0s, param_sets, rewards, thresh)
+                self.save_extra(y_t, pop0s, param_sets, rewards, thresh)
 
         return model_idx, self.genotype, pop0s, param_sets, rewards
 
@@ -73,18 +84,31 @@ class Model(object):
         df["state"] = df["state"].astype("category")
 
         fname = self.state_dir.joinpath(f"{uuid4()}.{ext}").resolve().absolute()
-        if fname.exists():
-            raise FileExistsError(f"{fname} already exists")
-
         print(f"Writing to: {fname}")
         if ext == "csv":
             df.to_csv(fname, index=False)
         elif ext == "parquet":
             df.to_parquet(fname, index=False)
 
-    def save_oscillation(self, y_t, pop0s, param_sets, rewards, thresh, ext="parquet"):
-        raise NotImplementedError
-    
+    def save_extra(self, y_t, pop0s, param_sets, rewards, thresh):
+        save_idx = np.where(rewards > thresh)[0]
+        data = (
+            dict(state=self.genotype, reward=rewards[save_idx])
+            | dict(zip(self.init_columns, np.atleast_2d(pop0s[save_idx]).T))
+            | dict(zip(self.param_names, np.atleast_2d(param_sets[save_idx]).T))
+        )
+        df = pd.DataFrame(data)
+        df["state"] = df["state"].astype("category")
+
+        state_no_asterisk = self.genotype.strip("*")
+        fname = self.extras_dir.joinpath(f"state_{state_no_asterisk}_{uuid4()}.hdf5")
+        fname = fname.resolve().absolute()
+        print(f"Writing to: {fname}")
+        with h5py.File(fname, "w") as f:
+            f.create_dataset("y_t", data=y_t[save_idx])
+        df.to_hdf(fname, key="metadata", mode="a")
+
+
 def main(
     n_samples: int = 10000,
     n_cycles: int = 100,

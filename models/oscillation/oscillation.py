@@ -88,7 +88,7 @@ class TFNetworkModel:
         dt: Optional[float] = None,
         nt: Optional[int] = None,
         init_mean: float = 10.0,
-        **kwargs
+        **kwargs,
     ):
         dt = dt or self.dt
         nt = nt or self.nt
@@ -475,7 +475,7 @@ class OscillationTree(OscillationTreeBase):
     def model_table(self):
         return self._model_table
 
-    def get_reward(self, state: str, visit_num: int) -> float | int:
+    def get_reward(self, state: str) -> float | int:
         """Run the model and get a random reward"""
         model = self.model_table[state]
         y_t, pop0, params, reward = model.run_ssa_and_get_acf_extrema(
