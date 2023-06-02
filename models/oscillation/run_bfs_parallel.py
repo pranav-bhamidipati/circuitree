@@ -70,6 +70,7 @@ class Model(object):
             # Save all the data if any of the runs showed oscillation
             thresh = oscillation_thresh or self.oscillation_thresh
             if (rewards > thresh).any():
+                print(f"Found a run from {self.genotype} with reward {max(rewards)}!")
                 self.save_extra(y_t, pop0s, param_sets, rewards, thresh)
 
         return model_idx, self.genotype, pop0s, param_sets, rewards
@@ -101,9 +102,9 @@ class Model(object):
         df["state"] = df["state"].astype("category")
 
         state_no_asterisk = self.genotype.strip("*")
-        fname = self.extras_dir.joinpath(f"state_{state_no_asterisk}_{uuid4()}.hdf5")
+        fname = self.extras_dir.joinpath(f"state_{state_no_asterisk}_ID#{uuid4()}.hdf5")
         fname = fname.resolve().absolute()
-        print(f"Writing to: {fname}")
+        print(f"Writing extra data to: {fname}")
         with h5py.File(fname, "w") as f:
             f.create_dataset("y_t", data=y_t[save_idx])
         df.to_hdf(fname, key="metadata", mode="a")
