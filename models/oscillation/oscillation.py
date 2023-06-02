@@ -452,7 +452,9 @@ class OscillationTreeBase(SimpleNetworkTree):
         payout = self.graph.nodes[state]["reward"]
         visits = self.graph.nodes[state]["visits"]
         return visits > 0 and payout / visits > self.success_threshold
-
+    
+    def get_reward(sef, state: str):
+        pass
 
 class OscillationTree(OscillationTreeBase):
     """Searches the space of TF networks for oscillatory topologies.
