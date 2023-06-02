@@ -151,7 +151,7 @@ class TFNetworkModel:
         For convenience, this returns the genotype ("state") and visit number in addition
         to simulation results.
         """
-        pop0, params, peak_height = self.run_ssa_and_get_acf_extrema(
+        y_t, pop0, params, peak_height = self.run_ssa_and_get_acf_extrema(
             self.dt, self.nt, size=1, freqs=False, indices=False, **kwargs
         )
         return peak_height, pop0, params
@@ -162,10 +162,10 @@ class TFNetworkModel:
         For convenience, this returns the genotype ("state") and visit number in addition
         to simulation results.
         """
-        pop0s, param_sets, peak_heights = self.run_ssa_and_get_acf_extrema(
+        y_t, pop0s, param_sets, peak_heights = self.run_ssa_and_get_acf_extrema(
             self.dt, self.nt, size=batch_size, freqs=False, indices=False, **kwargs
         )
-        return pop0s, param_sets, peak_heights
+        return y_t, pop0s, param_sets, peak_heights
 
     # def run_batch(self, size, **kwargs):
     #     """Run the simulation with random parameters and default time-stepping."""
@@ -288,7 +288,7 @@ class TFNetworkModel:
         else:
             results = self.get_acf_extrema(t, y_t, freqs=freqs, indices=indices)
 
-        return pop0, params, results
+        return y_t, pop0, params, results
 
 
 def autocorrelate(data: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
@@ -478,7 +478,7 @@ class OscillationTree(OscillationTreeBase):
     def get_reward(self, state: str, visit_num: int) -> float | int:
         """Run the model and get a random reward"""
         model = self.model_table[state]
-        pop0, params, reward = model.run_ssa_and_get_acf_extrema(
+        y_t, pop0, params, reward = model.run_ssa_and_get_acf_extrema(
             tau_leap=self.tau_leap, freqs=False, indices=False
         )
         return reward

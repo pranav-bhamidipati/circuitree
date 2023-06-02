@@ -26,6 +26,7 @@ class Model(object):
         param_names=None,
         save_dir: Path = None,
         initialize: bool = False,
+        oscillation_thresh: float = 0.4,
         **kwargs,
     ):
         self.model = model or TFNetworkModel(**kwargs)
@@ -35,6 +36,7 @@ class Model(object):
         self.state_dir = Path(save_dir).joinpath(f"state_{self.genotype.strip('*')}")
 
         self.state_dir.mkdir(exist_ok=True)
+        self.oscillation_thresh = oscillation_thresh
 
         if initialize:
             self.initialize_ssa(**kwargs)
@@ -43,18 +45,21 @@ class Model(object):
         print(f"Initializing SSA for {self.genotype}")
         self.model.initialize_ssa(*args, **kwargs)
 
-    def run_batch(self, model_idx: int, n: int, save: bool = True):
+    def run_batch(self, model_idx: int, n: int, save: bool = True, oscillation_thresh=None):
         if self.model.ssa is None:
             self.initialize_ssa()
 
         print(f"Running batch")
-        pop0s, param_sets, extrema = self.model.run_batch_job(n)
+        y_t, pop0s, param_sets, extrema = self.model.run_batch_job(n)
         print(f"Finished batch")
 
         rewards = np.abs(extrema)
 
         if save:
             self.save_results(pop0s, param_sets, rewards)
+            thresh = oscillation_thresh or self.oscillation_thresh
+            if (rewards > thresh).any():
+                self.save_oscillation(y_t, pop0s, param_sets, rewards, thresh)
 
         return model_idx, self.genotype, pop0s, param_sets, rewards
 
@@ -77,7 +82,9 @@ class Model(object):
         elif ext == "parquet":
             df.to_parquet(fname, index=False)
 
-
+    def save_oscillation(self, y_t, pop0s, param_sets, rewards, thresh, ext="parquet"):
+        raise NotImplementedError
+    
 def main(
     n_samples: int = 10000,
     n_cycles: int = 100,
