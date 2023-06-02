@@ -105,9 +105,8 @@ class CircuiTree(ABC):
     def get_reward(self, state) -> float | int:
         raise NotImplementedError
 
-    @staticmethod
     @abstractmethod
-    def get_unique_state(genotype: str) -> str:
+    def get_unique_state(self, state: Any) -> Any:
         raise NotImplementedError
 
     def select(self, node, **kwargs):

@@ -170,7 +170,7 @@ class BinaryTree(CircuiTree):
             extend_from_graph=self_graph,
         )
 
-    def _do_action(self, state: str, action: str):
+    def do_action(self, state: str, action: str):
         if action == "left":
             new_state = state + "0"
         elif action == "right":
@@ -197,6 +197,10 @@ class BinaryTree(CircuiTree):
     def get_reward(self, state: str) -> int:
         reward = int(self.is_success(state))
         return reward
+
+    @staticmethod
+    def get_unique_state(self, state: str) -> str:
+        return state
 
 
 def search_sequential(

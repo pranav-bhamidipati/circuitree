@@ -35,7 +35,6 @@ class SimpleNetworkTree(CircuiTree):
     def __init__(
         self, components: Iterable[Iterable[str]], interactions: Iterable[str], **kwargs
     ):
-
         if len(set(c[0] for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
         if len(set(c[0] for c in interactions)) < len(interactions):
@@ -100,7 +99,8 @@ class SimpleNetworkTree(CircuiTree):
                 )
         return new_genotype
 
-    def is_terminal(self, genotype: str) -> bool:
+    @staticmethod
+    def is_terminal(genotype: str) -> bool:
         return genotype.startswith("*")
 
     @staticmethod
