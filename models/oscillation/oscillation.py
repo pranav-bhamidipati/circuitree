@@ -214,7 +214,7 @@ class TFNetworkModel:
 
     @staticmethod
     def largest_acf_extremum(y_t: np.ndarray[np.float64 | np.int64]):
-        filtered = binomial5_kernel(y_t)[..., 2:-2, :]
+        filtered = filter_ndarray_binomial5(y_t)[..., 2:-2, :]
         acorrs = autocorrelate_vectorized(filtered)
         return compute_largest_extremum(acorrs)
 
@@ -231,7 +231,7 @@ class TFNetworkModel:
         """
 
         # Filter out high-frequency (salt-and-pepper) noise
-        filtered = binomial5_kernel(pop_t)[..., 2:-2, :]
+        filtered = filter_ndarray_binomial5(pop_t)[..., 2:-2, :]
 
         # Compute autocorrelation
         acorrs = autocorrelate_vectorized(filtered)
@@ -335,6 +335,21 @@ def binomial7_kernel(a):
     return (
         a[-3] + 6 * a[-2] + 15 * a[-1] + 20 * a[0] + 15 * a[1] + 6 * a[2] + a[3]
     ) / 64
+
+
+@njit
+def filter_ndarray_binomial5(ndarr: np.ndarray) -> float:
+    """Apply a binomial filter to 1d signals arranged in an nd array, where the time axis
+    is the second to last axis (``axis = -2``).
+    """
+    ndarr_shape = ndarr.shape
+    leading_shape = ndarr_shape[:-2]
+    n = ndarr_shape[-1]
+    filtered = np.zeros_like(ndarr)
+    for leading_index in np.ndindex(leading_shape):
+        for i in range(n):
+            filtered[leading_index][:, i] = binomial5_kernel(ndarr[leading_index][:, i])
+    return filtered
 
 
 @stencil(cval=False)
