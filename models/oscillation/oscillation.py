@@ -214,12 +214,12 @@ class TFNetworkModel:
 
     @staticmethod
     def largest_acf_extremum(y_t: np.ndarray[np.float64 | np.int64]):
-        acorrs = autocorrelate_vectorized(y_t)
+        filtered = binomial5_kernel(y_t)[..., 2:-2, :]
+        acorrs = autocorrelate_vectorized(filtered)
         return compute_largest_extremum(acorrs)
 
     @staticmethod
     def get_acf_extrema(
-        self,
         t: np.ndarray,
         pop_t: np.ndarray,
         freqs: bool = True,
@@ -230,8 +230,11 @@ class TFNetworkModel:
         function, excluding the bounds.
         """
 
+        # Filter out high-frequency (salt-and-pepper) noise
+        filtered = binomial5_kernel(pop_t)[..., 2:-2, :]
+
         # Compute autocorrelation
-        acorrs = autocorrelate_vectorized(pop_t)
+        acorrs = autocorrelate_vectorized(filtered)
 
         # Compute the location and size of the largest interior extremum over
         # all species
@@ -291,15 +294,47 @@ class TFNetworkModel:
         return y_t, pop0, params, results
 
 
-def autocorrelate(data: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
-    norm = data - data.mean()
-    acorr = correlate(norm, norm, mode="same")[len(norm) // 2 :]
-    acorr = acorr / acorr.max()
+def autocorrelate_mean0(arr1d_norm: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    "Autocorrelation of an array with mean 0"
+    return correlate(arr1d_norm, arr1d_norm, mode="same")[len(arr1d_norm) // 2 :]
+
+
+def autocorrelate(data1d: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    data1d -= data1d.mean()
+    acorr = autocorrelate_mean0(data1d)
+    acorr /= acorr.max()
     return acorr
 
 
-def autocorrelate_vectorized(data: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
-    return np.apply_along_axis(autocorrelate, -2, data)
+def autocorrelate_vectorized(
+    data: np.ndarray[np.float_], axis=-2
+) -> np.ndarray[np.float_]:
+    """Compute autocorrelation of 1d signals arranged in an nd array, where `axis` is the
+    time axis."""
+    data -= data.mean(axis=axis, keepdims=True)
+    acorr = np.apply_along_axis(autocorrelate_mean0, axis, data)
+    acorr /= acorr.max(axis=axis, keepdims=True)
+    return acorr
+
+
+@stencil
+def binomial3_kernel(a):
+    """Basic 3-point binomial filter."""
+    return (a[-1] + a[0] + a[0] + a[1]) / 4
+
+
+@stencil
+def binomial5_kernel(a):
+    """Basic 5-point binomial filter."""
+    return (a[-2] + 4 * a[-1] + 6 * a[0] + 4 * a[1] + a[2]) / 16
+
+
+@stencil
+def binomial7_kernel(a):
+    """Basic 7-point binomial filter."""
+    return (
+        a[-3] + 6 * a[-2] + 15 * a[-1] + 20 * a[0] + 15 * a[1] + 6 * a[2] + a[3]
+    ) / 64
 
 
 @stencil(cval=False)
@@ -452,9 +487,10 @@ class OscillationTreeBase(SimpleNetworkTree):
         payout = self.graph.nodes[state]["reward"]
         visits = self.graph.nodes[state]["visits"]
         return visits > 0 and payout / visits > self.success_threshold
-    
+
     def get_reward(sef, state: str):
         pass
+
 
 class OscillationTree(OscillationTreeBase):
     """Searches the space of TF networks for oscillatory topologies.
