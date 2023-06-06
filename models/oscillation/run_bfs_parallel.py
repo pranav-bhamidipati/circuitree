@@ -99,7 +99,6 @@ class Model(object):
             | dict(zip(self.param_names, np.atleast_2d(param_sets[save_idx]).T))
         )
         df = pd.DataFrame(data)
-        df["state"] = df["state"].astype("category")
 
         state_no_asterisk = self.genotype.strip("*")
         fname = self.extras_dir.joinpath(f"state_{state_no_asterisk}_ID#{uuid4()}.hdf5")
@@ -107,7 +106,7 @@ class Model(object):
         print(f"Writing extra data to: {fname}")
         with h5py.File(fname, "w") as f:
             f.create_dataset("y_t", data=y_t[save_idx])
-        df.to_hdf(fname, key="metadata", mode="a")
+        df.to_hdf(fname, key="metadata", mode="a", format="table")
 
 
 def main(
