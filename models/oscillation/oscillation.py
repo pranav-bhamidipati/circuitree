@@ -300,10 +300,10 @@ def autocorrelate_mean0(arr1d_norm: np.ndarray[np.float_]) -> np.ndarray[np.floa
 
 
 def autocorrelate(data1d: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
-    data1d -= data1d.mean()
-    acorr = autocorrelate_mean0(data1d)
-    acorr /= acorr.max()
-    return acorr
+    arr = data1d - data1d.mean()
+    arr = autocorrelate_mean0(arr)
+    arr /= arr.max()
+    return arr
 
 
 def autocorrelate_vectorized(
@@ -311,10 +311,10 @@ def autocorrelate_vectorized(
 ) -> np.ndarray[np.float_]:
     """Compute autocorrelation of 1d signals arranged in an nd array, where `axis` is the
     time axis."""
-    data -= data.mean(axis=axis, keepdims=True)
-    acorr = np.apply_along_axis(autocorrelate_mean0, axis, data)
-    acorr /= acorr.max(axis=axis, keepdims=True)
-    return acorr
+    ndarr = data - data.mean(axis=axis, keepdims=True)
+    ndarr = np.apply_along_axis(autocorrelate_mean0, axis, ndarr)
+    ndarr /= ndarr.max(axis=axis, keepdims=True)
+    return ndarr
 
 
 @stencil
@@ -348,7 +348,9 @@ def filter_ndarray_binomial5(ndarr: np.ndarray) -> float:
     filtered = np.zeros_like(ndarr)
     for leading_index in np.ndindex(leading_shape):
         for i in range(n):
-            filtered[leading_index][:, i] = binomial5_kernel(ndarr[leading_index][:, i])
+            arr1d = ndarr[leading_index][:, i]
+            filt = binomial5_kernel(arr1d)
+            filtered[leading_index][:, i] = filt
     return filtered
 
 
