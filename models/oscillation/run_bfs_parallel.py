@@ -59,10 +59,8 @@ class Model(object):
             self.initialize_ssa()
 
         print(f"Running batch")
-        y_t, pop0s, param_sets, extrema = self.model.run_batch_job(n)
+        y_t, pop0s, param_sets, rewards = self.model.run_batch_job(n, abs=True)
         print(f"Finished batch")
-
-        rewards = np.abs(extrema)
 
         if save:
             self.save_results(pop0s, param_sets, rewards)

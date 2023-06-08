@@ -145,18 +145,18 @@ class TFNetworkModel:
         else:
             return self.ssa.run_batch(n_samples)
 
-    def run_job(self, **kwargs):
+    def run_job(self, abs: bool = False, **kwargs):
         """
         Run the simulation with random parameters and default time-stepping.
         For convenience, this returns the genotype ("state") and visit number in addition
         to simulation results.
         """
         y_t, pop0, params, reward = self.run_ssa_and_get_acf_minima(
-            self.dt, self.nt, size=1, freqs=False, indices=False, abs=True, **kwargs
+            self.dt, self.nt, size=1, freqs=False, indices=False, abs=abs, **kwargs
         )
         return reward, pop0, params
 
-    def run_batch_job(self, batch_size: int, **kwargs):
+    def run_batch_job(self, batch_size: int, abs: bool = False, **kwargs):
         """
         Run the simulation with random parameters and default time-stepping.
         For convenience, this returns the genotype ("state") and visit number in addition
@@ -168,7 +168,7 @@ class TFNetworkModel:
             size=batch_size,
             freqs=False,
             indices=False,
-            abs=True,
+            abs=abs,
             **kwargs,
         )
         return y_t, pop0s, param_sets, rewards
