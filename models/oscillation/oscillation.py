@@ -151,10 +151,10 @@ class TFNetworkModel:
         For convenience, this returns the genotype ("state") and visit number in addition
         to simulation results.
         """
-        y_t, pop0, params, peak_height = self.run_ssa_and_get_acf_extrema(
-            self.dt, self.nt, size=1, freqs=False, indices=False, **kwargs
+        y_t, pop0, params, reward = self.run_ssa_and_get_acf_minima(
+            self.dt, self.nt, size=1, freqs=False, indices=False, abs=True, **kwargs
         )
-        return peak_height, pop0, params
+        return reward, pop0, params
 
     def run_batch_job(self, batch_size: int, **kwargs):
         """
@@ -162,68 +162,34 @@ class TFNetworkModel:
         For convenience, this returns the genotype ("state") and visit number in addition
         to simulation results.
         """
-        y_t, pop0s, param_sets, peak_heights = self.run_ssa_and_get_acf_extrema(
-            self.dt, self.nt, size=batch_size, freqs=False, indices=False, **kwargs
+        y_t, pop0s, param_sets, rewards = self.run_ssa_and_get_acf_minima(
+            self.dt,
+            self.nt,
+            size=batch_size,
+            freqs=False,
+            indices=False,
+            abs=True,
+            **kwargs,
         )
-        return y_t, pop0s, param_sets, peak_heights
-
-    # def run_batch(self, size, **kwargs):
-    #     """Run the simulation with random parameters and default time-stepping."""
-    #     return self.run_ssa_and_get_secondary_autocorrelation_peaks(
-    #         self.dt, self.nt, size=size, freqs=False, indices=False, **kwargs
-    #     )
-
-    # def get_secondary_autocorrelation_peaks(
-    #     self,
-    #     t: np.ndarray,
-    #     pop: np.ndarray,
-    #     freqs: bool = True,
-    #     indices: bool = False,
-    #     **kwargs,
-    # ):
-    #     """
-    #     Get the location and height of the secondary autocorrelation peaks.
-    #     """
-
-    #     # Compute autocorrelation
-    #     acorr = self.get_autocorrelation(pop)
-    #     acorr = acorr.reshape(-1, *acorr.shape[-2:])
-    #     n_traj, nt, m = acorr.shape
-
-    #     # Compute the location and height of the second peak
-    #     second_peaks = np.apply_along_axis(find_secondary_peak, -2, acorr)
-    #     has_peak = np.any(second_peaks[:, 0, :] > 0, axis=-1)
-    #     where_peak = np.where(has_peak, np.argmax(second_peaks[:, 1, :], axis=-1), -1)
-
-    #     second_peak_loc = np.where(
-    #         has_peak, second_peaks[np.arange(n_traj), 0, where_peak], -1
-    #     ).astype(int)
-    #     second_peak_val = np.where(
-    #         has_peak, second_peaks[np.arange(n_traj), 1, where_peak], 0.0
-    #     )
-    #     second_peak_freq = np.where(has_peak, 1 / t[second_peak_loc], 0.0)
-
-    #     if freqs and indices:
-    #         return second_peak_loc, second_peak_freq, second_peak_val
-    #     elif freqs:
-    #         return second_peak_freq, second_peak_val
-    #     elif indices:
-    #         return second_peak_loc, second_peak_val
-    #     else:
-    #         return second_peak_val
+        return y_t, pop0s, param_sets, rewards
 
     @staticmethod
-    def largest_acf_extremum(y_t: np.ndarray[np.float64 | np.int64]):
-        filtered = filter_ndarray_binomial7(y_t)[..., 3:-3, :]
+    def get_acf_minima(y_t: np.ndarray[np.float64 | np.int64], abs: bool = False):
+        filtered = filter_ndarray_binomial9(y_t.astype(np.float64))[..., 4:-4, :]
         acorrs = autocorrelate_vectorized(filtered)
-        return compute_largest_extremum(acorrs)
+        where_minima, minima = compute_lowest_minima(acorrs)
+        if abs:
+            return np.abs(minima)
+        else:
+            return minima
 
     @staticmethod
-    def get_acf_extrema(
+    def get_acf_minima_and_results(
         t: np.ndarray,
         pop_t: np.ndarray,
         freqs: bool = True,
         indices: bool = False,
+        abs: bool = False,
     ):
         """
         Get the location and height of the largest extremum of the autocorrelation
@@ -231,35 +197,39 @@ class TFNetworkModel:
         """
 
         # Filter out high-frequency (salt-and-pepper) noise
-        filtered = filter_ndarray_binomial7(pop_t)[..., 3:-3, :]
+        filtered = filter_ndarray_binomial9(pop_t.astype(np.float64))[..., 4:-4, :]
 
         # Compute autocorrelation
         acorrs = autocorrelate_vectorized(filtered)
 
         # Compute the location and size of the largest interior extremum over
         # all species
-        where_extrema, extrema = compute_largest_extremum_and_loc(acorrs)
-        if freqs:
-            extrema_freqs = np.where(where_extrema > 0, 1 / t[where_extrema], 0.0)
+        where_minima, minima = compute_lowest_minima(acorrs)
+        if abs:
+            minima = np.abs(minima)
 
-        squeeze = where_extrema.size == 1
+        tdiff = t - t[0]
+        if freqs:
+            minima_freqs = np.where(where_minima > 0, 1 / tdiff[where_minima], 0.0)
+
+        squeeze = where_minima.size == 1
         if squeeze:
-            where_extrema = where_extrema.flat[0]
-            extrema = extrema.flat[0]
+            where_minima = where_minima.flat[0]
+            minima = minima.flat[0]
             if freqs:
-                extrema_freqs = extrema_freqs.flat[0]
+                minima_freqs = minima_freqs.flat[0]
 
         if freqs:
             if indices:
-                return where_extrema, extrema_freqs, extrema
+                return where_minima, minima_freqs, minima
             else:
-                return extrema_freqs, extrema
+                return minima_freqs, minima
         elif indices:
-            return where_extrema, extrema
+            return where_minima, minima
         else:
-            return extrema
+            return minima
 
-    def run_ssa_and_get_acf_extrema(
+    def run_ssa_and_get_acf_minima(
         self,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
@@ -268,11 +238,12 @@ class TFNetworkModel:
         indices: bool = False,
         init_mean: float = 10.0,
         tau_leap: bool = False,
+        abs: bool = False,
         **kwargs,
     ):
         """
         Run the stochastic simulation algorithm for the system and get the
-        secondary autocorrelation peaks.
+        autocorrelation-based reward.
         """
 
         if (dt is not None) and (nt is not None):
@@ -287,9 +258,11 @@ class TFNetworkModel:
         y_t = y_t[..., self.m : self.m * 2]
 
         if not (freqs or indices):
-            results = self.largest_acf_extremum(y_t)
+            results = self.get_acf_minima(y_t, abs=abs)
         else:
-            results = self.get_acf_extrema(t, y_t, freqs=freqs, indices=indices)
+            results = self.get_acf_minima_and_results(
+                t, y_t, freqs=freqs, indices=indices, abs=abs
+            )
 
         return y_t, pop0, params, results
 
@@ -337,6 +310,22 @@ def binomial7_kernel(a):
     ) / 64
 
 
+@stencil
+def binomial9_kernel(a):
+    """9-point binomial filter."""
+    return (
+        a[-4]
+        + 8 * a[-3]
+        + 28 * a[-2]
+        + 56 * a[-1]
+        + 70 * a[0]
+        + 56 * a[1]
+        + 28 * a[2]
+        + 8 * a[3]
+        + a[4]
+    ) / 256
+
+
 @njit
 def filter_ndarray_binomial5(ndarr: np.ndarray) -> float:
     """Apply a binomial filter to 1d signals arranged in an nd array, where the time axis
@@ -349,9 +338,10 @@ def filter_ndarray_binomial5(ndarr: np.ndarray) -> float:
     for leading_index in np.ndindex(leading_shape):
         for i in range(n):
             arr1d = ndarr[leading_index][:, i]
-            filt = binomial5_kernel(arr1d)
-            filtered[leading_index][:, i] = filt
+            filt1d = binomial5_kernel(arr1d)
+            filtered[leading_index][:, i] = filt1d
     return filtered
+
 
 @njit
 def filter_ndarray_binomial7(ndarr: np.ndarray) -> float:
@@ -365,8 +355,25 @@ def filter_ndarray_binomial7(ndarr: np.ndarray) -> float:
     for leading_index in np.ndindex(leading_shape):
         for i in range(n):
             arr1d = ndarr[leading_index][:, i]
-            filt = binomial7_kernel(arr1d)
-            filtered[leading_index][:, i] = filt
+            filt1d = binomial7_kernel(arr1d)
+            filtered[leading_index][:, i] = filt1d
+    return filtered
+
+
+@njit
+def filter_ndarray_binomial9(ndarr: np.ndarray) -> float:
+    """Apply a binomial filter to 1d signals arranged in an nd array, where the time axis
+    is the second to last axis (``axis = -2``).
+    """
+    ndarr_shape = ndarr.shape
+    leading_shape = ndarr_shape[:-2]
+    n = ndarr_shape[-1]
+    filtered = np.zeros_like(ndarr)
+    for leading_index in np.ndindex(leading_shape):
+        for i in range(n):
+            arr1d = ndarr[leading_index][:, i]
+            filt1d = binomial9_kernel(arr1d)
+            filtered[leading_index][:, i] = filt1d
     return filtered
 
 
@@ -443,6 +450,55 @@ def compute_largest_extremum_and_loc(ndarr: np.ndarray) -> float:
         where_largest_extrema[leading_index] = argmaxval
         largest_extrema[leading_index] = maxval
     return where_largest_extrema, largest_extrema
+
+
+@stencil(cval=False)
+def minimum_kernel(a):
+    """
+    Returns a 1D mask that is True at local minima, excluding the bounds.
+    Computes when the finite difference changes sign from - to + (or is zero).
+    """
+    return (a[0] - a[-1] <= 0) and (a[1] - a[0] >= 0)
+
+
+@njit
+def compute_lowest_minimum(seq: np.ndarray[np.float_]) -> tuple[int, float]:
+    """
+    Find the minimum in a sequence of values with the greatest absolute
+    value, excluding the bounds.
+    """
+    minimum_mask = minimum_kernel(seq)
+    if not minimum_mask.any():
+        return -1, 0.0
+    else:
+        minima = np.where(minimum_mask)[0]
+        where_lowest_minimum = minima[np.argmin(seq[minima])]
+        return where_lowest_minimum, seq[where_lowest_minimum]
+
+
+@njit
+def compute_lowest_minima(ndarr: np.ndarray) -> float:
+    """
+    Get the lowest interior minimum of a batch of n 1d arrays, each of length m.
+    Vectorizes over arbitrary leading axes. For an input of shape (k, l, m, n),
+    k x l x n minima are calculated, and the min-of-minima is taken over the last axis
+    to return an array of shape (k, l).
+    Also returns the index of the minimum if it exists, otherwise -1.
+    """
+    nd_shape = ndarr.shape[:-2]
+    where_largest_minima = np.zeros(nd_shape, dtype=np.int64)
+    largest_minima = np.zeros(nd_shape, dtype=np.float64)
+    for leading_index in np.ndindex(nd_shape):
+        argmin = -1
+        minval = 0.0
+        for a in ndarr[leading_index].T:
+            where_minimum, minimum = compute_lowest_minimum(a)
+            if minimum < minval:
+                minval = minimum
+                argmin = where_minimum
+        where_largest_minima[leading_index] = argmin
+        largest_minima[leading_index] = minval
+    return where_largest_minima, largest_minima
 
 
 class OscillationTreeBase(SimpleNetworkTree):
@@ -549,7 +605,7 @@ class OscillationTree(OscillationTreeBase):
     def get_reward(self, state: str) -> float | int:
         """Run the model and get a random reward"""
         model = self.model_table[state]
-        y_t, pop0, params, reward = model.run_ssa_and_get_acf_extrema(
+        y_t, pop0, params, reward = model.run_ssa_and_get_acf_minima(
             tau_leap=self.tau_leap, freqs=False, indices=False
         )
         return reward
