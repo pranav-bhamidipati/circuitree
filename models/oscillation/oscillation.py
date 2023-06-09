@@ -1,6 +1,6 @@
 from functools import cached_property, partial
 from itertools import permutations
-from typing import Callable, Optional, Iterable
+from typing import Any, Callable, Optional, Iterable
 from numba import stencil, njit
 import numpy as np
 from scipy.signal import correlate
@@ -136,7 +136,6 @@ class TFNetworkModel:
             pop0, params, y_t = self.ssa.run_random_sample_tau_leap()
         else:
             pop0, params, y_t = self.ssa.run_random_sample()
-        pop0 = pop0[self.m : self.m * 2]
         return pop0, params, y_t
 
     def run_batch_random(self, n_samples, tau_leap=False):
@@ -254,6 +253,7 @@ class TFNetworkModel:
             pop0, params, y_t = self.run_batch_random(size, tau_leap=tau_leap)
         else:
             pop0, params, y_t = self.run_ssa_random_params(tau_leap=tau_leap)
+
         pop0 = pop0[..., self.m : self.m * 2]
         y_t = y_t[..., self.m : self.m * 2]
 
@@ -501,7 +501,7 @@ def compute_lowest_minima(ndarr: np.ndarray) -> float:
     return where_largest_minima, largest_minima
 
 
-class OscillationTreeBase(SimpleNetworkTree):
+class OscillationTree(SimpleNetworkTree):
     def __init__(
         self,
         time_points: Optional[np.ndarray[np.float64]] = None,
@@ -511,6 +511,8 @@ class OscillationTreeBase(SimpleNetworkTree):
         dt: Optional[float] = None,
         nt: Optional[int] = None,
         tau_leap: bool = False,
+        batch_size: int = 1,
+        results_table: Optional[Any] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -523,6 +525,16 @@ class OscillationTreeBase(SimpleNetworkTree):
         self.nt = nt
         self.init_mean = init_mean
         self.tau_leap = tau_leap
+        self.batch_size = batch_size
+
+        if results_table is not None:
+            self._results_table = results_table
+        else:
+            self._results_table = DefaultFactoryDict(list)
+
+    @property
+    def results_table(self):
+        return self._results_table
 
     @cached_property
     def _recolor(self):
@@ -577,35 +589,26 @@ class OscillationTreeBase(SimpleNetworkTree):
         visits = self.graph.nodes[state]["visits"]
         return visits > 0 and payout / visits > self.success_threshold
 
-    def get_reward(sef, state: str):
-        pass
-
-
-class OscillationTree(OscillationTreeBase):
-    """Searches the space of TF networks for oscillatory topologies.
-    Searches independently, not in parallel.
-    """
-
-    def __init__(
+    def get_reward(
         self,
-        *args,
-        model_table: DefaultFactoryDict = None,
-        model_factory: Callable = None,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self._model_table = model_table or DefaultFactoryDict(
-            default_factory=model_factory
+        state: str,
+        batch_size: Optional[int] = None,
+        dt: Optional[float] = None,
+        nt: Optional[int] = None,
+        tau_leap: Optional[bool] = None,
+        record: bool = False,
+    ) -> float:
+        dt = dt if dt is not None else self.dt
+        nt = nt if nt is not None else self.nt
+        tau_leap = tau_leap if tau_leap is not None else self.tau_leap
+        batch_size = batch_size if batch_size is not None else self.batch_size
+
+        model = TFNetworkModel(state, initialize=True, dt=dt, nt=nt)
+        y_t, pop0s, param_sets, rewards = model.run_batch_job(
+            batch_size, abs=True, tau_leap=tau_leap
         )
 
-    @property
-    def model_table(self):
-        return self._model_table
+        if record:
+            self.results_table[state].append((pop0s, param_sets, rewards))
 
-    def get_reward(self, state: str) -> float | int:
-        """Run the model and get a random reward"""
-        model = self.model_table[state]
-        y_t, pop0, params, reward = model.run_ssa_and_get_acf_minima(
-            tau_leap=self.tau_leap, freqs=False, indices=False
-        )
-        return reward
+        return np.mean(rewards)

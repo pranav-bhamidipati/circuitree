@@ -13,7 +13,7 @@ from uuid import uuid4
 
 
 # from models.oscillation.oscillation import TFNetworkModel, OscillationTreeBase
-from oscillation import TFNetworkModel, OscillationTreeBase
+from oscillation import TFNetworkModel, OscillationTree
 
 import ray
 
@@ -133,7 +133,7 @@ def main(
     components = ["A", "B", "C"]
     interactions = ["activates", "inhibits"]
     root = "ABC::"
-    tree = OscillationTreeBase(
+    tree = OscillationTree(
         components=components,
         interactions=interactions,
         root=root,

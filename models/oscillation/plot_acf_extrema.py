@@ -6,14 +6,13 @@ from pathlib import Path
 
 from oscillation import (
     autocorrelate,
-    compute_largest_extremum_and_loc,
     compute_lowest_minima,
     binomial9_kernel,
-    OscillationTreeBase,
+    OscillationTree,
 )
 
 
-otree = OscillationTreeBase(
+otree = OscillationTree(
     components=["A", "B", "C"], interactions=["activates", "inhibits"], root="ABC::"
 )
 
@@ -44,6 +43,7 @@ def plot_copy_number(
     fig=None,
     suffix="",
     plot_motifs=(),
+    suptitle=None,
     **kwargs,
 ):
     nplot, n_species, nt = data.shape
@@ -72,9 +72,8 @@ def plot_copy_number(
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-    plt.suptitle(
-        r"3-TF circuits with the most extreme ACF - Copy number vs $t$ (mins)", size=14
-    )
+    if suptitle is not None:
+        plt.suptitle(suptitle, size=14)
     plt.tight_layout()
 
     if save:
@@ -85,7 +84,7 @@ def plot_copy_number(
         plt.savefig(fname, dpi=dpi)
 
 
-def plot_acfx(
+def plot_acf(
     t,
     data,
     states,
@@ -103,6 +102,7 @@ def plot_acfx(
     plot_motifs=(),
     locs_compare=None,
     extrema_compare=None,
+    suptitle=None,
     **kwargs,
 ):
     nplot, n_species, nt = data.shape
@@ -165,10 +165,8 @@ def plot_acfx(
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-    plt.suptitle(
-        r"3-TF circuits with the most extreme ACF - Autocorrelation vs $t-t'$ (mins)",
-        size=14,
-    )
+    if suptitle is not None:
+        plt.suptitle(suptitle, size=14)
     plt.tight_layout()
 
     if save:
@@ -192,7 +190,7 @@ def main(
     with h5py.File(data_fpath, "r") as f:
         t = f["t"][...]
         data = f["y_t"][:nplot]
-        states = f["top_states"][:nplot].astype(str).tolist()
+        states = f["states"][:nplot].astype(str).tolist()
     data_T = np.swapaxes(data, -2, -1)
 
     plot_motifs = [
@@ -208,17 +206,22 @@ def main(
     # Before autocorrelation, we filter the data with a 9-point binomial filter
     filtered9 = np.apply_along_axis(binomial9_kernel, -2, data_T)[..., 4:-4, :]
     acorrs_f9 = np.apply_along_axis(autocorrelate, -2, filtered9)
-    where_extrema_f9, extrema_f9 = compute_largest_extremum_and_loc(acorrs_f9)
-    t_f9 = t[4:-4]
     data_f9 = np.swapaxes(filtered9, -2, -1)
-    locs_f9 = t_f9[where_extrema_f9]
+    t_f9 = t[4:-4]
+
+    # where_extrema_f9, extrema_f9 = compute_largest_extremum_and_loc(acorrs_f9)
+    # locs_f9 = t_f9[where_extrema_f9]
+
+    # Compare to the lowest minimum instead of largest extremum
+    where_minima_f9, minima_f9 = compute_lowest_minima(acorrs_f9)
+    locs_f9 = t_f9[where_minima_f9]
     plot_data = dict(
         t=t_f9,
         data=data_f9,
         states=states,
         acorrs=acorrs_f9,
         locs=locs_f9,
-        extrema=extrema_f9,
+        extrema=minima_f9,
         prows=prows,
         pcols=pcols,
         plot_dir=plot_dir,
@@ -226,81 +229,27 @@ def main(
         dpi=dpi,
         fmt=fmt,
         plot_motifs=plot_motifs,
+        suffix="_230608",
     )
-    plot_copy_number(**plot_data)
-    # plot_acfx(**plot_data)
+
+    plot_copy_number(
+        suptitle=r"Runs with the highest reward - Copy number vs $t$ (mins)",
+        # suptitle=r"3-TF circuits with the most oscillating runs - Copy number vs $t$ (mins)",
+        **plot_data,
+    )
+    plot_acf(
+        suptitle=r"Runs with the highest reward - Autocorrelation vs $t-t'$ (mins)",
+        # suptitle=r"3-TF circuits with the most oscillating runs - Autocorrelation vs $t-t'$ (mins)",
+        **plot_data,
+    )
 
     ...
-
-    # Compare to the lowest minimum instead of largest extremum
-    where_minima_f9, minima_f9 = compute_lowest_minima(acorrs_f9)
-    locs_minima_f9 = t_f9[where_minima_f9]
-    plot_data_minima = plot_data | dict(
-        locs_compare=locs_minima_f9,
-        extrema_compare=minima_f9,
-        suffix="_with_minima",
-    )
-    plot_acfx(**plot_data_minima)
-
-    ...
-
-    # # Filter signal with a larger filter (9-point)
-    # filtered9 = np.apply_along_axis(binomial9_kernel, -2, data_T)[..., 4:-4, :]
-    # acorrs_f9 = np.apply_along_axis(autocorrelate, -2, filtered9)
-    # where_extrema_f9, extrema_f9 = compute_largest_extremum_and_loc(acorrs_f9)
-    # t_f9 = t[4:-4]
-    # data_f9 = np.swapaxes(filtered9, -2, -1)
-    # locs_f9 = t_f9[where_extrema_f9]
-
-    # # Plot filtered data
-    # plot_data_f9 = plot_data | dict(
-    #     t=t_f9,
-    #     data=data_f9,
-    #     acorrs=acorrs_f9,
-    #     locs=locs_f9,
-    #     extrema=extrema_f9,
-    # )
-    # plot_conc(**plot_data_f9, suffix="_filtered_binomial9")
-    # plot_acfx(**plot_data_f9, suffix="_filtered_binomial9")
-
-    # # Try a 5-point filter
-    # filtered5 = np.apply_along_axis(binomial5_kernel, -2, data_T)[..., 2:-2, :]
-    # acorrs_f5 = np.apply_along_axis(autocorrelate, -2, filtered5)
-    # where_extrema_f5, extrema_f5 = compute_largest_extremum_and_loc(acorrs_f5)
-    # t_f5 = t[2:-2]
-    # data_f5 = np.swapaxes(filtered5, -2, -1)
-    # locs_f5 = t_f5[where_extrema_f5]
-    # plot_data_f5 = dict(
-    #     t=t_f5,
-    #     data=data_f5,
-    #     acorrs=acorrs_f5,
-    #     locs=locs_f5,
-    #     extrema=extrema_f5,
-    # )
-    # plot_acfx(**plot_data_f5, suffix="_filtered_binomial5")
-    # plot_conc(**plot_data_f5, suffix="_filtered_binomial5")
-
-    # # Try a 7-point filter
-    # filtered7 = np.apply_along_axis(binomial7_kernel, -2, data_T)[..., 3:-3, :]
-    # acorrs_f7 = np.apply_along_axis(autocorrelate, -2, filtered7)
-    # where_extrema_f7, extrema_f7 = compute_largest_extremum_and_loc(acorrs_f7)
-    # t_f7 = t[3:-3]
-    # data_f7 = np.swapaxes(filtered7, -2, -1)
-    # locs_f7 = t_f7[where_extrema_f7]
-    # plot_data_f7 = dict(
-    #     t=t_f7,
-    #     data=data_f7,
-    #     acorrs=acorrs_f7,
-    #     locs=locs_f7,
-    #     extrema=extrema_f7,
-    # )
-    # plot_acfx(**plot_data_f7, suffix="_filtered_binomial7")
-    # plot_conc(**plot_data_f7, suffix="_filtered_binomial7")
 
 
 if __name__ == "__main__":
     data_fpath = Path(
-        "~/git/circuitree/data/oscillation/bfs/top_oscillating_states.hdf5"
+        "~/git/circuitree/data/oscillation/bfs/top_oscillating_runs.hdf5"
+        # "~/git/circuitree/data/oscillation/bfs/top_oscillating_states.hdf5"
     ).expanduser()
     plot_dir = Path("~/git/circuitree/figures/oscillation").expanduser()
     main(
