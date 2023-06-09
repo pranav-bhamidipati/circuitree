@@ -198,7 +198,7 @@ class CircuiTree(ABC):
         exploration_constant: Optional[float] = None,
         accumulate: bool = True,
         accumulate_post: bool = False,
-        progress_bar: bool = True,
+        progress_bar: bool = False,
         **kwargs,
     ):
         if accumulate and accumulate_post:
@@ -219,6 +219,8 @@ class CircuiTree(ABC):
 
         metrics = [metric_func(self.graph, [], root, None, **kwargs)]
         if progress_bar:
+            from tqdm import trange
+
             _range = trange
         else:
             _range = range
@@ -358,7 +360,7 @@ class CircuiTree(ABC):
         root: Optional[Any] = None,
         metric_func: Optional[Callable] = None,
         shuffle: bool = False,
-        progress: bool = True,
+        progress: bool = False,
         **kwargs,
     ):
         if root is None:
@@ -380,6 +382,8 @@ class CircuiTree(ABC):
         n_steps = min(n_repeats * len(leaves), max_steps)
         iterator = range(n_steps)
         if progress:
+            from tqdm import tqdm
+
             iterator = tqdm(iterator)
         for i in iterator:
             n = next(bfs)

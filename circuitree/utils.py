@@ -1,5 +1,5 @@
 from math import ceil
-from numba import vectorize
+from numpy import vectorize
 
 __all__ = [
     "ceiling",

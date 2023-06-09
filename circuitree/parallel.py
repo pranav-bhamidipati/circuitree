@@ -179,16 +179,11 @@ class TableBuffer(TranspositionTable):
 
 
 class DefaultFactoryDict(dict):
-    """A dictionary for storing the simulation object to use for each circuit topology.
-    Similar to a defaultdict, but the default value is a function of the key.
-
-    This is useful for cases when creating a model is expensive (e.g. JIT-compiled
-    models) and we want to reuse the same model object for each visit.
-    """
+    """Similar to a defaultdict, but the default value is a function of the key."""
 
     def __init__(self, *args, default_factory=None, **kwargs):
         if default_factory is None:
-            raise ValueError("Must provide a model_factory")
+            raise ValueError("Must provide a default_factory")
         super().__init__(*args, **kwargs)
         self._default_factory = default_factory
 
