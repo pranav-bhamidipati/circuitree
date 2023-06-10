@@ -188,6 +188,24 @@ def _init_logger(task_id, log_dir: Path):
     return logger, logfile
 
 
+def prompt_before_wiping_logs(log_dir):
+    while True:
+        decision = input(f"Delete all files in log directory?\n\t{log_dir}\n[Y/n]: ")
+        if decision.lower() in ("y", "yes"):
+            import shutil
+
+            shutil.rmtree(log_dir)
+            log_dir.mkdir()
+            break
+        elif decision.lower() in ("n", "no"):
+            import sys
+
+            print("Exiting...")
+            sys.exit(0)
+        else:
+            print(f"Invalid input: {decision}")
+
+
 def main(
     log_dir: Path,
     save_dir: Path,
@@ -305,9 +323,13 @@ def main(
 
 if __name__ == "__main__":
     save_dir = Path("data/oscillation/bfs")
-    log_dir = Path("logs/oscillation/bfs")
     save_dir.mkdir(exist_ok=True)
+
+    log_dir = Path("logs/oscillation/bfs")
     log_dir.mkdir(exist_ok=True)
+    if any(log_dir.iterdir()):
+        prompt_before_wiping_logs(log_dir)
+
     main(
         save_dir=save_dir,
         log_dir=log_dir,
