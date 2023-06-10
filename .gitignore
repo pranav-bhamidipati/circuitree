@@ -1,5 +1,6 @@
 # Large/unnecessary files (can be symlink)
 data
+logs
 scratch
 figures
 sacred
