@@ -3,7 +3,6 @@ from itertools import cycle, chain, repeat
 from typing import Callable, Literal, Optional, Iterable, Any
 import numpy as np
 import networkx as nx
-from tqdm import trange, tqdm
 
 from .modularity import tree_modularity, tree_modularity_estimate
 
