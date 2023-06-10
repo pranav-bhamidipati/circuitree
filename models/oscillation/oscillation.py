@@ -49,6 +49,7 @@ class TFNetworkModel:
         self,
         genotype: str,
         initialize: bool = False,
+        seed: Optional[int] = None,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
         **kwargs,
@@ -78,18 +79,23 @@ class TFNetworkModel:
         self.t: Optional[Iterable[float]] = None
 
         self.ssa: GillespieSSA | None = None
+        self.seed = seed
         self.dt = dt
         self.nt = nt
         if initialize:
-            self.initialize_ssa(dt, nt)
+            if any(arg is None for arg in (seed, dt, nt)):
+                raise ValueError("seed, dt and nt must be specified if initialize=True")
+            self.initialize_ssa(seed, dt, nt)
 
     def initialize_ssa(
         self,
+        seed: int,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
         init_mean: float = 10.0,
         **kwargs,
     ):
+        seed = seed or self.seed
         dt = dt or self.dt
         nt = nt or self.nt
         t = dt * np.arange(nt)
@@ -99,6 +105,7 @@ class TFNetworkModel:
 
         Am, Rm, U = make_matrices_for_ssa(self.m, self.activations, self.inhibitions)
         self.ssa = GillespieSSA(
+            seed,
             self.m,
             Am,
             Rm,
@@ -232,6 +239,7 @@ class TFNetworkModel:
         self,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
+        seed: Optional[int] = None,
         size: int = 1,
         freqs: bool = False,
         indices: bool = False,
@@ -245,8 +253,8 @@ class TFNetworkModel:
         autocorrelation-based reward.
         """
 
-        if (dt is not None) and (nt is not None):
-            self.initialize_ssa(dt, nt, init_mean)
+        if all(arg is not None for arg in (seed, dt, nt)):
+            self.initialize_ssa(seed, dt, nt, init_mean)
             t = self.t
 
         if size > 1:
@@ -530,7 +538,7 @@ class OscillationTree(SimpleNetworkTree):
         if results_table is not None:
             self._results_table = results_table
         else:
-            self._results_table = DefaultFactoryDict(list)
+            self._results_table = DefaultFactoryDict(default_factory=list)
 
     @property
     def results_table(self):

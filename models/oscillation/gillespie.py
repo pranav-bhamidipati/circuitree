@@ -154,15 +154,14 @@ def make_matrices_for_ssa(n_components, activations, inhibitions):
 
 
 @njit
-def _sample_discrete(probs, probs_sum):
-    q = np.random.rand() * probs_sum
-
+def _sample_discrete(rg, probs, probs_sum):
+    q = rg.uniform() * probs_sum
     i = 0
     p_sum = 0.0
     while p_sum < q:
         p_sum += probs[i]
         i += 1
-    return i - 1
+    return rg, i - 1
 
 
 @njit
@@ -171,12 +170,12 @@ def _sum(ar):
 
 
 @njit
-def _draw_time(props_sum):
-    return np.random.exponential(1 / props_sum)
+def _draw_time(rg, props_sum):
+    return rg, rg.exponential(1 / props_sum)
 
 
 @njit
-def _sample_propensities(propensities):
+def _sample_propensities(rg, propensities):
     """
     Draws a reaction and the time it took to do that reaction.
     """
@@ -185,15 +184,15 @@ def _sample_propensities(propensities):
 
     # Bail if the sum of propensities is zero
     if props_sum == 0.0:
-        return -1, -1.0
+        rxn = -1
+        time = -1.0
 
-    # Compute time
-    time = _draw_time(props_sum)
+    # Compute time and draw reaction from propensities
+    else:
+        rg, time = _draw_time(rg, props_sum)
+        rg, rxn = _sample_discrete(rg, propensities, props_sum)
 
-    # Draw reaction given propensities
-    rxn = _sample_discrete(propensities, props_sum)
-
-    return rxn, time
+    return rg, rxn, time
 
 
 @njit
@@ -235,17 +234,17 @@ def package_params_for_ssa(params) -> tuple:
 
 
 @njit
-def draw_random_initial(m, a, r, poisson_mean):
+def draw_random_initial(rg, m, a, r, poisson_mean):
     m2 = 2 * m
     n_species = m2 + a + r
     pop0 = np.zeros(n_species).astype(np.int64)
-    pop0[m:m2] = np.random.poisson(poisson_mean, m)
+    pop0[m:m2] = rg.poisson(poisson_mean, m)
 
-    return pop0
+    return rg, pop0
 
 
 @njit
-def draw_random_params(PARAM_RANGES):
+def draw_random_params(rg, PARAM_RANGES):
     # Make random draws for each quantity needed to define a parameter set
     (
         log10_k_on,
@@ -257,7 +256,7 @@ def draw_random_params(PARAM_RANGES):
         kp,
         nlog10_gamma_m,
         nlog10_gamma_p,
-    ) = [np.random.uniform(lo, hi) for lo, hi in PARAM_RANGES]
+    ) = [rg.uniform(lo, hi) for lo, hi in PARAM_RANGES]
 
     # Calculate derived parameters
     k_on = 10**log10_k_on
@@ -282,12 +281,14 @@ def draw_random_params(PARAM_RANGES):
         gamma_m,
         gamma_p,
     )
-    return params
+    return rg, params
 
 
 @njit
-def draw_random_initial_and_params(PARAM_RANGES, m, a, r, poisson_mean):
-    return draw_random_initial(m, a, r, poisson_mean), draw_random_params(PARAM_RANGES)
+def draw_random_initial_and_params(rg, PARAM_RANGES, m, a, r, poisson_mean):
+    rg, pop0 = draw_random_initial(rg, m, a, r, poisson_mean)
+    rg, params = draw_random_params(rg, PARAM_RANGES)
+    return rg, pop0, params
 
 
 @njit(fastmath=True)
@@ -393,6 +394,7 @@ def get_propensities(
 
 @njit
 def take_gillespie_step(
+    rg,
     t,
     population,
     event,
@@ -424,7 +426,7 @@ def take_gillespie_step(
         r,
         *ssa_params,
     )
-    event, dt = _sample_propensities(propensities)
+    rg, event, dt = _sample_propensities(rg, propensities)
 
     # Skip to the end of the simulation
     if event == -1:
@@ -434,11 +436,12 @@ def take_gillespie_step(
         # If t exceeds the next time point, population isn't updated
         t += dt
 
-    return t, population, event
+    return rg, t, population, event
 
 
 @njit
 def gillespie_trajectory(
+    rg,
     time_points,
     population_0,
     U,
@@ -471,7 +474,8 @@ def gillespie_trajectory(
     while j < nt:
         tj = time_points[j]
         while t <= tj:
-            t, population, event = take_gillespie_step(
+            rg, t, population, event = take_gillespie_step(
+                rg,
                 t,
                 population,
                 event,
@@ -496,18 +500,18 @@ def gillespie_trajectory(
         # Increment index
         j = new_j
 
-    return pop_out
+    return rg, pop_out
 
 
 @njit
-def _sample_poisson(propensities, dt):
+def _sample_poisson(rg, propensities, dt):
     """Sample the number of events occurring in the time interval dt
     from a Poisson distribution."""
     n = len(propensities)
     out = np.zeros((n, 1)).astype(np.int64)
     for i, mean_num_events in enumerate(propensities * dt):
-        out[i, 0] = np.random.poisson(mean_num_events)
-    return out
+        out[i, 0] = rg.poisson(mean_num_events)
+    return rg, out
 
 
 @njit
@@ -523,6 +527,7 @@ def get_tau(epsilon, population, mu, sigma2, highest_rxn_order):
 
 @njit
 def take_tau_leap(
+    rg,
     population,
     events,
     propensities,
@@ -576,23 +581,23 @@ def take_tau_leap(
 
         if accept:
             # Calculate the number of each event occuring in the time interval
-            events = _sample_poisson(propensities, tau)
+            rg, events = _sample_poisson(rg, propensities, tau)
         else:
             # Wipe the events array until tau-leaping resumes. Otherwise, when it
             # resumes, the events from the previous tau-leap will be executed
             events.fill(0)
 
-        return accept, tau, population, events
-
     # If no reactions occur, skip to the end of the simulation
     else:
         accept = True
         tau = np.inf
-        return accept, tau, population, events
+
+    return rg, accept, tau, population, events
 
 
 @njit
 def gillespie_tau_leaping(
+    rg,
     epsilon,
     highest_rxn_order,
     time_points,
@@ -638,7 +643,8 @@ def gillespie_tau_leaping(
         while t <= tj:
             # When tau is too small, take Gillespie steps
             if n_gillespie_steps > 0:
-                t, population, event = take_gillespie_step(
+                rg, t, population, event = take_gillespie_step(
+                    rg,
                     t,
                     population,
                     event,
@@ -655,7 +661,8 @@ def gillespie_tau_leaping(
                 )
                 n_gillespie_steps -= 1
             else:
-                accept_leap, tau, population, events = take_tau_leap(
+                rg, accept_leap, tau, population, events = take_tau_leap(
+                    rg,
                     population,
                     events,
                     propensities,
@@ -688,11 +695,12 @@ def gillespie_tau_leaping(
         # Increment index
         j = new_j
 
-    return pop_out
+    return rg, pop_out
 
 
 # @jitclass
 class GillespieSSA:
+    seed: int64
     PARAM_RANGES: float64[:, :]
     time_points: float64[:]
     dt: float64
@@ -733,6 +741,7 @@ class GillespieSSA:
 
     def __init__(
         self,
+        seed,
         n_species,
         activation_mtx,
         inhibition_mtx,
@@ -744,6 +753,8 @@ class GillespieSSA:
         DEFAULT_PARAMS,
         epsilon=0.03,
     ):
+        self.rg = np.random.default_rng(seed)
+
         self.init_mean = mean_mRNA_init
 
         self.PARAM_RANGES = PARAM_RANGES
@@ -811,7 +822,8 @@ class GillespieSSA:
 
     def gillespie_trajectory(self, population_0, *ssa_params):
         """ """
-        return gillespie_trajectory(
+        self.rg, y_t = gillespie_trajectory(
+            self.rg,
             self.time_points,
             population_0,
             self.U,
@@ -824,10 +836,12 @@ class GillespieSSA:
             self.inhibitions_right,
             *ssa_params,
         )
+        return y_t
 
     def gillespie_tau_leaping(self, population_0, *ssa_params):
         """ """
-        return gillespie_tau_leaping(
+        self.rg, y_t = gillespie_tau_leaping(
+            self.rg,
             self.epsilon,
             self.highest_rxn_order,
             self.time_points,
@@ -842,15 +856,17 @@ class GillespieSSA:
             self.inhibitions_right,
             *ssa_params,
         )
+        return y_t
 
     def package_params_for_ssa(self, params):
         """ """
         return package_params_for_ssa(params)
 
     def draw_random_initial_and_params(self):
-        return draw_random_initial_and_params(
-            self.PARAM_RANGES, self.m, self.a, self.r, self.init_mean
+        self.rg, pop0, params = draw_random_initial_and_params(
+            self.rg, self.PARAM_RANGES, self.m, self.a, self.r, self.init_mean
         )
+        return pop0, params
 
     def run_with_params(self, pop0, params):
         """ """
