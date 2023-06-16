@@ -51,7 +51,7 @@ PARAM_NAMES = [
 
 DISSOCIATION_RATE_SUM = 100.0
 
-SAMPLE_RANGES = np.array(
+SAMPLING_RANGES = np.array(
     [
         (-2.0, 4.0),  # log10_kd_1
         (0.0, 0.5),  # kd_2_1_ratio
@@ -65,7 +65,7 @@ SAMPLE_RANGES = np.array(
     dtype=np.float64,
 )
 
-SAMPLE_VAR_NAMES = [
+SAMPLED_VAR_NAMES = [
     "log10_kd_1",
     "kd_2_1_ratio",
     "km_unbound",
@@ -230,9 +230,9 @@ def draw_random_initial(rg, m, a, r, poisson_mean):
 
 
 @njit
-def draw_random_initial_and_params(rg, PARAM_RANGES, m, a, r, poisson_mean):
+def draw_random_initial_and_params(rg, SAMPLING_RANGES, m, a, r, poisson_mean):
     rg, pop0 = draw_random_initial(rg, m, a, r, poisson_mean)
-    rg, params = draw_random_params(rg, PARAM_RANGES)
+    rg, params = draw_random_params(rg, SAMPLING_RANGES)
     return rg, pop0, params
 
 
@@ -600,7 +600,7 @@ def gillespie_trajectory(
 
 class GillespieSSA:
     seed: int64
-    PARAM_RANGES: float64[:, :]
+    SAMPLING_RANGES: float64[:, :]
     time_points: float64[:]
     dt: float64
     nt: int64
@@ -648,14 +648,14 @@ class GillespieSSA:
         dt,
         nt,
         mean_mRNA_init,
-        PARAM_RANGES,
+        SAMPLING_RANGES,
         DEFAULT_PARAMS,
     ):
         self.rg = np.random.default_rng(seed)
 
         self.init_mean = mean_mRNA_init
 
-        self.PARAM_RANGES = PARAM_RANGES
+        self.SAMPLING_RANGES = SAMPLING_RANGES
         self.DEFAULT_PARAMS = DEFAULT_PARAMS
 
         # Compute some numbers for convenient indexing
@@ -717,7 +717,7 @@ class GillespieSSA:
 
     def draw_random_initial_and_params(self):
         self.rg, pop0, params = draw_random_initial_and_params(
-            self.rg, self.PARAM_RANGES, self.m, self.a, self.r, self.init_mean
+            self.rg, self.SAMPLING_RANGES, self.m, self.a, self.r, self.init_mean
         )
         return pop0, params
 

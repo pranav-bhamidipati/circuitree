@@ -9,10 +9,10 @@ from circuitree import SimpleNetworkTree
 from circuitree.parallel import DefaultFactoryDict, ParallelTree
 
 
-from models.oscillation.gillespie_newranges import (
+from models.oscillation.gillespie import (
     GillespieSSA,
     make_matrices_for_ssa,
-    SAMPLE_RANGES,
+    SAMPLING_RANGES,
     DEFAULT_PARAMS,
 )
 
@@ -113,7 +113,7 @@ class TFNetworkModel:
             dt,
             nt,
             init_mean,
-            SAMPLE_RANGES,
+            SAMPLING_RANGES,
             DEFAULT_PARAMS,
         )
 
