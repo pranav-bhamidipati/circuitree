@@ -77,14 +77,6 @@ SAMPLED_VAR_NAMES = [
 ]
 
 
-def _normalize(x, xmin, xmax):
-    return (x - xmin) / (xmax - xmin)
-
-
-def _rescale(x, xmin, xmax):
-    return x * (xmax - xmin) + xmin
-
-
 @njit
 def convert_uniform_to_params(uniform, param_ranges):
     """Convert uniform random samples to parameter values"""
@@ -129,6 +121,44 @@ def convert_uniform_to_params(uniform, param_ranges):
     )
 
     return params
+
+
+@njit
+def package_params_for_ssa(params) -> tuple:
+    """Set up reaction propensities in convenient form"""
+
+    (
+        k_on,
+        k_off_1,
+        k_off_2,
+        km_unbound,
+        km_act,
+        km_rep,
+        km_act_rep,
+        kp,
+        gamma_m,
+        gamma_p,
+    ) = params
+
+    # Transcription rates are stored in a nested list
+    # First layer is number of activators and second layer is number of repressors
+    k_tx = np.array(
+        [
+            [km_unbound, km_rep, km_rep],
+            [km_act, km_act_rep, 0.0],
+            [km_act, 0.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+
+    # Promoter binding/unbinding are stored in index-able arrays, where the index
+    # is the number of bound species
+    k_ons = np.array([k_on, k_on, 0.0]).astype(np.float64)
+    k_offs = np.array([0.0, k_off_1, k_off_2]).astype(np.float64)
+
+    # This is the parameter tuple actually used for the propensity function
+    # due to added efficiency
+    return k_tx, kp, gamma_m, gamma_p, k_ons, k_offs
 
 
 def convert_params_to_sampled_quantities(params, param_ranges=None, normalize=False):
@@ -178,6 +208,22 @@ def convert_params_to_sampled_quantities(params, param_ranges=None, normalize=Fa
         return sampled_quantities
 
 
+def _normalize(x, xmin, xmax):
+    return (x - xmin) / (xmax - xmin)
+
+
+def _rescale(x, xmin, xmax):
+    return x * (xmax - xmin) + xmin
+
+
+@njit
+def draw_random_params(rg, param_ranges):
+    """Make random draws for each quantity needed to define a parameter set"""
+    uniform = np.array([rg.uniform(lo, hi) for lo, hi in param_ranges])
+    params = convert_uniform_to_params(uniform, param_ranges)
+    return rg, params
+ 
+
 @njit
 def draw_random_initial(rg, m, a, r, poisson_mean):
     m2 = 2 * m
@@ -189,56 +235,10 @@ def draw_random_initial(rg, m, a, r, poisson_mean):
 
 
 @njit
-def draw_random_params(rg, param_ranges):
-    """Make random draws for each quantity needed to define a parameter set"""
-    uniform = np.array([rg.uniform(lo, hi) for lo, hi in param_ranges])
-    params = convert_uniform_to_params(uniform, param_ranges)
-    return rg, params
-
-
-@njit
 def draw_random_initial_and_params(rg, PARAM_RANGES, m, a, r, poisson_mean):
     rg, pop0 = draw_random_initial(rg, m, a, r, poisson_mean)
     rg, params = draw_random_params(rg, PARAM_RANGES)
     return rg, pop0, params
-
-
-@njit
-def package_params_for_ssa(params) -> tuple:
-    """Set up reaction propensities in convenient form"""
-
-    (
-        k_on,
-        k_off_1,
-        k_off_2,
-        km_unbound,
-        km_act,
-        km_rep,
-        km_act_rep,
-        kp,
-        gamma_m,
-        gamma_p,
-    ) = params
-
-    # Transcription rates are stored in a nested list
-    # First layer is number of activators and second layer is number of repressors
-    k_tx = np.array(
-        [
-            [km_unbound, km_rep, km_rep],
-            [km_act, km_act_rep, 0.0],
-            [km_act, 0.0, 0.0],
-        ],
-        dtype=np.float64,
-    )
-
-    # Promoter binding/unbinding are stored in index-able arrays, where the index
-    # is the number of bound species
-    k_ons = np.array([k_on, k_on, 0.0]).astype(np.float64)
-    k_offs = np.array([0.0, k_off_1, k_off_2]).astype(np.float64)
-
-    # This is the parameter tuple actually used for the propensity function
-    # due to added efficiency
-    return k_tx, kp, gamma_m, gamma_p, k_ons, k_offs
 
 
 def make_matrices_for_ssa(n_components, activations, inhibitions):
