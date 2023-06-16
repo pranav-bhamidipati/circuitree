@@ -49,31 +49,31 @@ PARAM_NAMES = [
 ]
 
 
-SAMPLING_RANGES = np.array(
+DISSOCIATION_RATE_SUM = 100.0
+
+SAMPLE_RANGES = np.array(
     [
-        (-1.0, 2.0),  # log10_k_on
-        (0.0, 3.0),  # log10_k_off_1
-        (0.0, 1.0),  # k_off_2_1_ratio
+        (-2.0, 4.0),  # log10_kd_1
+        (0.0, 0.5),  # kd_2_1_ratio
         (0.0, 1.0),  # km_unbound
         (1.0, 10.0),  # km_act
         (0.0, 5.0),  # nlog10_km_rep_unbound_ratio
         (0.015, 0.25),  # kp
-        (1.0, 3.0),  # nlog10_gamma_m
-        (1.0, 3.0),  # nlog10_gamma_p
+        (0.001, 0.1),  # gamma_m
+        (0.001, 0.1),  # gamma_p
     ],
     dtype=np.float64,
 )
 
-SAMPLED_VAR_NAMES = [
-    "log10_k_on",
-    "log10_k_off_1",
-    "k_off_2_1_ratio",
+SAMPLE_VAR_NAMES = [
+    "log10_kd_1",
+    "kd_2_1_ratio",
     "km_unbound",
     "km_act",
     "nlog10_km_rep_unbound_ratio",
     "kp",
-    "nlog10_gamma_m",
-    "nlog10_gamma_p",
+    "gamma_m",
+    "gamma_p",
 ]
 
 
@@ -85,24 +85,23 @@ def convert_uniform_to_params(uniform, param_ranges):
         quantities[i] = lo + (hi - lo) * uniform[i]
 
     (
-        log10_k_on,
-        log10_k_off_1,
-        k_off_2_1_ratio,
+        log10_kd,
+        kd_2_1_ratio,
         km_unbound,
         km_act,
         nlog10_km_rep_unbound_ratio,
         kp,
-        nlog10_gamma_m,
-        nlog10_gamma_p,
+        gamma_m,
+        gamma_p,
     ) = quantities
 
     # Calculate derived parameters
-    k_on = 10**log10_k_on
-    k_off_1 = 10**log10_k_off_1
-    k_off_2 = k_off_1 * k_off_2_1_ratio
+    kd_1 = 10**log10_kd
+    k_off_1 = DISSOCIATION_RATE_SUM * kd_1 / (1 + kd_1)
+    k_on = DISSOCIATION_RATE_SUM - k_off_1
+    k_off_2 = k_off_1 * kd_2_1_ratio
+
     km_rep = km_unbound * 10**-nlog10_km_rep_unbound_ratio
-    gamma_m = 10**-nlog10_gamma_m
-    gamma_p = 10**-nlog10_gamma_p
 
     # activation and repression together have no effect on transcription
     km_act_rep = km_unbound
@@ -176,23 +175,19 @@ def convert_params_to_sampled_quantities(params, param_ranges=None, normalize=Fa
     ) = params
 
     # Calculate quantities that were sampled
-    log10_k_on = np.log10(k_on)
-    log10_k_off_1 = np.log10(k_off_1)
-    k_off_2_1_ratio = k_off_2 / k_off_1
+    log10_kd = np.log10(k_off_1 / k_on)
+    kd_2_1_ratio = k_off_2 / k_off_1
     nlog10_km_rep_unbound_ratio = np.log10(km_unbound / km_rep)
-    nlog10_gamma_m = -np.log10(gamma_m)
-    nlog10_gamma_p = -np.log10(gamma_p)
 
     sampled_quantities = (
-        log10_k_on,
-        log10_k_off_1,
-        k_off_2_1_ratio,
+        log10_kd,
+        kd_2_1_ratio,
         km_unbound,
         km_act,
         nlog10_km_rep_unbound_ratio,
         kp,
-        nlog10_gamma_m,
-        nlog10_gamma_p,
+        gamma_m,
+        gamma_p,
     )
 
     if normalize:
