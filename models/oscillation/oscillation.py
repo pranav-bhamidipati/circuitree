@@ -9,10 +9,10 @@ from circuitree import SimpleNetworkTree
 from circuitree.parallel import DefaultFactoryDict, ParallelTree
 
 
-from models.oscillation.gillespie import (
+from models.oscillation.gillespie_newranges import (
     GillespieSSA,
     make_matrices_for_ssa,
-    PARAM_RANGES,
+    SAMPLE_RANGES,
     DEFAULT_PARAMS,
 )
 
@@ -113,43 +113,28 @@ class TFNetworkModel:
             dt,
             nt,
             init_mean,
-            PARAM_RANGES,
+            SAMPLE_RANGES,
             DEFAULT_PARAMS,
         )
 
-    def run_ssa_with_params(self, pop0, params, tau_leap=False):
-        if tau_leap:
-            return self.ssa.run_with_params_tau_leap(pop0, params)
-        else:
-            return self.ssa.run_with_params(pop0, params)
+    def run_ssa_with_params(self, pop0, params):
+        return self.ssa.run_with_params(pop0, params)
 
-    def run_batch_with_params(self, pop0, params, n, tau_leap=False):
+    def run_batch_with_params(self, pop0, params, n):
         pop0 = np.asarray(pop0)
         params = np.asarray(params)
         is_vectorized = pop0.ndim == 2 and params.ndim == 2
-        if tau_leap:
-            if is_vectorized:
-                return self.ssa.run_batch_with_params_tau_leap_vector(pop0, params, n)
-            else:
-                return self.ssa.run_batch_with_params_tau_leap(pop0, params, n)
+        if is_vectorized:
+            return self.ssa.run_batch_with_params_vector(pop0, params)
         else:
-            if is_vectorized:
-                return self.ssa.run_batch_with_params_vector(pop0, params, n)
-            else:
-                return self.ssa.run_batch_with_params(pop0, params, n)
+            return self.ssa.run_batch_with_params(pop0, params, n)
 
-    def run_ssa_random_params(self, tau_leap=False):
-        if tau_leap:
-            pop0, params, y_t = self.ssa.run_random_sample_tau_leap()
-        else:
-            pop0, params, y_t = self.ssa.run_random_sample()
+    def run_ssa_random_params(self):
+        pop0, params, y_t = self.ssa.run_random_sample()
         return pop0, params, y_t
 
-    def run_batch_random(self, n_samples, tau_leap=False):
-        if tau_leap:
-            return self.ssa.run_batch_tau_leap(n_samples)
-        else:
-            return self.ssa.run_batch(n_samples)
+    def run_batch_random(self, n_samples):
+        return self.ssa.run_batch(n_samples)
 
     def run_job(self, abs: bool = False, **kwargs):
         """
@@ -178,6 +163,12 @@ class TFNetworkModel:
             **kwargs,
         )
         return y_t, pop0s, param_sets, rewards
+
+    @staticmethod
+    def get_autocorrelation(y_t: np.ndarray[np.float64 | np.int64]):
+        filtered = filter_ndarray_binomial9(y_t.astype(np.float64))[..., 4:-4, :]
+        acorrs = autocorrelate_vectorized(filtered)
+        return acorrs
 
     @staticmethod
     def get_acf_minima(y_t: np.ndarray[np.float64 | np.int64], abs: bool = False):
@@ -244,7 +235,6 @@ class TFNetworkModel:
         freqs: bool = False,
         indices: bool = False,
         init_mean: float = 10.0,
-        tau_leap: bool = False,
         abs: bool = False,
         **kwargs,
     ):
@@ -258,9 +248,9 @@ class TFNetworkModel:
             t = self.t
 
         if size > 1:
-            pop0, params, y_t = self.run_batch_random(size, tau_leap=tau_leap)
+            pop0, params, y_t = self.run_batch_random(size)
         else:
-            pop0, params, y_t = self.run_ssa_random_params(tau_leap=tau_leap)
+            pop0, params, y_t = self.run_ssa_random_params()
 
         pop0 = pop0[..., self.m : self.m * 2]
         y_t = y_t[..., self.m : self.m * 2]
@@ -518,7 +508,6 @@ class OscillationTree(SimpleNetworkTree):
         init_mean: float = 10.0,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
-        tau_leap: bool = False,
         batch_size: int = 1,
         results_table: Optional[Any] = None,
         **kwargs,
@@ -532,7 +521,6 @@ class OscillationTree(SimpleNetworkTree):
         self.dt = dt
         self.nt = nt
         self.init_mean = init_mean
-        self.tau_leap = tau_leap
         self.batch_size = batch_size
 
         if results_table is not None:
@@ -603,18 +591,14 @@ class OscillationTree(SimpleNetworkTree):
         batch_size: Optional[int] = None,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
-        tau_leap: Optional[bool] = None,
         record: bool = False,
     ) -> float:
         dt = dt if dt is not None else self.dt
         nt = nt if nt is not None else self.nt
-        tau_leap = tau_leap if tau_leap is not None else self.tau_leap
         batch_size = batch_size if batch_size is not None else self.batch_size
 
         model = TFNetworkModel(state, initialize=True, dt=dt, nt=nt)
-        y_t, pop0s, param_sets, rewards = model.run_batch_job(
-            batch_size, abs=True, tau_leap=tau_leap
-        )
+        y_t, pop0s, param_sets, rewards = model.run_batch_job(batch_size, abs=True)
 
         if record:
             self.results_table[state].append((pop0s, param_sets, rewards))
