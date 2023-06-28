@@ -2,7 +2,7 @@
 name = "aiohttp"
 version = "3.8.4"
 description = "Async http client/server framework (asyncio)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -22,8 +22,8 @@ speedups = ["Brotli", "aiodns", "cchardet"]
 name = "aiohttp-cors"
 version = "0.7.0"
 description = "CORS support for aiohttp"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [package.dependencies]
@@ -33,7 +33,7 @@ aiohttp = ">=1.1"
 name = "aiosignal"
 version = "1.3.1"
 description = "aiosignal: a list of registered asynchronous callbacks"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -44,8 +44,8 @@ frozenlist = ">=1.1.0"
 name = "ansicon"
 version = "1.89.0"
 description = "Python wrapper for loading Jason Hood's ANSICON"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [[package]]
@@ -145,7 +145,7 @@ typing-extensions = ">=4.0.0"
 name = "async-timeout"
 version = "4.0.2"
 description = "Timeout context manager for asyncio programs"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -153,7 +153,7 @@ python-versions = ">=3.6"
 name = "attrs"
 version = "23.1.0"
 description = "Classes Without Boilerplate"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -256,8 +256,8 @@ css = ["tinycss2 (>=1.1.0,<1.2)"]
 name = "blessed"
 version = "1.20.0"
 description = "Easy, practical library for making terminal apps, by providing an elegant, well-documented interface to Colors, Keyboard input, and screen Positioning capabilities."
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=2.7"
 
 [package.dependencies]
@@ -269,8 +269,8 @@ wcwidth = ">=0.1.4"
 name = "blosc2"
 version = "2.0.0"
 description = "Python wrapper for the C-Blosc2 library."
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.8, <4"
 
 [package.dependencies]
@@ -299,15 +299,15 @@ xyzservices = ">=2021.09.1"
 name = "cachetools"
 version = "5.3.1"
 description = "Extensible memoizing collections and decorators"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [[package]]
 name = "certifi"
 version = "2023.5.7"
 description = "Python package for providing Mozilla's CA Bundle."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -326,7 +326,7 @@ pycparser = "*"
 name = "charset-normalizer"
 version = "3.1.0"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7.0"
 
@@ -334,7 +334,7 @@ python-versions = ">=3.7.0"
 name = "click"
 version = "8.1.3"
 description = "Composable command line interface toolkit"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -353,7 +353,7 @@ python-versions = ">=3.6"
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 
@@ -380,8 +380,8 @@ tests-extra = ["flake8", "nbsmoke (>=0.2.6)", "pytest (>=2.8.5)", "pytest-cov", 
 name = "colorful"
 version = "0.5.5"
 description = "Terminal string styling done right, in Python."
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [package.dependencies]
@@ -407,7 +407,7 @@ typing = ["mypy (>=0.990)"]
 name = "contourpy"
 version = "1.1.0"
 description = "Python library for calculating contours of 2D quadrilateral grids"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -425,7 +425,7 @@ test-no-images = ["pytest", "pytest-cov", "wurlitzer"]
 name = "cycler"
 version = "0.11.0"
 description = "Composable style cycles"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -433,8 +433,8 @@ python-versions = ">=3.6"
 name = "cython"
 version = "0.29.35"
 description = "The Cython compiler for writing C extensions for the Python language."
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
@@ -561,8 +561,8 @@ graph = ["objgraph (>=1.7.2)"]
 name = "distlib"
 version = "0.3.6"
 description = "Distribution utilities"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [[package]]
@@ -666,8 +666,8 @@ devel = ["colorama", "json-spec", "jsonschema", "pylint", "pytest", "pytest-benc
 name = "filelock"
 version = "3.12.2"
 description = "A platform independent file lock."
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.extras]
@@ -678,7 +678,7 @@ testing = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "diff-cover (>=7.5)", "p
 name = "fonttools"
 version = "4.40.0"
 description = "Tools to manipulate font files"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -708,7 +708,7 @@ python-versions = ">=2.7, !=3.0, !=3.1, !=3.2, !=3.3, !=3.4, <4"
 name = "frozenlist"
 version = "1.3.3"
 description = "A list-like structure which implements collections.abc.MutableSequence"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -770,8 +770,8 @@ gitdb = ">=4.0.1,<5"
 name = "google-api-core"
 version = "2.11.1"
 description = "Google API client core library"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -789,8 +789,8 @@ grpcio-gcp = ["grpcio-gcp (>=0.2.2,<1.0.dev0)"]
 name = "google-auth"
 version = "2.17.3"
 description = "Google Authentication Library"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*"
 
 [package.dependencies]
@@ -810,8 +810,8 @@ requests = ["requests (>=2.20.0,<3.0.0dev)"]
 name = "googleapis-common-protos"
 version = "1.59.1"
 description = "Common protobufs used in Google APIs"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -824,8 +824,8 @@ grpc = ["grpcio (>=1.44.0,<2.0.0.dev0)"]
 name = "gpustat"
 version = "1.1"
 description = "An utility to monitor NVIDIA GPU status and usage"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -841,8 +841,8 @@ test = ["mockito (>=1.2.1)", "pytest (>=5.4.1)", "pytest-runner"]
 name = "grpcio"
 version = "1.49.1"
 description = "HTTP/2-based RPC framework"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -855,8 +855,8 @@ protobuf = ["grpcio-tools (>=1.49.1)"]
 name = "grpcio"
 version = "1.51.3"
 description = "HTTP/2-based RPC framework"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.extras]
@@ -866,8 +866,8 @@ protobuf = ["grpcio-tools (>=1.51.3)"]
 name = "h5py"
 version = "3.9.0"
 description = "Read and write HDF5 files from Python"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.8"
 
 [package.dependencies]
@@ -898,7 +898,7 @@ testing = ["Flake8-pyproject", "flake8-docstrings", "pytest", "pytest-cov", "pyt
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -1074,8 +1074,8 @@ i18n = ["Babel (>=2.7)"]
 name = "jinxed"
 version = "1.2.0"
 description = "Jinxed Terminal Library"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [package.dependencies]
@@ -1117,7 +1117,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, 
 name = "jsonschema"
 version = "4.17.3"
 description = "An implementation of JSON Schema validation for Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1341,7 +1341,7 @@ python-versions = ">=3.7"
 name = "kiwisolver"
 version = "1.4.4"
 description = "A fast implementation of the Cassowary constraint solver"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1367,7 +1367,7 @@ tests-strict = ["IPython (==0.13)", "IPython (==0.13)", "coverage[toml] (==5.3)"
 name = "llvmlite"
 version = "0.40.1"
 description = "lightweight wrapper around basic LLVM functionality"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -1391,7 +1391,7 @@ python-versions = ">=3.7"
 name = "matplotlib"
 version = "3.7.1"
 description = "Python plotting package"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -1430,15 +1430,15 @@ python-versions = ">=3.7"
 name = "more-itertools"
 version = "9.1.0"
 description = "More routines for operating on iterables, beyond itertools"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [[package]]
 name = "msgpack"
 version = "1.0.5"
 description = "MessagePack serializer"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1446,7 +1446,7 @@ python-versions = "*"
 name = "multidict"
 version = "6.0.4"
 description = "multidict implementation"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1615,7 +1615,7 @@ test = ["pytest", "pytest-console-scripts", "pytest-jupyter", "pytest-tornasync"
 name = "numba"
 version = "0.57.1"
 description = "compiling Python code using LLVM"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -1627,8 +1627,8 @@ numpy = ">=1.21,<1.25"
 name = "numexpr"
 version = "2.8.4"
 description = "Fast numerical expression evaluator for NumPy"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -1646,16 +1646,16 @@ python-versions = ">=3.8"
 name = "nvidia-ml-py"
 version = "11.525.112"
 description = "Python Bindings for the NVIDIA Management Library"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [[package]]
 name = "opencensus"
 version = "0.11.2"
 description = "A stats collection and distributed tracing framework"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [package.dependencies]
@@ -1666,8 +1666,8 @@ opencensus-context = ">=0.1.3"
 name = "opencensus-context"
 version = "0.1.3"
 description = "OpenCensus Runtime Context"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [[package]]
@@ -1690,7 +1690,7 @@ python-versions = ">=3.6"
 name = "packaging"
 version = "23.1"
 description = "Core utilities for Python packages"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1698,7 +1698,7 @@ python-versions = ">=3.7"
 name = "pandas"
 version = "2.0.2"
 description = "Powerful data structures for data analysis, time series, and statistics"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.8"
 
@@ -1813,7 +1813,7 @@ python-versions = "*"
 name = "pillow"
 version = "9.5.0"
 description = "Python Imaging Library (Fork)"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1825,7 +1825,7 @@ tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "pa
 name = "platformdirs"
 version = "3.8.0"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1837,7 +1837,7 @@ test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=7.3.1)", "pytest-
 name = "prometheus-client"
 version = "0.17.0"
 description = "Python client for the Prometheus monitoring system."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -1859,15 +1859,15 @@ wcwidth = "*"
 name = "protobuf"
 version = "4.23.3"
 description = ""
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [[package]]
 name = "psutil"
 version = "5.9.5"
 description = "Cross-platform lib for process and system monitoring in Python."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
@@ -1897,7 +1897,7 @@ tests = ["pytest"]
 name = "py-cpuinfo"
 version = "9.0.0"
 description = "Get CPU info with pure Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1905,16 +1905,16 @@ python-versions = "*"
 name = "py-spy"
 version = "0.3.14"
 description = "Sampling profiler for Python programs"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [[package]]
 name = "pyarrow"
 version = "12.0.1"
 description = "Python library for Apache Arrow"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -1924,16 +1924,16 @@ numpy = ">=1.16.6"
 name = "pyasn1"
 version = "0.5.0"
 description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs (X.208)"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
 
 [[package]]
 name = "pyasn1-modules"
 version = "0.3.0"
 description = "A collection of ASN.1-based protocols modules"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
 
 [package.dependencies]
@@ -1968,7 +1968,7 @@ tests = ["flake8", "pytest"]
 name = "pydantic"
 version = "1.10.9"
 description = "Data validation and settings management using python type hints"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1994,7 +1994,7 @@ plugins = ["importlib-metadata"]
 name = "pyparsing"
 version = "3.1.0"
 description = "pyparsing module - Classes and methods to define and execute parsing grammars"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6.8"
 
@@ -2005,7 +2005,7 @@ diagrams = ["jinja2", "railroad-diagrams"]
 name = "pyrsistent"
 version = "0.19.3"
 description = "Persistent/Functional/Immutable data structures"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2013,7 +2013,7 @@ python-versions = ">=3.7"
 name = "python-dateutil"
 version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 
@@ -2032,7 +2032,7 @@ python-versions = ">=3.6"
 name = "pytz"
 version = "2023.3"
 description = "World timezone definitions, modern and historical"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -2056,7 +2056,7 @@ python-versions = ">=3.7"
 name = "pyyaml"
 version = "6.0"
 description = "YAML parser and emitter for Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -2075,8 +2075,8 @@ cffi = {version = "*", markers = "implementation_name == \"pypy\""}
 name = "ray"
 version = "2.5.1"
 description = "Ray provides a simple, universal API for building distributed applications."
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = "*"
 
 [package.dependencies]
@@ -2124,7 +2124,7 @@ tune = ["pandas", "pyarrow (>=6.0.1)", "requests", "tensorboardX (>=1.9)"]
 name = "requests"
 version = "2.31.0"
 description = "Python HTTP for Humans."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2161,8 +2161,8 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 name = "rsa"
 version = "4.9"
 description = "Pure-Python RSA implementation"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.6,<4"
 
 [package.dependencies]
@@ -2190,7 +2190,7 @@ wrapt = ">=1.0,<2.0"
 name = "scipy"
 version = "1.11.0"
 description = "Fundamental algorithms for scientific computing in Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "<3.13,>=3.9"
 
@@ -2206,8 +2206,8 @@ test = ["asv", "gmpy2", "mpmath", "pooch", "pytest", "pytest-cov", "pytest-timeo
 name = "seaborn"
 version = "0.12.2"
 description = "Statistical data visualization"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -2237,7 +2237,7 @@ win32 = ["pywin32"]
 name = "setuptools"
 version = "68.0.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2250,7 +2250,7 @@ testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (
 name = "setuptools-scm"
 version = "7.1.0"
 description = "the blessed package to manage your versions by scm tags"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2279,7 +2279,7 @@ test = ["aiohttp", "psutil", "pytest", "pytest-asyncio", "pytest-cov"]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
@@ -2287,8 +2287,8 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 name = "smart-open"
 version = "6.3.0"
 description = "Utils for streaming large files (S3, HDFS, GCS, Azure Blob Storage, gzip, bz2...)"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.6,<4.0"
 
 [package.extras]
@@ -2367,8 +2367,8 @@ full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart", "pyyam
 name = "tables"
 version = "3.8.0"
 description = "Hierarchical datasets for Python"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.8"
 
 [package.dependencies]
@@ -2426,7 +2426,7 @@ test = ["flake8", "isort", "pytest"]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2450,7 +2450,7 @@ python-versions = ">= 3.8"
 name = "tqdm"
 version = "4.65.0"
 description = "Fast, Extensible Progress Meter"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2487,7 +2487,7 @@ python-versions = ">=3.6"
 name = "typing-extensions"
 version = "4.6.3"
 description = "Backported and Experimental Type Hints for Python 3.7+"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2495,7 +2495,7 @@ python-versions = ">=3.7"
 name = "tzdata"
 version = "2023.3"
 description = "Provider of IANA time zone data"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2"
 
@@ -2514,7 +2514,7 @@ dev = ["flake8", "flake8-annotations", "flake8-bandit", "flake8-bugbear", "flake
 name = "urllib3"
 version = "2.0.3"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2528,8 +2528,8 @@ zstd = ["zstandard (>=0.18.0)"]
 name = "virtualenv"
 version = "20.21.0"
 description = "Virtual Python Environment builder"
-category = "dev"
-optional = false
+category = "main"
+optional = true
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -2545,7 +2545,7 @@ test = ["covdefaults (>=2.2.2)", "coverage (>=7.1)", "coverage-enable-subprocess
 name = "wcwidth"
 version = "0.2.6"
 description = "Measures the displayed width of unicode strings in a terminal"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -2631,7 +2631,7 @@ python-versions = ">=3.8"
 name = "yarl"
 version = "1.9.2"
 description = "Yet another URL library"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -2660,13 +2660,13 @@ docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "rst.linker
 testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more-itertools", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-flake8", "pytest-mypy (>=0.9.1)"]
 
 [extras]
-examples = []
-parallel = []
+examples = ["scipy", "numba", "psutil", "ray", "pandas", "tables", "pyarrow", "h5py", "more-itertools", "matplotlib", "seaborn", "tqdm"]
+parallel = ["psutil", "ray", "pandas", "tables", "pyarrow", "h5py"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "9d17b8d8965533c3135cb7d748d2b1a8439acb89f7786cd14632c7da14a89305"
+content-hash = "260af21d73b52703d9228cd72b882be06138f069fe962f39330e3c5c4faf93da"
 
 [metadata.files]
 aiohttp = [
