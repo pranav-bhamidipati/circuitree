@@ -1,4 +1,4 @@
-from functools import cached_property, partial
+from functools import cache, cached_property, partial
 from itertools import permutations
 from typing import Any, Callable, Optional, Iterable
 from numba import stencil, njit
@@ -6,7 +6,7 @@ import numpy as np
 from scipy.signal import correlate
 
 from circuitree import SimpleNetworkTree
-from circuitree.parallel import DefaultFactoryDict, ParallelTree
+from circuitree import DefaultFactoryDict
 
 
 from models.oscillation.gillespie import (
@@ -256,13 +256,13 @@ class TFNetworkModel:
         y_t = y_t[..., self.m : self.m * 2]
 
         if not (freqs or indices):
-            results = self.get_acf_minima(y_t, abs=abs)
+            acf_results = self.get_acf_minima(y_t, abs=abs)
         else:
-            results = self.get_acf_minima_and_results(
+            acf_results = self.get_acf_minima_and_results(
                 t, y_t, freqs=freqs, indices=indices, abs=abs
             )
 
-        return y_t, pop0, params, results
+        return y_t, pop0, params, acf_results
 
 
 def autocorrelate_mean0(arr1d_norm: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
@@ -509,7 +509,6 @@ class OscillationTree(SimpleNetworkTree):
         dt: Optional[float] = None,
         nt: Optional[int] = None,
         batch_size: int = 1,
-        results_table: Optional[Any] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -523,15 +522,6 @@ class OscillationTree(SimpleNetworkTree):
         self.init_mean = init_mean
         self.batch_size = batch_size
 
-        if results_table is not None:
-            self._results_table = results_table
-        else:
-            self._results_table = DefaultFactoryDict(default_factory=list)
-
-    @property
-    def results_table(self):
-        return self._results_table
-
     @cached_property
     def _recolor(self):
         return [dict(zip(self.components, p)) for p in permutations(self.components)]
@@ -540,7 +530,8 @@ class OscillationTree(SimpleNetworkTree):
     def _recolor_string(mapping, string):
         return "".join([mapping.get(c, c) for c in string])
 
-    def get_interaction_recolorings(self, genotype: str) -> Iterable[str]:
+    @cache 
+    def get_interaction_recolorings(self, genotype: str) -> list[str]:
         if "::" in genotype:
             components, interactions = genotype.split("::")
         else:
@@ -555,7 +546,8 @@ class OscillationTree(SimpleNetworkTree):
 
         return interaction_recolorings
 
-    def get_component_recolorings(self, genotype: str) -> Iterable[str]:
+    @cache
+    def get_component_recolorings(self, genotype: str) -> list[str]:
         if "::" in genotype:
             components, interactions = genotype.split("::")
         else:
@@ -580,6 +572,23 @@ class OscillationTree(SimpleNetworkTree):
     def get_unique_state(self, genotype: str) -> str:
         return min(self.get_recolorings(genotype))
 
+    def has_motif(self, state, motif):
+        if ("::" in motif) or ("*" in motif):
+            raise ValueError("Motif code should only contain interactions, no components")
+        if "::" not in state:
+            raise ValueError("State code should contain both components and interactions")
+        
+        interaction_code = state.split("::")[1]
+        if not interaction_code:
+            return False
+        state_interactions = set(interaction_code.split("_"))
+
+        for recoloring in self.get_interaction_recolorings(motif):
+            motif_interactions = set(recoloring.split("_"))
+            if motif_interactions.issubset(state_interactions):
+                return True
+        return False
+
     def is_success(self, state: str) -> bool:
         payout = self.graph.nodes[state]["reward"]
         visits = self.graph.nodes[state]["visits"]
@@ -591,7 +600,6 @@ class OscillationTree(SimpleNetworkTree):
         batch_size: Optional[int] = None,
         dt: Optional[float] = None,
         nt: Optional[int] = None,
-        record: bool = False,
     ) -> float:
         dt = dt if dt is not None else self.dt
         nt = nt if nt is not None else self.nt
@@ -599,8 +607,5 @@ class OscillationTree(SimpleNetworkTree):
 
         model = TFNetworkModel(state, initialize=True, dt=dt, nt=nt)
         y_t, pop0s, param_sets, rewards = model.run_batch_job(batch_size, abs=True)
-
-        if record:
-            self.results_table[state].append((pop0s, param_sets, rewards))
 
         return np.mean(rewards)
