@@ -220,10 +220,10 @@ class CircuiTree(ABC):
         if progress_bar:
             from tqdm import trange
 
-            _range = trange
+            iterator = trange(n_steps, desc="MCTS search")
         else:
-            _range = range
-        for i in _range(n_steps):
+            iterator = range(n_steps)
+        for i in iterator:
             selection_path, reward, sim_node = self.traverse(
                 root, accumulate=accumulate, **kwargs
             )
@@ -383,7 +383,7 @@ class CircuiTree(ABC):
         if progress:
             from tqdm import tqdm
 
-            iterator = tqdm(iterator)
+            iterator = tqdm(iterator, desc="BFS search")
         for i in iterator:
             n = next(bfs)
             reward = sum(self.get_reward(n) for _ in range(n_steps_per_node))
