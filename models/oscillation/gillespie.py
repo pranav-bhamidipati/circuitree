@@ -76,6 +76,8 @@ SAMPLED_VAR_NAMES = [
     "gamma_p",
 ]
 
+MEAN_INITIAL_POPULATION = 10.0
+
 
 @njit
 def convert_uniform_to_params(uniform, param_ranges):
@@ -217,15 +219,30 @@ def draw_random_params(rg, param_ranges):
     uniform = np.array([rg.uniform(lo, hi) for lo, hi in param_ranges])
     params = convert_uniform_to_params(uniform, param_ranges)
     return rg, params
- 
+
+
+@njit
+def draw_random_initial_protein(rg, m, poisson_mean):
+    prot0 = rg.poisson(poisson_mean, m)
+    return rg, prot0
+
+
+@njit
+def _population_from_proteins(
+    proteins: np.ndarray, fill_value: int, m: int, n_species: int
+):
+    pop0 = np.full(n_species, fill_value, dtype=np.int64)
+    for i, p in enumerate(proteins):
+        pop0[m + i] = p
+    return pop0
+
 
 @njit
 def draw_random_initial(rg, m, a, r, poisson_mean):
     m2 = 2 * m
     n_species = m2 + a + r
     pop0 = np.zeros(n_species).astype(np.int64)
-    pop0[m:m2] = rg.poisson(poisson_mean, m)
-
+    rg, pop0[m:m2] = draw_random_initial_protein(rg, m, poisson_mean)
     return rg, pop0
 
 
@@ -692,6 +709,10 @@ class GillespieSSA:
         self.dt = dt
         self.nt = nt
         self.time_points = dt * np.arange(nt)
+
+    def population_from_proteins(self, proteins: np.ndarray, fill_value: int = 0):
+        """ """
+        return _population_from_proteins(proteins, fill_value, self.m, self.n_species)
 
     def gillespie_trajectory(self, population_0, *ssa_params):
         """ """
