@@ -6,15 +6,22 @@ import numpy as np
 from scipy.signal import correlate
 
 from circuitree import SimpleNetworkTree
-from circuitree.parallel import DefaultFactoryDict, ParallelTree
+from circuitree.parallel import DefaultFactoryDict
 
-
-from models.oscillation.gillespie import (
-    GillespieSSA,
-    make_matrices_for_ssa,
-    SAMPLING_RANGES,
-    DEFAULT_PARAMS,
-)
+try:
+    from models.oscillation.gillespie import (
+        GillespieSSA,
+        make_matrices_for_ssa,
+        SAMPLING_RANGES,
+        DEFAULT_PARAMS,
+    )
+except ModuleNotFoundError:
+    from gillespie import (
+        GillespieSSA,
+        make_matrices_for_ssa,
+        SAMPLING_RANGES,
+        DEFAULT_PARAMS,
+    )
 
 
 class TFNetworkModel:
@@ -236,6 +243,8 @@ class TFNetworkModel:
         indices: bool = False,
         init_mean: float = 10.0,
         abs: bool = False,
+        pop0: Optional[np.ndarray] = None,
+        params: Optional[np.ndarray] = None,
         **kwargs,
     ):
         """
@@ -247,22 +256,40 @@ class TFNetworkModel:
             self.initialize_ssa(seed, dt, nt, init_mean)
             t = self.t
 
-        if size > 1:
-            pop0, params, y_t = self.run_batch_random(size)
+        if (params is None) and (pop0 is None):
+            if size > 1:
+                pop0, params, y_t = self.run_batch_random(size)
+            else:
+                pop0, params, y_t = self.run_ssa_random_params()
+
+            if not (freqs or indices):
+                results = self.get_acf_minima(y_t, abs=abs)
+            else:
+                results = self.get_acf_minima_and_results(
+                    t, y_t, freqs=freqs, indices=indices, abs=abs
+                )
+
+        elif (params is not None) and (pop0 is not None):
+            size = np.atleast_2d(params).shape[0]
+            if size > 1:
+                y_t = self.run_batch_with_params(pop0, params, size)
+            else:
+                y_t = self.run_ssa_with_params(pop0.flatten(), params.flatten())
+
+            if not (freqs or indices):
+                results = self.get_acf_minima(y_t, abs=abs)
+            else:
+                results = self.get_acf_minima_and_results(
+                    t, y_t, freqs=freqs, indices=indices, abs=abs
+                )
+
         else:
-            pop0, params, y_t = self.run_ssa_random_params()
+            raise ValueError("Either both or neither of params and pop0 must be given.")
 
-        pop0 = pop0[..., self.m : self.m * 2]
-        y_t = y_t[..., self.m : self.m * 2]
+        prots0 = pop0[..., self.m : self.m * 2]
+        prots_t = y_t[..., self.m : self.m * 2]
 
-        if not (freqs or indices):
-            results = self.get_acf_minima(y_t, abs=abs)
-        else:
-            results = self.get_acf_minima_and_results(
-                t, y_t, freqs=freqs, indices=indices, abs=abs
-            )
-
-        return y_t, pop0, params, results
+        return prots_t, prots0, params, results
 
 
 def autocorrelate_mean0(arr1d_norm: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
@@ -284,7 +311,12 @@ def autocorrelate_vectorized(
     time axis."""
     ndarr = data - data.mean(axis=axis, keepdims=True)
     ndarr = np.apply_along_axis(autocorrelate_mean0, axis, ndarr)
-    ndarr /= ndarr.max(axis=axis, keepdims=True)
+    arrmax = ndarr.max(axis=axis, keepdims=True)
+
+    # avoid division by zero when signal is flat
+    arrmax = np.where(arrmax == 0, 1, arrmax)
+
+    ndarr /= arrmax
     return ndarr
 
 
