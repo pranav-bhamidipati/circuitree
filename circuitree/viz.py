@@ -79,12 +79,18 @@ def plot_network(
 
     n_components = len(names)
 
-    angle0 = (0.0, np.pi / 2)[n_components % 2]
-    theta = np.linspace(angle0, angle0 + 2 * np.pi, n_components, endpoint=False)
-    theta = theta % (2 * np.pi)
+    if n_components == 1:
+        # Special case
+        theta = np.array([np.pi / 2])
+        x = np.array([0.0]) + center[0]
+        y = np.array([0.0]) + center[1]
+    elif n_components > 1:
+        angle0 = np.pi / 2
+        theta = np.linspace(angle0, angle0 + 2 * np.pi, n_components, endpoint=False)
+        x = np.cos(theta) + center[0]
+        y = np.sin(theta) + center[1]
 
-    x = np.cos(theta) + center[0]
-    y = np.sin(theta) + center[1]
+    theta = theta % (2 * np.pi)
     xy = np.column_stack([x, y])
 
     colormap = plt.get_cmap(cmap)
@@ -412,4 +418,7 @@ def plot_autoinhibition(
 
 
 def _compute_radius(n_components: int):
-    return 0.25 * np.sqrt(2 * (1 - np.cos(2 * np.pi / n_components)))
+    if n_components == 1:
+        return _compute_radius(2)
+    else:
+        return 0.25 * np.sqrt(2 * (1 - np.cos(2 * np.pi / n_components)))
