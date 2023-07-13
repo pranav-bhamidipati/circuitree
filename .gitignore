@@ -4,6 +4,7 @@ logs
 scratch
 figures
 sacred
+arrayjobs
 
 # Interactive notebooks 
 morph_circuits/*.ipynb
