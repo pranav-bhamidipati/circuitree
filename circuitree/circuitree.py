@@ -188,6 +188,10 @@ class CircuiTree(ABC):
         if graph is None:
             return _accumulated
 
+    @property
+    def terminal_states(self):
+        return (node for node in self.graph.nodes if self.is_terminal(node))
+
     def search_mcts(
         self,
         n_steps: int,

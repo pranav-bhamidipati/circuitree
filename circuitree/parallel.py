@@ -6,11 +6,7 @@ import pandas as pd
 
 from .utils import DefaultFactoryDict, DefaultMapping
 
-__all__ = [
-    "MCTSResult",
-    "ResultsRegistry",
-    "TranspositionTable"
-]
+__all__ = ["MCTSResult", "ResultsRegistry", "TranspositionTable"]
 
 
 @dataclass
@@ -138,6 +134,10 @@ class TranspositionTable:
     def __len__(self):
         return len(self.table)
 
+    @property
+    def shape(self):
+        return len(self.table), self.ncols
+
     def n_visits(self, state):
         """Return number of visits with triggering a default factory call."""
         if state in self.table:
@@ -207,6 +207,13 @@ class TranspositionTable:
         else:
             df = read_func(src, **load_kw)
 
+        if "state" not in df.columns:
+            if df.index.name == "state":
+                df = df.reset_index()
+            else:
+                raise ValueError(
+                    "Dataframe must have a 'state' column or have 'state' as the index."
+                )
         df["state"] = pd.Categorical(df["state"])
         if visit_col not in df.columns:
             df[visit_col] = df.groupby("state").cumcount()
@@ -246,16 +253,16 @@ class TranspositionTable:
         visit_column: str = "visit",
         reward_column: str = "reward",
         state_column: str = "state",
+        **kwargs,
     ):
         table = DefaultFactoryDict(default_factory=ResultsRegistry)
         init_columns = init_columns or []
         param_columns = param_columns or []
         for state, state_table in df.sort_values(visit_column).groupby(state_column):
-            rewards = state_table[reward_column]
+            rewards = state_table[reward_column].abs()
             init_conds = state_table[init_columns].values
             params = state_table[param_columns].values
             table[state].extend(zip(rewards, init_conds, params))
-            ...
 
         colnames = [reward_column] + list(init_columns) + list(param_columns)
         return cls(results_colnames=colnames, table=table)
