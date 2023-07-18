@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from itertools import cycle, chain, repeat
+import json
+from pathlib import Path
 from typing import Callable, Literal, Optional, Iterable, Any
 import numpy as np
 import networkx as nx
@@ -65,13 +67,16 @@ class CircuiTree(ABC):
         self.rg = rg
         self.seed = self.rg.bit_generator._seed_seq.entropy
 
+        self.root = root
         if graph is None:
             self.graph = nx.DiGraph()
+            self.graph.add_node(self.root, visits=0, reward=0)
         else:
             self.graph = graph
-
-        self.root = root
-        self.graph.add_node(self.root, visits=0, reward=0)
+            if self.root not in self.graph:
+                raise ValueError(
+                    f"Supplied graph does not contain the root node: {root}"
+                )
 
         if tree_shape not in ("tree", "dag"):
             raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
@@ -458,6 +463,50 @@ class CircuiTree(ABC):
             graph.edges[n1, n2].update(graph.nodes[n2])
 
         return graph, node, reward
+
+    def to_file(
+        self,
+        gml_file: str | Path,
+        json_file: Optional[str | Path] = None,
+        save_attrs: Optional[Iterable[str]] = None,
+        **kwargs,
+    ):
+        gml_target = Path(gml_file).with_suffix(".gml")
+        nx.write_gml(self.graph, gml_target, **kwargs)
+
+        if json_file is not None:
+            if save_attrs is None:
+                keys = set(self.__dict__.keys()) - set(["graph", "rg"])
+            else:
+                keys = set(save_attrs)
+
+            if "graph" in keys:
+                raise ValueError("Cannot serialize networkx DiGraph objects")
+            if "rg" in keys:
+                raise ValueError("Cannot serialize NumPy BitGenerator objects")
+
+            attrs = {k: v for k, v in self.__dict__.items() if k in keys}
+
+            json_target = Path(json_file).with_suffix(".json")
+            with json_target.open("w") as f:
+                json.dump(attrs, f, indent=4)
+
+            return gml_target, json_target
+
+        else:
+            return gml_target
+
+    @classmethod
+    def from_gml(
+        cls, graph_gml: str | Path, opts_json: Optional[str | Path] = None, **kwargs
+    ):
+        if opts_json is not None:
+            with open(opts_json, "r") as f:
+                kwargs.update(json.load(f))
+
+        graph = nx.read_gml(graph_gml)
+
+        return cls(graph=graph, **kwargs)
 
 
 def accumulate_visits_and_rewards(
