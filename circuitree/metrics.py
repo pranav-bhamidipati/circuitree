@@ -9,6 +9,7 @@ __all__ = [
 
 """Utility functions for recording metrics during a search"""
 
+
 def sequential_reward(graph, n, reward=None, **kwargs):
     return reward
 
@@ -22,6 +23,17 @@ def mcts_reward(graph, selection_path, n, reward=None, **kwargs):
 
 
 def mcts_reward_and_modularity_estimate(
-    root, graph, selection_path, n, reward=None, **kwargs
+    graph, selection_path, n, reward=None, **kwargs
 ):
-    return reward, tree_modularity_estimate(graph, root, **kwargs)
+    return reward, tree_modularity_estimate(graph, graph.root, **kwargs)
+
+
+def mcts_reward_and_nodes_visited(graph, selection_path, n, reward=None, **kwargs):
+    simulated_node = selection_path[-1] if selection_path else graph.root
+    return reward, n, simulated_node
+
+
+def mcts_reward_nodes_and_modularity_estimate(graph, selection_path, n, reward=None, **kwargs):
+    simulated_node = selection_path[-1] if selection_path else graph.root
+    MThat = tree_modularity_estimate(graph, graph.root, **kwargs)
+    return reward, n, simulated_node, MThat

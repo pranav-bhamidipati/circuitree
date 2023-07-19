@@ -47,6 +47,10 @@ class SimpleNetworkTree(CircuiTree):
         self.interactions = interactions
         self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
 
+        self._non_serializable_attrs.extend(
+            ["component_map", "interaction_map", "edge_options", "_recolor"]
+        )
+
     @cached_property
     def edge_options(self):
         return [
@@ -197,6 +201,10 @@ class DimerNetworkTree(CircuiTree):
         self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
 
         self.n_binding_sites = n_binding_sites
+
+        self._non_serializable_attrs.extend(
+            ["component_map", "regulator_map", "interaction_map"]
+        )
 
     @cached_property
     def dimer_options(self):

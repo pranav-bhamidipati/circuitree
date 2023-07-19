@@ -50,6 +50,7 @@ class CircuiTree(ABC):
         graph: Optional[nx.DiGraph] = None,
         tree_shape: Literal["tree", "dag"] = "dag",
         score_func: Optional[Callable] = None,
+        **kwargs,
     ):
         if exploration_constant is None:
             self.exploration_constant = np.sqrt(2)
@@ -77,6 +78,7 @@ class CircuiTree(ABC):
                 raise ValueError(
                     f"Supplied graph does not contain the root node: {root}"
                 )
+        self.graph.root = self.root
 
         if tree_shape not in ("tree", "dag"):
             raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
@@ -86,6 +88,13 @@ class CircuiTree(ABC):
             self._score_func = ucb_score
         else:
             self._score_func = score_func
+
+        self._non_serializable_attrs = [
+            "_non_serializable_attrs",
+            "rg",
+            "graph",
+            "_score_func",
+        ]
 
     def _do_action(self, state: Any, action: Any):
         new_state = self.do_action(state, action)
@@ -222,30 +231,38 @@ class CircuiTree(ABC):
         if root not in self.graph.nodes:
             self.graph.add_node(root, visits=0, reward=0)
 
-        if metric_func is None:
-            metric_func = lambda *a, **kw: None
-
-        metrics = [metric_func(self.graph, [], root, None, **kwargs)]
         if progress_bar:
             from tqdm import trange
 
             iterator = trange(n_steps, desc="MCTS search")
         else:
             iterator = range(n_steps)
-        for i in iterator:
-            selection_path, reward, sim_node = self.traverse(
-                root, accumulate=accumulate, **kwargs
-            )
-            if not i % save_every:
-                m = metric_func(self.graph, selection_path, sim_node, reward, **kwargs)
-                metrics.append(m)
+            
+        
+        if metric_func is None:
+            for i in iterator:
+                selection_path, reward, sim_node = self.traverse(
+                    root, accumulate=accumulate, **kwargs
+                )
 
-        # Accumulate results on nodes post-hoc rather than at each step
+        else:
+            metrics = [metric_func(self.graph, [], root, None, **kwargs)]
+            for i in iterator:
+                selection_path, reward, sim_node = self.traverse(
+                    root, accumulate=accumulate, **kwargs
+                )
+                if i % save_every == 0:
+                    m = metric_func(self.graph, selection_path, sim_node, reward, **kwargs)
+                    metrics.append(m)
+
+        # Accumulate results from edges onto nodes
         if accumulate_post:
             self.accumulate_visits_and_rewards()
 
         if metric_func is not None:
             return metrics
+        else:
+            return None
 
     def grow_tree(
         self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
@@ -476,14 +493,14 @@ class CircuiTree(ABC):
 
         if json_file is not None:
             if save_attrs is None:
-                keys = set(self.__dict__.keys()) - set(["graph", "rg"])
+                keys = set(self.__dict__.keys()) - set(self._non_serializable_attrs)
             else:
                 keys = set(save_attrs)
-
-            if "graph" in keys:
-                raise ValueError("Cannot serialize networkx DiGraph objects")
-            if "rg" in keys:
-                raise ValueError("Cannot serialize NumPy BitGenerator objects")
+                if non_serializable := (keys & set(self._non_serializable_attrs)):
+                    repr_non_ser = ", ".join(non_serializable)
+                    raise ValueError(
+                        f"Attempting to save non-serializable attributes: {repr_non_ser}."
+                    )
 
             attrs = {k: v for k, v in self.__dict__.items() if k in keys}
 
@@ -497,11 +514,11 @@ class CircuiTree(ABC):
             return gml_target
 
     @classmethod
-    def from_gml(
-        cls, graph_gml: str | Path, opts_json: Optional[str | Path] = None, **kwargs
+    def from_file(
+        cls, graph_gml: str | Path, attrs_json: Optional[str | Path] = None, **kwargs
     ):
-        if opts_json is not None:
-            with open(opts_json, "r") as f:
+        if attrs_json is not None:
+            with open(attrs_json, "r") as f:
                 kwargs.update(json.load(f))
 
         graph = nx.read_gml(graph_gml)
