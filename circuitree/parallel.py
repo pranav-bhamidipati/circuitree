@@ -14,19 +14,10 @@ class MCTSResult:
     reward: float
     initial_conditions: Iterable[float | int]
     params: Iterable[float | int]
-    _metadata: Optional[Any] = None
-
-    @property
-    def metadata(self):
-        if self._metadata is None:
-            return ()
-        elif isinstance(self._metadata, Iterable):
-            return tuple(self._metadata)
-        else:
-            return (self._metadata,)
+    extras: Optional[Any] = field(default_factory=list)
 
     def unpack(self):
-        return self.reward, *self.initial_conditions, *self.params, *self.metadata
+        return self.reward, *self.initial_conditions, *self.params, *self.extras
 
 
 @dataclass
@@ -44,10 +35,16 @@ class ResultsRegistry:
         return iter(self.visit_results)
 
     def append(self, results):
-        self.visit_results.append(MCTSResult(results))
+        if isinstance(results, MCTSResult):
+            self.visit_results.append(results)
+        else:
+            self.visit_results.append(MCTSResult(*results))
 
     def extend(self, batch_results):
-        self.visit_results.extend([MCTSResult(*r) for r in batch_results])
+        batch = [
+            r if isinstance(r, MCTSResult) else MCTSResult(*r) for r in batch_results
+        ]
+        self.visit_results.extend(batch)
 
     def unpack_results(self):
         return list(zip(*(results.unpack() for results in self.visit_results)))
@@ -196,14 +193,7 @@ class TranspositionTable:
         **kwargs,
     ):
         if isinstance(src, Iterable):
-            if progress:
-                from tqdm import tqdm
-
-                df = pd.concat(
-                    [read_func(f, **load_kw) for f in tqdm(src, desc="Loading data")]
-                )
-            else:
-                df = pd.concat([read_func(f, **load_kw) for f in src])
+            df = pd.concat([read_func(f, **load_kw) for f in src])
         else:
             df = read_func(src, **load_kw)
 
@@ -218,7 +208,9 @@ class TranspositionTable:
         if visit_col not in df.columns:
             df[visit_col] = df.groupby("state").cumcount()
 
-        return cls.from_dataframe(df, visit_column=visit_col, **kwargs)
+        return cls.from_dataframe(
+            df, visit_column=visit_col, progress=progress, **kwargs
+        )
 
     @classmethod
     def from_csv(cls, source, **kwargs):
@@ -253,12 +245,27 @@ class TranspositionTable:
         visit_column: str = "visit",
         reward_column: str = "reward",
         state_column: str = "state",
+        progress: bool = False,
         **kwargs,
     ):
         table = DefaultFactoryDict(default_factory=ResultsRegistry)
         init_columns = init_columns or []
         param_columns = param_columns or []
-        for state, state_table in df.sort_values(visit_column).groupby(state_column):
+        df = df.reindex(
+            columns=[state_column, visit_column, reward_column]
+            + list(init_columns)
+            + list(param_columns)
+        ).sort_values([state_column, visit_column])
+        grouped = df.groupby(state_column)
+
+        if progress:
+            from tqdm import tqdm
+
+            iterator = tqdm(grouped, desc="Loading transposition table")
+        else:
+            iterator = grouped
+
+        for state, state_table in iterator:
             rewards = state_table[reward_column].abs()
             init_conds = state_table[init_columns].values
             params = state_table[param_columns].values
