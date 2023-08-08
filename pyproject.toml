@@ -64,4 +64,3 @@ build-backend = "poetry.core.masonry.api"
 
 [virtualenvs]
 in-project = true
-prefer-active-python = true

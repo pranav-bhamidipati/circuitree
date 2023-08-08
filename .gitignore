@@ -1,14 +1,3 @@
-# Large/unnecessary files (can be symlink)
-data
-logs
-scratch
-figures
-sacred
-arrayjobs
-
-# Interactive notebooks 
-morph_circuits/*.ipynb
-
 # VS Code
 .vscode/
 
