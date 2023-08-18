@@ -237,8 +237,7 @@ class CircuiTree(ABC):
             iterator = trange(n_steps, desc="MCTS search")
         else:
             iterator = range(n_steps)
-            
-        
+
         if metric_func is None:
             for i in iterator:
                 selection_path, reward, sim_node = self.traverse(
@@ -252,7 +251,9 @@ class CircuiTree(ABC):
                     root, accumulate=accumulate, **kwargs
                 )
                 if i % save_every == 0:
-                    m = metric_func(self.graph, selection_path, sim_node, reward, **kwargs)
+                    m = metric_func(
+                        self.graph, selection_path, sim_node, reward, **kwargs
+                    )
                     metrics.append(m)
 
         # Accumulate results from edges onto nodes

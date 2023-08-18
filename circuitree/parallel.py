@@ -171,7 +171,7 @@ class TranspositionTable:
         if rg is None:
             rg = np.random.default_rng()
         indices = rg.integers(0, len(self.table[state]), size=size)
-        return [self.table[state][i] for i in indices]
+        return indices, [self.table[state][i] for i in indices]
 
     def draw_bootstrap_reward(
         self, state: str, size: int, rg: Optional[np.random.Generator] = None
@@ -180,7 +180,7 @@ class TranspositionTable:
         if rg is None:
             rg = np.random.default_rng()
         indices = rg.integers(0, len(self.table[state]), size=size)
-        return np.array([self.table[state][i].reward for i in indices])
+        return indices, np.array([self.table[state][i].reward for i in indices])
 
     @classmethod
     def _load_from_source(
