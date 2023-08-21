@@ -1,76 +1,28 @@
-from dataclasses import dataclass, field
+from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Callable, Iterable, Optional
 import numpy as np
 import pandas as pd
 
-from .utils import DefaultFactoryDict, DefaultMapping
+from .utils import DefaultMapping
 
-__all__ = ["MCTSResult", "ResultsRegistry", "TranspositionTable"]
-
-
-@dataclass
-class MCTSResult:
-    reward: float
-    initial_conditions: Iterable[float | int]
-    params: Iterable[float | int]
-    extras: Optional[Any] = field(default_factory=list)
-
-    def unpack(self):
-        return self.reward, *self.initial_conditions, *self.params, *self.extras
-
-
-@dataclass
-class ResultsRegistry:
-    state: str
-    visit_results: list[MCTSResult] = field(default_factory=list)
-
-    def __getitem__(self, visit: int):
-        return self.visit_results[visit]
-
-    def __len__(self):
-        return len(self.visit_results)
-
-    def __iter__(self):
-        return iter(self.visit_results)
-
-    def append(self, results):
-        if isinstance(results, MCTSResult):
-            self.visit_results.append(results)
-        else:
-            self.visit_results.append(MCTSResult(*results))
-
-    def extend(self, batch_results):
-        batch = [
-            r if isinstance(r, MCTSResult) else MCTSResult(*r) for r in batch_results
-        ]
-        self.visit_results.extend(batch)
-
-    def unpack_results(self):
-        return list(zip(*(results.unpack() for results in self.visit_results)))
-
-    @property
-    def rewards(self):
-        return (r.reward for r in self.visit_results)
+__all__ = [
+    "TranspositionTable",
+]
 
 
 class TranspositionTable:
     """
-    A transposition table for storing results of MCTS with stochastic playouts.
+    Stores the history of reward payouts at each visit to each state in a decision tree.
+    Used to store results and simulate playouts of a stochastic game.
 
     In a stochastic game, each visit to a terminal state yields a different result.
-    For a given random series of playouts, the result `vals` of visit number `i` to
-    state `s` is stored as ...
+    For a given random series of playouts, the reward values to a terminal state `s` are
+    stored in a list `vals`. The reward for visit `n` to state `s` can be accessed as:
 
+    ```TranspositionTable[s, n]```
 
-    [[under construction]]
-
-    `TranspositionTable[s, i] = vals`.
-
-    The first element of `vals` is the reward value, which will be accessed by the
-    MCTS algorithm. The next elements are the initial conditions of the playout and
-    the parameters used. The remaining elements of `vals` are other metadata of the
-    simulated playout (returned by the `metric_func` function).
+    The full list of rewards for state `s` can be accessed as `TranspositionTable[s]`.
     """
 
     def __new__(cls, *args, **kwargs):
@@ -82,21 +34,20 @@ class TranspositionTable:
 
     def __init__(
         self,
-        results_colnames: Iterable[str],
-        table: Optional[DefaultMapping[str, ResultsRegistry]] = None,
+        table: Optional[DefaultMapping[str, list]] = None,
     ):
-        self.columns = tuple(results_colnames)
-        self.ncols = len(self.columns)
         if table is None:
-            _table = DefaultFactoryDict(default_factory=ResultsRegistry)
+            self._table = defaultdict(list)
         elif isinstance(table, DefaultMapping):
-            _table = table
+            self._table = table
         else:
             raise TypeError(
                 f"table must be a DefaultMapping, not {type(table).__name__}"
             )
 
-        self.table: DefaultMapping[str, ResultsRegistry] = _table
+    @property
+    def table(self):
+        return self._table
 
     def __getitem__(self, state_wwo_visit):
         """Access the results of visit(s) to a state. If no visit number is specified,
@@ -118,7 +69,7 @@ class TranspositionTable:
                     f"{n_visits} total visits."
                 )
             case state:
-                self.table[state] = ResultsRegistry(state)
+                self.table[state] = self._default_factory()
                 return self.table[state]
 
     def __contains__(self, state_wwo_visit):
@@ -131,19 +82,12 @@ class TranspositionTable:
     def __len__(self):
         return len(self.table)
 
-    @property
-    def shape(self):
-        return len(self.table), self.ncols
-
     def n_visits(self, state):
         """Return number of visits with triggering a default factory call."""
         if state in self.table:
             return len(self.table[state])
         else:
             return 0
-
-    def get_reward(self, state: str, visit: int):
-        return self.table[state][visit].reward
 
     def keys(self):
         return self.table.keys()
@@ -154,24 +98,14 @@ class TranspositionTable:
     def items(self):
         return self.table.items()
 
-    def draw_random_result(self, state: str, rg: Optional[np.random.Generator] = None):
-        """Draw a random result from state `state`."""
-        index = rg.integers(0, len(self.table[state]))
-        return self.table[state][index]
-
-    def draw_random_reward(self, state: str, rg: Optional[np.random.Generator] = None):
-        """Draw a random result from state `state`."""
-        index = rg.integers(0, len(self.table[state]))
-        return self.table[state][index].reward
-
-    def draw_bootstrap(
-        self, state: str, size: int, rg: Optional[np.random.Generator] = None
-    ):
-        """Draw a bootstrap sample of size `size` from the results for `state`."""
+    def draw_random_reward(
+        self, state: str, rg: Optional[np.random.Generator] = None
+    ) -> tuple[int, float]:
+        """Draw a random visit number and resulting reward from state `state`."""
         if rg is None:
             rg = np.random.default_rng()
-        indices = rg.integers(0, len(self.table[state]), size=size)
-        return indices, [self.table[state][i] for i in indices]
+        index = rg.integers(0, len(self.table[state]))
+        return index, self.table[state, index]
 
     def draw_bootstrap_reward(
         self, state: str, size: int, rg: Optional[np.random.Generator] = None
@@ -180,7 +114,8 @@ class TranspositionTable:
         if rg is None:
             rg = np.random.default_rng()
         indices = rg.integers(0, len(self.table[state]), size=size)
-        return indices, np.array([self.table[state][i].reward for i in indices])
+        state_table = self.table[state]
+        return indices, np.array([state_table[i] for i in indices])
 
     @classmethod
     def _load_from_source(
@@ -188,28 +123,42 @@ class TranspositionTable:
         read_func: Callable,
         src: Iterable[Path | str] | Path | str,
         progress: bool = False,
+        state_col: str = "state",
         visit_col: str = "visit",
-        load_kw: Mapping[str, Any] = {},
-        **kwargs,
+        reward_col: str = "reward",
+        **load_kwargs,
     ):
         if isinstance(src, Iterable):
-            df = pd.concat([read_func(f, **load_kw) for f in src])
-        else:
-            df = read_func(src, **load_kw)
+            if progress:
+                from tqdm import tqdm
 
-        if "state" not in df.columns:
-            if df.index.name == "state":
-                df = df.reset_index()
+                iter_src = tqdm(src)
             else:
-                raise ValueError(
-                    "Dataframe must have a 'state' column or have 'state' as the index."
-                )
-        df["state"] = pd.Categorical(df["state"])
+                iter_src = src
+            df = pd.concat([read_func(f, **load_kwargs) for f in iter_src])
+        else:
+            df = read_func(src, **load_kwargs)
+
+        if state_col in df.columns:
+            df.set_index(state_col, inplace=True)
+
+        if df.index.name == state_col:
+            df.index = pd.CategoricalIndex(df.index, ordered=True)
+        else:
+            raise ValueError(
+                f"Dataframe does not have a column or index named '{state_col}'."
+            )
+
+        if reward_col not in df.columns:
+            raise ValueError(f"Dataframe does not have a column named '{reward_col}'.")
+
         if visit_col not in df.columns:
-            df[visit_col] = df.groupby("state").cumcount()
+            df[visit_col] = df.groupby(state_col).cumcount()
 
         return cls.from_dataframe(
-            df, visit_column=visit_col, progress=progress, **kwargs
+            df,
+            visit_column=visit_col,
+            reward_column=reward_col,
         )
 
     @classmethod
@@ -240,48 +189,23 @@ class TranspositionTable:
     def from_dataframe(
         cls,
         df: pd.DataFrame,
-        init_columns: Optional[Iterable[str]] = None,
-        param_columns: Optional[Iterable[str]] = None,
         visit_column: str = "visit",
         reward_column: str = "reward",
-        state_column: str = "state",
-        progress: bool = False,
-        **kwargs,
     ):
-        table = DefaultFactoryDict(default_factory=ResultsRegistry)
-        init_columns = init_columns or []
-        param_columns = param_columns or []
-        df = df.reindex(
-            columns=[state_column, visit_column, reward_column]
-            + list(init_columns)
-            + list(param_columns)
-        ).sort_values([state_column, visit_column])
-        grouped = df.groupby(state_column)
+        table = defaultdict(list)
+        grouped = (
+            df[[visit_column, reward_column]]
+            .sort_values(visit_column)
+            .groupby(level=0)[reward_column]
+        )
+        for state, rewards in grouped:
+            table[state] = rewards.to_list()
+        return cls(table=table)
 
-        if progress:
-            from tqdm import tqdm
-
-            iterator = tqdm(grouped, desc="Loading transposition table")
-        else:
-            iterator = grouped
-
-        for state, state_table in iterator:
-            rewards = state_table[reward_column].abs()
-            init_conds = state_table[init_columns].values
-            params = state_table[param_columns].values
-            table[state].extend(zip(rewards, init_conds, params))
-
-        colnames = [reward_column] + list(init_columns) + list(param_columns)
-        return cls(results_colnames=colnames, table=table)
-
-    def to_dataframe(self):
-        data = {
-            state: pd.DataFrame([v.unpack() for v in res], columns=self.columns)
-            for state, res in self.table.items()
-        }
-        df = pd.concat(data, names=["state", "visit"])
-        df = df.reset_index(level="visit")
-        df.index = pd.CategoricalIndex(df.index, ordered=True, name="state")
+    def to_dataframe(self, state_col: str = "state", visit_col: str = "visit"):
+        df = pd.concat({k: pd.Series(v) for k, v in self.table.items()})
+        df.reset_index(names=[state_col, visit_col], inplace=True)
+        df[state_col] = df[state_col].astype("category")
         return df
 
     def to_csv(self, fname, **kwargs):
