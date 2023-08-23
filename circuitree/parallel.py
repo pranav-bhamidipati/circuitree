@@ -1,10 +1,9 @@
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional, Sequence
 import numpy as np
 import pandas as pd
-import warnings
 
 from .circuitree import CircuiTree
 from .utils import DefaultMapping, defaultlist
@@ -19,38 +18,34 @@ __all__ = [
 @dataclass
 class ParameterTable:
     seeds: Iterable[int]
-    initial_conditions: Optional[defaultlist[Any]] = field(default_factory=defaultlist)
-    parameter_sets: Optional[defaultlist[Any]] = field(default_factory=defaultlist)
+    initial_conditions: Optional[Sequence[Any]] = field(default_factory=list)
+    parameter_sets: Optional[Sequence[Any]] = field(default_factory=list)
+    wrap_index: bool = True
 
     """Stores a table of parameter sets that are used as inputs for a stochastic game.
-    Each row includes a random seed and columns for any initial conditions and parameter 
-    values."""
+    For each visit there is a random seed, a set of initial conditions, and a set of 
+    parameter values."""
 
     def __post_init__(self):
         n = len(self.seeds)
         n_init = len(self.initial_conditions)
         n_params = len(self.parameter_sets)
-        if n_init not in (0, n) or n_params not in (0, n):
+        if n_init != n or n_params != n:
             raise ValueError(
-                "Number of initial conditions and parameters must be zero or equal to "
-                "the number of random seeds"
+                "Number of initial conditions, parameter sets, and random seeds "
+                "must be equal."
             )
 
     def __len__(self):
         return len(self.seeds)
 
     def __getitem__(self, index):
+        if self.wrap_index:
+            index = index % len(self)
         return (
             self.seeds[index],
-            self.initial_conditions.getdefault(index, None),
-            self.parameter_sets.getdefault(index, None),
-        )
-
-    def __slice__(self, start, stop, step):
-        return (
-            self.seeds[start:stop:step],
-            self.initial_conditions[start:stop:step],
-            self.parameter_sets[start:stop:step],
+            self.initial_conditions[index],
+            self.parameter_sets[index],
         )
 
     @classmethod
@@ -330,11 +325,9 @@ class ParallelTree(CircuiTree):
     def __init__(
         self,
         *,
-        parameter_table: Optional[TranspositionTable] = None,
+        parameter_table: Optional[ParameterTable] = None,
         transposition_table: Optional[TranspositionTable] = None,
         counter: Counter = None,
-        bootstrap: bool = False,
-        warn_if_nan: bool = True,
         seed_col: Optional[str] = None,
         param_cols: Optional[Iterable[str]] = None,
         init_cols: Optional[Iterable[str]] = None,
@@ -352,10 +345,8 @@ class ParallelTree(CircuiTree):
         else:
             self._parameter_table = parameter_table
         self._transposition_table = TranspositionTable(transposition_table)
-        self.visit_counter = Counter(counter)
 
-        self.bootstrap = bootstrap
-        self.warn_if_nan = warn_if_nan
+        self.visit_counter = Counter(counter)
 
         # Specify any attributes that should not be serialized when dumping to file
         self._non_serializable_attrs.extend(
@@ -367,82 +358,12 @@ class ParallelTree(CircuiTree):
         )
 
     @property
-    def param_table(self):
+    def param_table(self) -> ParameterTable:
         return self._parameter_table
 
     @property
-    def ttable(self):
+    def ttable(self) -> TranspositionTable:
         return self._transposition_table
 
     def reset_counter(self):
         self.visit_counter.clear()
-
-    def simulate_visits(self, state, visits) -> tuple[list[float], dict[str, Any]]:
-        """Should return a list of reward values and a dictionary of any data
-        to be analyzed. Takes a state and a list of which visits to simulate.
-        Random seeds, parameter sets, and initial conditions are selected from
-        the parameter table `self.param_table`."""
-        raise NotImplementedError
-
-    def save_results(self, state, visits, rewards, data: dict[str, Any]) -> None:
-        """Optionally save the results of simulated visits. May or may not update the
-        transposition table. Parameter sets and initial conditions can be accessed from
-        the parameter table `self.param_table`."""
-        raise NotImplementedError
-
-    def _draw_bootstrap_reward(self, state, maxiter=100):
-        indices, rewards = self.ttable.draw_bootstrap_reward(
-            state=state, size=self.batch_size, rg=self.rg
-        )
-
-        # Replace any nans with new draws
-        for _ in range(maxiter):
-            where_nan = np.isnan(rewards)
-            if not where_nan.any():
-                break
-            indices, new_rewards = self.ttable.draw_bootstrap_reward(
-                state=state, size=where_nan.sum(), rg=self.rg
-            )
-            rewards[where_nan] = new_rewards
-        else:
-            # If maxiter was reached, (probably) all rewards for a state are NaN
-            if where_nan.any():
-                raise RuntimeError(
-                    f"Could not resolve NaN rewards in {maxiter} iterations of "
-                    f"bootstrap sampling. Perhaps all rewards for state {state} "
-                    "are NaN?"
-                )
-
-        return rewards.mean()
-
-    def get_reward(self, state, maxiter=100):
-        if self.bootstrap:
-            return self._draw_bootstrap_reward(state, maxiter=maxiter)
-
-        visit = self.visit_counter[state]
-        n_recorded_visits = self.ttable.n_visits(state)
-        n_to_read = np.clip(n_recorded_visits - visit, 0, self.batch_size)
-        n_to_simulate = self.batch_size - n_to_read
-
-        rewards = self.ttable[state, visit : visit + n_to_read]
-
-        if n_to_simulate > 0:
-            sim_visits = visit + n_to_read + np.arange(n_to_simulate)
-            sim_rewards, sim_data = self.simulate_visits(state, sim_visits)
-            self.save_results(state, sim_visits, sim_rewards, sim_data)
-            rewards.extend(sim_rewards)
-
-        self.visit_counter[state] += self.batch_size
-
-        nan_rewards = np.isnan(rewards)
-        if nan_rewards.all():
-            if self.warn_if_nan:
-                warnings.warn(f"All rewards in batch are NaNs. Skipping this batch.")
-            reward = self.get_reward(state)
-        elif nan_rewards.any():
-            if self.warn_if_nan:
-                warnings.warn(f"Found NaN rewards in batch.")
-            reward = np.nanmean(rewards)
-        else:
-            reward = np.mean(rewards)
-        return reward
