@@ -4,24 +4,11 @@ from numpy import vectorize
 from abc import ABC
 
 __all__ = [
-    "defaultlist",
     "DefaultMapping",
     "DefaultFactoryDict",
     "ceiling",
     "vround",
 ]
-
-
-class defaultlist(list):
-    """A list type with a getdefault() method analogous to dict.get()"""
-
-    def getdefault(self, index, default):
-        if index < 0:
-            index += len(self)
-        if index < 0 or index >= len(self):
-            return default
-        else:
-            return self[index]
 
 
 class DefaultMapping(ABC, Mapping):
