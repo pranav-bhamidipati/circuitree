@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from .circuitree import CircuiTree
-from .utils import DefaultMapping, defaultlist
+from .utils import DefaultMapping
 
 __all__ = [
     "ParameterTable",
@@ -65,9 +65,9 @@ class ParameterTable:
 
         kw = {}
         if init_cols:
-            kw["initial_conditions"] = defaultlist(df[init_cols].values)
+            kw["initial_conditions"] = list(df[init_cols].values)
         if param_cols:
-            kw["parameter_sets"] = defaultlist(df[param_cols].values)
+            kw["parameter_sets"] = list(df[param_cols].values)
 
         return cls(df[seed_col].tolist(), **kw)
 
@@ -287,8 +287,10 @@ class TranspositionTable:
         return cls(table=table)
 
     def to_dataframe(self, state_col: str = "state", visit_col: str = "visit"):
-        df = pd.concat({k: pd.Series(v) for k, v in self.table.items()})
-        df.reset_index(names=[state_col, visit_col], inplace=True)
+        df = pd.concat(
+            {k: pd.Series(v) for k, v in self.table.items()},
+            names=[state_col, visit_col],
+        ).reset_index()
         df[state_col] = df[state_col].astype("category")
         return df
 
