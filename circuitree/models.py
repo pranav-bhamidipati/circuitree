@@ -2,7 +2,7 @@ from collections import Counter
 from functools import cached_property, cache
 from itertools import product, permutations
 import numpy as np
-from typing import Iterable
+from typing import Iterable, Optional
 from .circuitree import CircuiTree
 
 __all__ = ["SimpleNetworkTree", "DimerNetworkTree"]
@@ -33,7 +33,11 @@ class SimpleNetworkTree(CircuiTree):
     """
 
     def __init__(
-        self, components: Iterable[Iterable[str]], interactions: Iterable[str], **kwargs
+        self,
+        components: Iterable[Iterable[str]],
+        interactions: Iterable[str],
+        max_interactions: Optional[int] = None,
+        **kwargs,
     ):
         if len(set(c[0] for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
@@ -46,6 +50,11 @@ class SimpleNetworkTree(CircuiTree):
         self.component_map = {c[0]: c for c in self.components}
         self.interactions = interactions
         self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
+
+        if max_interactions is None:
+            self.max_interactions = len(self.components) ** 2  # all possible edges
+        else:
+            self.max_interactions = max_interactions
 
         self._non_serializable_attrs.extend(
             ["component_map", "interaction_map", "edge_options", "_recolor"]
@@ -65,22 +74,17 @@ class SimpleNetworkTree(CircuiTree):
         # Terminating assembly is always an option
         actions = ["*terminate*"]
 
-        components, interactions_joined = genotype.strip("*").split("::")
-        interactions = set(ixn[:2] for ixn in interactions_joined.split("_"))
-        for component in self.components:
-            c0 = component[0]
-            if c0 not in components:
-                actions.append(c0)
+        components_joined, interactions_joined = genotype.strip("*").split("::")
+        components = set(components_joined)
+        interactions = set(ixn[:2] for ixn in interactions_joined.split("_") if ixn)
+        if len(interactions) >= self.max_interactions:
+            return actions
+        actions.extend(list(set(c[0] for c in self.components) - components))
         for action_group in self.edge_options:
             if action_group:
-                c1, c2, _ = action_group[0]
-                if (
-                    (c1 in components)
-                    and (c2 in components)
-                    and (c1 + c2) not in interactions
-                ):
-                    for action in action_group:
-                        actions.append(action)
+                c1_c2 = action_group[0][:2]
+                if set(c1_c2) <= components and c1_c2 not in interactions:
+                    actions.extend(action_group)
 
         return actions
 
@@ -88,19 +92,15 @@ class SimpleNetworkTree(CircuiTree):
         if action == "*terminate*":
             new_genotype = "*" + genotype
         else:
-            # Root node
-            if genotype == ".":
-                components = list()
-                interactions = list()
-            else:
-                components, interactions = genotype.split("::")
+            components, interactions = genotype.split("::")
             if len(action) == 1:
                 new_genotype = "".join([components, action, "::", interactions])
             elif len(action) == 3:
-                delim = ("", "_")[bool(interactions)]
-                new_genotype = "::".join(
-                    [components, delim.join([interactions, action])]
-                )
+                if interactions:
+                    delim = "_"
+                else:
+                    delim = ""
+                new_genotype = "::".join([components, interactions + delim + action])
         return new_genotype
 
     @staticmethod
@@ -168,9 +168,13 @@ class DimerNetworkTree(CircuiTree):
         - Interactions are separated from one another by underscores ``_``
         - A terminal assembly is denoted with a leading asterisk ``*``
 
-        For example, the following string represents a terminally assembled circuit
-        that encodes a 2-component MultiFate system with a regulator L that flips the
-        system into the A state:
+        For example, the following string represents a 2-component MultiFate system that
+        has not been fully assembled (lacks the terminal asterisk):
+
+            ``AB+::AAa_BBa``
+
+        While the following string represents a terminally assembled 2-component
+        MultiFate system with a regulator L that flips the system into the A state:
 
             ``*AB+L::AAa_ALa_BBa_BLi``
 
@@ -235,11 +239,10 @@ class DimerNetworkTree(CircuiTree):
         actions = ["*terminate*"]
 
         components, regulators, interactions_joined = self.get_genotype_parts(genotype)
-        n_bound = Counter()
-        for ixn in interactions_joined.split("_"):
-            if ixn:
-                n_bound[ixn[3]] += 1
-
+        actions.extend(list(set(self.components) - set(components)))
+        regulators_to_add = set(self.regulators) - set(regulators)
+        actions.extend([f"+{r}" for r in regulators_to_add])
+        n_bound = Counter(ixn[3] for ixn in interactions_joined.split("_") if ixn)
         for action_group in self.edge_options:
             if action_group:
                 promoter = action_group[0][-1]
@@ -249,56 +252,53 @@ class DimerNetworkTree(CircuiTree):
         return actions
 
     def do_action(self, genotype: str, action: str) -> str:
+        action_len = len(action)
+        components, regulators, interactions = self.get_genotype_parts(genotype)
         if action == "*terminate*":
-            new_genotype = "*" + genotype
-        else:
-            components_and_regulators, interactions = genotype.split("::")
-            delim = ("", "_")[bool(interactions)]
-            new_genotype = "::".join(
-                [components_and_regulators, delim.join([interactions, action])]
-            )
-        return new_genotype
+            components = "*" + components
+        elif action_len == 1:
+            components = components + action
+        elif action_len == 2 and action[0] == "+":
+            regulators = regulators + action[1]
+        elif action_len == 4:
+            ixn_list = interactions.split("_") if interactions else []
+            interactions = "_".join(ixn_list + [action])
+        return components + "+" + regulators + "::" + interactions
 
     @staticmethod
     @cache
     def get_unique_state(genotype: str) -> str:
         components_and_regulators, interactions = genotype.split("::")
-        prefix = ""
-        if components_and_regulators.startswith("*"):
+        components, regulators = components_and_regulators.split("+")
+        if components.startswith("*"):
             prefix = "*"
-            components_and_regulators = components_and_regulators[1:]
-        if "+" in components_and_regulators:
-            components, regulators = components_and_regulators.split("+")
-            unique_regulators = "".join(sorted(components))
-            joiner = "+"
+            components = components[1:]
         else:
-            components = components_and_regulators
-            unique_regulators = ""
-            joiner = ""
-
+            prefix = ""
         unique_components = "".join(sorted(components))
-        unique_components_and_regulators = joiner.join(
-            [unique_components, unique_regulators]
-        )
-
+        unique_regulators = "".join(sorted(regulators))
         unique_interaction_list = []
         for ixn in interactions.split("_"):
-            m1, m2, logic, promoter = ixn
-            unique_ixn = "".join(sorted([m1, m2])) + logic + promoter
+            *monomers, logic, promoter = ixn
+            unique_ixn = "".join(sorted(monomers)) + logic + promoter
             unique_interaction_list.append(unique_ixn)
         unique_interactions = "_".join(sorted(unique_interaction_list))
-
-        return prefix + unique_components_and_regulators + "::" + unique_interactions
+        unique_genotype = "".join(
+            [
+                prefix,
+                unique_components,
+                "+",
+                unique_regulators,
+                "::",
+                unique_interactions,
+            ]
+        )
+        return unique_genotype
 
     @staticmethod
     def get_genotype_parts(genotype: str):
         components_and_regulators, interactions = genotype.strip("*").split("::")
-        if "+" in components_and_regulators:
-            components, regulators = components_and_regulators.split("+")
-        else:
-            components = components_and_regulators
-            regulators = ""
-
+        components, regulators = components_and_regulators.split("+")
         return components, regulators, interactions
 
     @staticmethod
@@ -309,31 +309,30 @@ class DimerNetworkTree(CircuiTree):
             )
 
         components_and_regulators, interaction_codes = genotype.strip("*").split("::")
-        if "+" in components_and_regulators:
-            components, regulators = components_and_regulators.split("+")
-        else:
-            components = components_and_regulators
-            regulators = ""
+        components, regulators = components_and_regulators.split("+")
         component_indices = {c: i for i, c in enumerate(components + regulators)}
 
         interactions = interaction_codes.split("_") if interaction_codes else []
-
         activations = []
         inhbitions = []
-        for monomer1, monomer2, ixn, promoter in interactions:
-            m1, m2 = sorted([monomer1, monomer2])
-            ixn_tuple = (component_indices[m1], component_indices[m2], promoter)
-            if ixn.lower() == "a":
+        for *monomers, regulation_type, promoter in interactions:
+            m1, m2 = sorted(monomers)
+            ixn_tuple = (
+                component_indices[m1],
+                component_indices[m2],
+                component_indices[promoter],
+            )
+            if regulation_type.lower() == "a":
                 activations.append(ixn_tuple)
-            elif ixn.lower() == "i":
+            elif regulation_type.lower() == "i":
                 inhbitions.append(ixn_tuple)
             else:
-                raise ValueError(f"Unknown interaction type {ixn} in {genotype}")
-
+                raise ValueError(
+                    f"Unknown regulation type {regulation_type} in {genotype}"
+                )
         activations = np.array(activations, dtype=np.int_)
         inhbitions = np.array(inhbitions, dtype=np.int_)
-
-        return components, activations, inhbitions
+        return components, regulators, activations, inhbitions
 
     @cached_property
     def _recolor_components(self):
