@@ -1,11 +1,20 @@
+from abc import ABC, abstractmethod
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from itertools import chain
+import json
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional, Sequence
+import networkx as nx
+from numpy.random import default_rng, SeedSequence
 import numpy as np
 import pandas as pd
+from typing import Any, Callable, Iterable, Optional, Sequence
 
-from .circuitree import CircuiTree
+from psutil import cpu_count
+
+from .modularity import tree_modularity, tree_modularity_estimate
+from .circuitree import CircuiTree, accumulate_visits_and_rewards, ucb_score
 from .utils import DefaultMapping
 
 __all__ = [
@@ -13,6 +22,250 @@ __all__ = [
     "TranspositionTable",
     "ParallelTree",
 ]
+
+
+class MultithreadedCircuiTree(ABC):
+    def __init__(
+        self,
+        root: str,
+        threads: Optional[int] = None,
+        seed: int = 2023,
+        exploration_constant: Optional[float] = None,
+        graph: Optional[nx.DiGraph] = None,
+        **kwargs,
+    ):
+        if exploration_constant is None:
+            self.exploration_constant = np.sqrt(2)
+        else:
+            self.exploration_constant = exploration_constant
+
+        if threads is None:
+            threads = cpu_count()
+        self.threads = threads
+
+        self.seed = seed
+        seq = SeedSequence(seed)
+        self._random_generators = [default_rng(s) for s in seq.spawn(threads)]
+        self.executor = ThreadPoolExecutor(threads)
+
+        self.root = root
+        if graph is None:
+            self.graph = nx.DiGraph()
+            self.graph.add_node(self.root, visits=0, reward=0)
+        else:
+            self.graph = graph
+            if self.root not in self.graph:
+                raise ValueError(
+                    f"Supplied graph does not contain the root node: {root}"
+                )
+        self.graph.root = self.root
+
+        # Attributes that should not be saved to file
+        self._non_serializable_attrs = [
+            "_non_serializable_attrs",
+            "_random_generators",
+            "executor",
+            "graph",
+            "callback",
+        ]
+
+    @property
+    def default_attrs(self):
+        return dict(visits=0, reward=0)
+
+    def _do_action(self, state: Any, action: Any):
+        new_state = self.do_action(state, action)
+        return self.get_unique_state(new_state)
+
+    @abstractmethod
+    def get_actions(self, state: Any) -> Iterable[Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def do_action(self, state: Any, action: Any) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def is_terminal(self, state) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_reward(self, state) -> float | int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_unique_state(self, state: Any) -> Any:
+        raise NotImplementedError
+
+    def is_success(self, state) -> bool:
+        """Must be defined to calculate modularity."""
+        raise NotImplementedError
+
+    def get_ucb_score(self, parent, child):
+        return ucb_score(self.graph, parent, child, self.exploration_constant)
+
+    def select(self, thread_idx: int):
+        node = self.root
+        selection_path = [node]
+        while not self.is_leaf(node):
+            node = self.best_child(thread_idx, node)
+            selection_path.append(node)
+        return selection_path
+
+    def expand(self, thread_idx: int, selection_path: list[Any]) -> list[Any]:
+        """Expands a candidate selected node and returns the resulting selected node and
+        selection path.
+
+        If the candidate is non-terminal, selects a random child and appends it to the
+        selection path. Otherwise, does nothing."""
+        node = selection_path[-1]
+        actions = self.get_actions(node)
+        if not actions:
+            return selection_path
+        children = [self._do_action(node, action) for action in actions]
+        for action, child in zip(actions, children):
+            if child not in self.graph.nodes:
+                self.graph.add_node(child, **self.default_attrs)
+                self.graph.add_edge(node, child, action=action, **self.default_attrs)
+
+        rg = self._random_generators[thread_idx]
+        selection_path.append(rg.choice(children))
+        return selection_path
+
+    def simulate(self, thread_idx, node, **kwargs) -> tuple[Any, float | int]:
+        sim_node = node
+        rg: np.random.Generator = self._random_generators[thread_idx]
+        while not self.is_terminal(sim_node):
+            action = rg.choice(self.get_actions(sim_node))
+            sim_node = self._do_action(sim_node, action)
+        reward = self.get_reward(sim_node, **kwargs)
+        return sim_node, reward
+
+    def backpropagate_reward(self, selection_path: list, reward: float | int):
+        node = selection_path.pop()
+        while selection_path:
+            parent = selection_path.pop()
+            self.graph.edges[parent, node]["reward"] += reward
+            node = parent
+        self.graph.nodes[node]["reward"] += reward  # root node
+
+    def is_leaf(self, node):
+        return self.graph.out_degree(node) == 0
+
+    def best_child(self, thread_idx, node):
+        rg: np.random.Generator = self._random_generators[thread_idx]
+        children = list(self.graph.neighbors(node))
+        rg.shuffle(children)
+        scores = [self.get_ucb_score(node, child) for child in children]
+        best = children[np.argmax(scores)]
+        return best
+
+    def backpropagate_visit(self, selection_path: list) -> None:
+        for node in selection_path[::-1]:
+            self.graph.nodes[node]["visits"] += 1
+
+    def traverse(self, thread_idx: int, **kwargs):
+        selection_path = self.select(thread_idx)
+        selection_path = self.expand(thread_idx, selection_path)
+        sel_node = selection_path[-1]
+        self.backpropagate_visit(selection_path)
+        sim_node, reward = self.simulate(sel_node, **kwargs)
+        self.backpropagate_reward(selection_path.copy(), reward)
+        return selection_path, reward, sim_node
+
+    def accumulate_visits_and_rewards(self, graph: Optional[nx.DiGraph] = None):
+        _accumulated = self.graph if graph is None else graph
+        accumulate_visits_and_rewards(_accumulated)
+        if graph is None:
+            return _accumulated
+
+    @property
+    def terminal_states(self):
+        return (node for node in self.graph.nodes if self.is_terminal(node))
+
+    def bfs_iterator(self, root=None, shuffle=False):
+        root = self.root if root is None else root
+        return chain(*(l for l in nx.bfs_layers(self.graph, root)))
+
+    def modularity(self) -> float:
+        return tree_modularity(self.graph, self.root, self.is_terminal, self.is_success)
+
+    def modularity_estimate(self) -> float:
+        return tree_modularity_estimate(self.graph, self.root)
+
+    def to_file(
+        self,
+        gml_file: str | Path,
+        json_file: Optional[str | Path] = None,
+        save_attrs: Optional[Iterable[str]] = None,
+        **kwargs,
+    ):
+        gml_target = Path(gml_file).with_suffix(".gml")
+        nx.write_gml(self.graph, gml_target, **kwargs)
+
+        if json_file is not None:
+            if save_attrs is None:
+                keys = set(self.__dict__.keys()) - set(self._non_serializable_attrs)
+            else:
+                keys = set(save_attrs)
+                if non_serializable := (keys & set(self._non_serializable_attrs)):
+                    repr_non_ser = ", ".join(non_serializable)
+                    raise ValueError(
+                        f"Attempting to save non-serializable attributes: {repr_non_ser}."
+                    )
+
+            attrs = {k: v for k, v in self.__dict__.items() if k in keys}
+
+            json_target = Path(json_file).with_suffix(".json")
+            with json_target.open("w") as f:
+                json.dump(attrs, f, indent=4)
+
+            return gml_target, json_target
+
+        else:
+            return gml_target
+
+    @classmethod
+    def from_file(
+        cls, graph_gml: str | Path, attrs_json: Optional[str | Path] = None, **kwargs
+    ):
+        if attrs_json is not None:
+            with open(attrs_json, "r") as f:
+                kwargs.update(json.load(f))
+
+        graph = nx.read_gml(graph_gml)
+
+        return cls(graph=graph, **kwargs)
+
+
+def search_mcts_in_thread(
+    mtree: MultithreadedCircuiTree,
+    thread_idx: int,
+    n_steps: int,
+    callback: Optional[Callable] = None,
+    callback_every: int = 1,
+    return_metrics: Optional[bool] = None,
+    **kwargs,
+):
+    if callback is None:
+        callback = lambda *a, **kw: None
+
+    m0 = callback(mtree, 0, [None], None, None)
+    if return_metrics is None:
+        return_metrics = m0 is not None
+
+    metrics = [m0]
+    for iteration in range(1, n_steps + 1):
+        selection_path, reward, sim_node = mtree.traverse(thread_idx, **kwargs)
+        if iteration % callback_every == 0:
+            m = callback(mtree, iteration, selection_path, reward, sim_node)
+            if return_metrics:
+                metrics.append(m)
+
+    if return_metrics:
+        return mtree, metrics
+    else:
+        return mtree
 
 
 @dataclass
