@@ -60,7 +60,7 @@ class MultithreadedCircuiTree(ABC):
                 )
         self.graph.root = self.root
 
-        self._lock = Lock()
+        # self._lock = Lock()
 
         # Attributes that should not be saved to file
         self._non_serializable_attrs = [
@@ -70,9 +70,9 @@ class MultithreadedCircuiTree(ABC):
             "_lock",
         ]
 
-    @property
-    def lock(self):
-        return self._lock
+    # @property
+    # def lock(self):
+    #     return self._lock
 
     @property
     def default_attrs(self):
@@ -112,10 +112,10 @@ class MultithreadedCircuiTree(ABC):
     def select(self, thread_idx: int):
         node = self.root
         selection_path = [node]
-        with self.lock:
-            while not self.is_leaf(node):
-                node = self.best_child(thread_idx, node)
-                selection_path.append(node)
+        # with self.lock:
+        while not self.is_leaf(node):
+            node = self.best_child(thread_idx, node)
+            selection_path.append(node)
         return selection_path
 
     def expand(
@@ -128,16 +128,17 @@ class MultithreadedCircuiTree(ABC):
         selection path. Otherwise, does nothing."""
         node = selection_path[-1]
         actions = self.get_actions(node)
-        with self.lock:
-            if actions:
-                # Expand children
-                children = [self._do_action(node, action) for action in actions]
-                for action, child in zip(actions, children):
-                    if child not in self.graph.nodes:
-                        self.graph.add_node(child, **self.default_attrs)
-                        self.graph.add_edge(
-                            node, child, action=action, **self.default_attrs
-                        )
+        # with self.lock:
+        if actions:
+            # Expand children
+            children = [self._do_action(node, action) for action in actions]
+            for action, child in zip(actions, children):
+                if not self.graph.has_node(child):
+                    self.graph.add_node(child, **self.default_attrs)
+                if not self.graph.has_edge(node, child):
+                    self.graph.add_edge(
+                        node, child, action=action, **self.default_attrs
+                    )
 
                 # Select a random child
                 rg = self._random_generators[thread_idx]
@@ -175,13 +176,13 @@ class MultithreadedCircuiTree(ABC):
         """Update the value of an attribute for each node and edge in the path."""
         _path = path.copy()
         child = _path.pop()
-        with self.lock:
+        # with self.lock:
+        self.graph.nodes[child][attr] += value
+        while _path:
+            parent = _path.pop()
+            self.graph.edges[parent, child][attr] += value
+            child = parent
             self.graph.nodes[child][attr] += value
-            while _path:
-                parent = _path.pop()
-                self.graph.edges[parent, child][attr] += value
-                child = parent
-                self.graph.nodes[child][attr] += value
 
     def backpropagate_visit(self, selection_path: list) -> None:
         """Update the visit count for each node in the selection path. Happens
