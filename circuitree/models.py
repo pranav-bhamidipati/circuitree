@@ -57,22 +57,17 @@ class SimpleNetworkGrammar:
         # Terminating assembly is always an option
         actions = ["*terminate*"]
 
-        components, interactions_joined = genotype.strip("*").split("::")
-        interactions = set(ixn[:2] for ixn in interactions_joined.split("_"))
-        for component in self.components:
-            c0 = component[0]
-            if c0 not in components:
-                actions.append(c0)
+        components_joined, interactions_joined = genotype.strip("*").split("::")
+        components = set(components_joined)
+        interactions = set(ixn[:2] for ixn in interactions_joined.split("_") if ixn)
+        if len(interactions) >= self.max_interactions:
+            return actions
+        actions.extend(list(set(c[0] for c in self.components) - components))
         for action_group in self.edge_options:
             if action_group:
-                c1, c2, _ = action_group[0]
-                if (
-                    (c1 in components)
-                    and (c2 in components)
-                    and (c1 + c2) not in interactions
-                ):
-                    for action in action_group:
-                        actions.append(action)
+                c1_c2 = action_group[0][:2]
+                if set(c1_c2) <= components and c1_c2 not in interactions:
+                    actions.extend(action_group)
 
         return actions
 
@@ -80,19 +75,15 @@ class SimpleNetworkGrammar:
         if action == "*terminate*":
             new_genotype = "*" + genotype
         else:
-            # Root node
-            if genotype == ".":
-                components = list()
-                interactions = list()
-            else:
-                components, interactions = genotype.split("::")
+            components, interactions = genotype.split("::")
             if len(action) == 1:
                 new_genotype = "".join([components, action, "::", interactions])
             elif len(action) == 3:
-                delim = ("", "_")[bool(interactions)]
-                new_genotype = "::".join(
-                    [components, delim.join([interactions, action])]
-                )
+                if interactions:
+                    delim = "_"
+                else:
+                    delim = ""
+                new_genotype = "::".join([components, interactions + delim + action])
         return new_genotype
 
     @staticmethod
