@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from itertools import chain
 import json
@@ -9,15 +8,16 @@ import networkx as nx
 from numpy.random import default_rng, SeedSequence
 import numpy as np
 import pandas as pd
-from typing import Any, Callable, Iterable, Optional, Sequence
-
 from psutil import cpu_count
+from typing import Any, Callable, Iterable, Optional, Sequence
 
 from .modularity import tree_modularity, tree_modularity_estimate
 from .circuitree import CircuiTree, accumulate_visits_and_rewards, ucb_score
 from .utils import DefaultMapping
 
 __all__ = [
+    "MultithreadedCircuiTree",
+    "search_mcts",
     "ParameterTable",
     "TranspositionTable",
     "ParallelTree",
@@ -32,7 +32,6 @@ class MultithreadedCircuiTree(ABC):
         seed: int = 2023,
         exploration_constant: Optional[float] = None,
         graph: Optional[nx.DiGraph] = None,
-        **kwargs,
     ):
         if exploration_constant is None:
             self.exploration_constant = np.sqrt(2)
@@ -46,7 +45,6 @@ class MultithreadedCircuiTree(ABC):
         self.seed = seed
         seq = SeedSequence(seed)
         self._random_generators = [default_rng(s) for s in seq.spawn(threads)]
-        self.executor = ThreadPoolExecutor(threads)
 
         self.root = root
         if graph is None:
@@ -64,9 +62,7 @@ class MultithreadedCircuiTree(ABC):
         self._non_serializable_attrs = [
             "_non_serializable_attrs",
             "_random_generators",
-            "executor",
             "graph",
-            "callback",
         ]
 
     @property
@@ -238,7 +234,7 @@ class MultithreadedCircuiTree(ABC):
         return cls(graph=graph, **kwargs)
 
 
-def search_mcts_in_thread(
+def search_mcts(
     mtree: MultithreadedCircuiTree,
     thread_idx: int,
     n_steps: int,
