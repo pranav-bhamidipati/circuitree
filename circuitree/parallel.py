@@ -126,24 +126,28 @@ class MultithreadedCircuiTree(ABC):
 
         If the candidate is non-terminal, selects a random child and appends it to the
         selection path. Otherwise, does nothing."""
-        node = selection_path[-1]
-        actions = self.get_actions(node)
+        selected_node = selection_path[-1]
+        actions = self.get_actions(selected_node)
+
         # with self.lock:
         if actions:
             # Expand children
-            children = [self._do_action(node, action) for action in actions]
+            parent = selected_node
+            children = [self._do_action(parent, action) for action in actions]
             for action, child in zip(actions, children):
                 if not self.graph.has_node(child):
                     self.graph.add_node(child, **self.default_attrs)
-                if not self.graph.has_edge(node, child):
+                if not self.graph.has_edge(parent, child):
                     self.graph.add_edge(
-                        node, child, action=action, **self.default_attrs
+                        parent, child, action=action, **self.default_attrs
                     )
 
-                # Select a random child
-                rg = self._random_generators[thread_idx]
-                selection_path.append(rg.choice(children))
-            visit_number = self.graph.nodes[selection_path[-1]]["visits"]
+            # Select a random child
+            rg = self._random_generators[thread_idx]
+            selected_node = rg.choice(children)
+            selection_path.append(selected_node)
+
+        visit_number = self.graph.nodes[selected_node]["visits"]
 
         return selection_path, visit_number
 
