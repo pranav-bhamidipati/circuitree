@@ -17,7 +17,7 @@ from .utils import DefaultMapping
 
 __all__ = [
     "MultithreadedCircuiTree",
-    "search_mcts",
+    "search_mcts_in_thread",
     "ParameterTable",
     "TranspositionTable",
     "ParallelTree",
@@ -87,7 +87,7 @@ class MultithreadedCircuiTree(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_reward(self, state) -> float | int:
+    def get_reward(self, state, visit_number, **kwargs) -> float | int:
         raise NotImplementedError
 
     @abstractmethod
@@ -109,42 +109,46 @@ class MultithreadedCircuiTree(ABC):
             selection_path.append(node)
         return selection_path
 
-    def expand(self, thread_idx: int, selection_path: list[Any]) -> list[Any]:
-        """Expands a candidate selected node and returns the resulting selected node and
-        selection path.
+    def expand(
+        self, thread_idx: int, selection_path: list[Any]
+    ) -> tuple[list[Any], int]:
+        """Expands a candidate selected node and returns the nodes in the resulting
+        selection path and the visit number at the selected node.
 
         If the candidate is non-terminal, selects a random child and appends it to the
         selection path. Otherwise, does nothing."""
         node = selection_path[-1]
         actions = self.get_actions(node)
-        if not actions:
-            return selection_path
-        children = [self._do_action(node, action) for action in actions]
-        for action, child in zip(actions, children):
-            if child not in self.graph.nodes:
-                self.graph.add_node(child, **self.default_attrs)
-                self.graph.add_edge(node, child, action=action, **self.default_attrs)
+        if actions:
+            children = [self._do_action(node, action) for action in actions]
+            for action, child in zip(actions, children):
+                if child not in self.graph.nodes:
+                    self.graph.add_node(child, **self.default_attrs)
+                    self.graph.add_edge(
+                        node, child, action=action, **self.default_attrs
+                    )
+            rg = self._random_generators[thread_idx]
+            selection_path.append(rg.choice(children))
 
-        rg = self._random_generators[thread_idx]
-        selection_path.append(rg.choice(children))
-        return selection_path
+        if len(selection_path) == 1:
+            raise ValueError(f"Terminated at root state: {node}")
 
-    def simulate(self, thread_idx, node, **kwargs) -> tuple[Any, float | int]:
+        visit_number = self.graph.nodes[selection_path[-1]]["visits"]
+        return selection_path, visit_number
+
+    def simulate(
+        self, thread_idx, node, visit_number, **kwargs
+    ) -> tuple[Any, float | int]:
         sim_node = node
         rg: np.random.Generator = self._random_generators[thread_idx]
         while not self.is_terminal(sim_node):
             action = rg.choice(self.get_actions(sim_node))
             sim_node = self._do_action(sim_node, action)
-        reward = self.get_reward(sim_node, **kwargs)
+        reward = self.get_reward(sim_node, visit_number, **kwargs)
         return sim_node, reward
 
     def backpropagate_reward(self, selection_path: list, reward: float | int):
-        node = selection_path.pop()
-        while selection_path:
-            parent = selection_path.pop()
-            self.graph.edges[parent, node]["reward"] += reward
-            node = parent
-        self.graph.nodes[node]["reward"] += reward  # root node
+        self._backpropagate(selection_path, "reward", reward)
 
     def is_leaf(self, node):
         return self.graph.out_degree(node) == 0
@@ -157,17 +161,33 @@ class MultithreadedCircuiTree(ABC):
         best = children[np.argmax(scores)]
         return best
 
+    def _backpropagate(self, path: list, attr: str, value: float | int):
+        """Update the value of an attribute for each node and edge in the path."""
+        _path = path.copy()
+        child = _path.pop()
+        self.graph.nodes[child][attr] += value
+        while _path:
+            parent = _path.pop()
+            self.graph.edges[parent, child][attr] += value
+            child = parent
+            self.graph.nodes[child][attr] += value
+
     def backpropagate_visit(self, selection_path: list) -> None:
-        for node in selection_path[::-1]:
-            self.graph.nodes[node]["visits"] += 1
+        """Update the visit count for each node in the selection path. Happens
+        before simulation and reward calculation, so until the reward is known,
+        there is 'virtual loss' on each node in the selection path."""
+        self._backpropagate(selection_path, "visits", 1)
 
     def traverse(self, thread_idx: int, **kwargs):
         selection_path = self.select(thread_idx)
-        selection_path = self.expand(thread_idx, selection_path)
-        sel_node = selection_path[-1]
+        selection_path, visit_number = self.expand(thread_idx, selection_path)
+
+        # Between backprop of visit and reward, we incur virtual loss
         self.backpropagate_visit(selection_path)
-        sim_node, reward = self.simulate(sel_node, **kwargs)
-        self.backpropagate_reward(selection_path.copy(), reward)
+        sim_node, reward = self.simulate(
+            thread_idx, selection_path[-1], visit_number, **kwargs
+        )
+        self.backpropagate_reward(selection_path, reward)
         return selection_path, reward, sim_node
 
     def accumulate_visits_and_rewards(self, graph: Optional[nx.DiGraph] = None):
@@ -235,7 +255,7 @@ class MultithreadedCircuiTree(ABC):
         return cls(graph=graph, **kwargs)
 
 
-def search_mcts(
+def search_mcts_in_thread(
     mtree: MultithreadedCircuiTree,
     thread_idx: int,
     n_steps: int,
