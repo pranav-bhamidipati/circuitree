@@ -32,6 +32,7 @@ class MultithreadedCircuiTree(ABC):
         seed: int = 2023,
         exploration_constant: Optional[float] = None,
         graph: Optional[nx.DiGraph] = None,
+        **kwargs,
     ):
         if exploration_constant is None:
             self.exploration_constant = np.sqrt(2)
