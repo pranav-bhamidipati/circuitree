@@ -8,7 +8,7 @@ import networkx as nx
 from numpy.random import default_rng, SeedSequence
 import numpy as np
 import pandas as pd
-from psutil import cpu_count
+from multiprocessing import cpu_count
 from typing import Any, Callable, Iterable, Optional, Sequence
 
 from .modularity import tree_modularity, tree_modularity_estimate
