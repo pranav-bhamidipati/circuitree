@@ -272,8 +272,8 @@ class MultithreadedCircuiTree(ABC):
 
 
 def search_mcts_in_thread(
-    mtree: MultithreadedCircuiTree,
     thread_idx: int,
+    mtree: MultithreadedCircuiTree,
     n_steps: int,
     callback: Optional[Callable] = None,
     callback_every: int = 1,
