@@ -137,10 +137,7 @@ class MultithreadedCircuiTree(ABC):
             for action, child in zip(actions, children):
                 if not self.graph.has_node(child):
                     self.graph.add_node(child, **self.default_attrs)
-                if not self.graph.has_edge(parent, child):
-                    self.graph.add_edge(
-                        parent, child, action=action, **self.default_attrs
-                    )
+                self.graph.add_edge(parent, child, action=action, **self.default_attrs)
 
             # Select a random child
             rg = self._random_generators[thread_idx]

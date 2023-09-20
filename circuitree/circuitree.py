@@ -134,7 +134,8 @@ class CircuiTree(ABC):
         actions = self.get_actions(node)
         for action in actions:
             child = self._do_action(node, action)
-            self.graph.add_node(child, visits=0, reward=0)
+            if not self.graph.has_node(child):
+                self.graph.add_node(child, visits=0, reward=0)
             self.graph.add_edge(node, child, action=action, visits=0, reward=0)
 
     def simulate(self, node):
