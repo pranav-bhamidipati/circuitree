@@ -228,9 +228,14 @@ class MultithreadedCircuiTree(ABC):
         gml_file: str | Path,
         json_file: Optional[str | Path] = None,
         save_attrs: Optional[Iterable[str]] = None,
+        compress: bool = False,
         **kwargs,
     ):
-        gml_target = Path(gml_file).with_suffix(".gml")
+        if compress:
+            suffix = ".gml.gz"
+        else:
+            suffix = ".gml"
+        gml_target = Path(gml_file).with_suffix(suffix)
         nx.write_gml(self.graph, gml_target, **kwargs)
 
         if json_file is not None:
