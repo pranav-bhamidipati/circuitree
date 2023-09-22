@@ -63,6 +63,7 @@ def plot_network(
     padding=0.15,
     fontsize=None,
     text_kwargs=None,
+    plot_labels=True,
     ax: Optional[Axis] = None,
 ):
     """Plot an N-component network as a circular diagram.
@@ -140,8 +141,9 @@ def plot_network(
             plot_inhibition(x[lhs], y[lhs], x[rhs], y[rhs], displace=displace, **kw)
 
     # Component labels
-    for mlc, label in zip(molecules, names):
-        plt.text(*mlc.center, label, ha="center", va="center", **text_kw)
+    if plot_labels:
+        for mlc, label in zip(molecules, names):
+            plt.text(*mlc.center, label, ha="center", va="center", **text_kw)
 
     # Remove axes
     plt.axis("off")
