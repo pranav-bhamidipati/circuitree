@@ -9,7 +9,6 @@ from numpy.random import default_rng, SeedSequence
 import numpy as np
 import pandas as pd
 from multiprocessing import cpu_count
-from threading import Lock
 from typing import Any, Callable, Iterable, Optional, Sequence
 
 from .modularity import tree_modularity, tree_modularity_estimate
@@ -60,19 +59,12 @@ class MultithreadedCircuiTree(ABC):
                 )
         self.graph.root = self.root
 
-        # self._lock = Lock()
-
         # Attributes that should not be saved to file
         self._non_serializable_attrs = [
             "_non_serializable_attrs",
             "_random_generators",
             "graph",
-            "_lock",
         ]
-
-    # @property
-    # def lock(self):
-    #     return self._lock
 
     @property
     def default_attrs(self):
@@ -112,11 +104,13 @@ class MultithreadedCircuiTree(ABC):
     def select(self, thread_idx: int):
         node = self.root
         selection_path = [node]
-        # with self.lock:
-        while not self.is_leaf(node):
+        while not self.is_expandable(node):
             node = self.best_child(thread_idx, node)
             selection_path.append(node)
         return selection_path
+
+    def is_expandable(self, node):
+        return self.graph.out_degree(node) < len(self.get_actions(node))
 
     def expand(
         self, thread_idx: int, selection_path: list[Any]
@@ -127,22 +121,21 @@ class MultithreadedCircuiTree(ABC):
         If the candidate is non-terminal, selects a random child and appends it to the
         selection path. Otherwise, does nothing."""
         selected_node = selection_path[-1]
-        actions = self.get_actions(selected_node)
 
-        # with self.lock:
-        if actions:
-            # Expand children
-            parent = selected_node
-            children = [self._do_action(parent, action) for action in actions]
-            for action, child in zip(actions, children):
-                if not self.graph.has_node(child):
-                    self.graph.add_node(child, **self.default_attrs)
-                self.graph.add_edge(parent, child, action=action, **self.default_attrs)
-
-            # Select a random child
+        if self.is_expandable(selected_node):
+            # Select a random child to expand
+            actions = self.get_actions(selected_node)
             rg = self._random_generators[thread_idx]
-            selected_node = rg.choice(children)
-            selection_path.append(selected_node)
+            rg.shuffle(actions)
+            for action in actions:
+                child = self._do_action(selected_node, action)
+                if not self.graph.has_edge(selected_node, child):
+                    if not self.graph.has_node(child):
+                        self.graph.add_node(child, **self.default_attrs)
+                    self.graph.add_edge(
+                        selected_node, child, action=action, **self.default_attrs
+                    )
+                    break
 
         visit_number = self.graph.nodes[selected_node]["visits"]
 
@@ -177,7 +170,6 @@ class MultithreadedCircuiTree(ABC):
         """Update the value of an attribute for each node and edge in the path."""
         _path = path.copy()
         child = _path.pop()
-        # with self.lock:
         self.graph.nodes[child][attr] += value
         while _path:
             parent = _path.pop()
