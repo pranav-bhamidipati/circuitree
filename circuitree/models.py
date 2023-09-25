@@ -146,7 +146,7 @@ class SimpleNetworkTree(SimpleNetworkGrammar, CircuiTree):
     """
 
 
-class DimersMixin:
+class DimersGrammar:
     """A mixin class for dimerizing network circuits. Can be combined with the CircuiTree
     or MultithreadedCircuiTree base classes."""
 
@@ -282,12 +282,12 @@ class DimersMixin:
     def _recolor_regulators(self):
         return [dict(zip(self.regulators, p)) for p in permutations(self.regulators)]
 
-    @cached_property
+    @property
     def _recolorings(self):
-        return [
+        return (
             rc | rr
             for rc, rr in product(self._recolor_components, self._recolor_regulators)
-        ]
+        )
 
     @staticmethod
     def _recolor(mapping, code):
@@ -379,7 +379,7 @@ class DimersMixin:
         return False
 
 
-class DimerNetworkTree(DimersMixin, CircuiTree):
+class DimerNetworkTree(DimersGrammar, CircuiTree):
     """
     DimerNetworkTree
     =================
