@@ -39,6 +39,8 @@ class MultithreadedCircuiTree(ABC):
         else:
             self.exploration_constant = exploration_constant
 
+        self.sample_counter = Counter()
+
         if threads is None:
             threads = cpu_count()
         self.threads = threads
@@ -50,7 +52,7 @@ class MultithreadedCircuiTree(ABC):
         self.root = root
         if graph is None:
             self.graph = nx.DiGraph()
-            self.graph.add_node(self.root, visits=0, reward=0)
+            self.graph.add_node(self.root, **self.default_attrs)
         else:
             self.graph = graph
             if self.root not in self.graph:
@@ -87,7 +89,7 @@ class MultithreadedCircuiTree(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_reward(self, state, visit_number, **kwargs) -> float | int:
+    def get_reward(self, state, sample_number, **kwargs) -> float | int:
         raise NotImplementedError
 
     @abstractmethod
@@ -112,13 +114,9 @@ class MultithreadedCircuiTree(ABC):
     def is_expandable(self, node):
         return self.graph.out_degree(node) < len(self.get_actions(node))
 
-    def expand(
-        self, thread_idx: int, selection_path: list[Any]
-    ) -> tuple[list[Any], int]:
+    def expand(self, thread_idx: int, selection_path: list[Any]) -> list[Any]:
         """Expands a candidate selected node and returns the nodes in the resulting
-        selection path and the visit number at the selected node.
-
-        If the candidate is non-terminal, selects a random child and appends it to the
+        selection path. If the candidate is non-terminal, selects a random child and appends it to the
         selection path. Otherwise, does nothing."""
         selected_node = selection_path[-1]
 
@@ -137,19 +135,18 @@ class MultithreadedCircuiTree(ABC):
                     )
                     break
 
-        visit_number = self.graph.nodes[selected_node]["visits"]
+        return selection_path
 
-        return selection_path, visit_number
-
-    def simulate(
-        self, thread_idx, node, visit_number, **kwargs
-    ) -> tuple[Any, float | int]:
+    def simulate(self, thread_idx, node, **kwargs) -> tuple[Any, float | int]:
         sim_node = node
         rg: np.random.Generator = self._random_generators[thread_idx]
         while not self.is_terminal(sim_node):
             action = rg.choice(self.get_actions(sim_node))
             sim_node = self._do_action(sim_node, action)
-        reward = self.get_reward(sim_node, visit_number, **kwargs)
+
+        sample_number = self.sample_counter[sim_node]
+        self.sample_counter[sim_node] += 1
+        reward = self.get_reward(sim_node, sample_number, **kwargs)
         return sim_node, reward
 
     def backpropagate_reward(self, selection_path: list, reward: float | int):
@@ -185,21 +182,17 @@ class MultithreadedCircuiTree(ABC):
 
     def traverse(self, thread_idx: int, **kwargs):
         selection_path = self.select(thread_idx)
-        selection_path, visit_number = self.expand(thread_idx, selection_path)
+        selection_path = self.expand(thread_idx, selection_path)
 
         # Between backprop of visit and reward, we incur virtual loss
         self.backpropagate_visit(selection_path)
-        sim_node, reward = self.simulate(
-            thread_idx, selection_path[-1], visit_number, **kwargs
-        )
+        sim_node, reward = self.simulate(thread_idx, selection_path[-1], **kwargs)
         self.backpropagate_reward(selection_path, reward)
         return selection_path, reward, sim_node
 
     def accumulate_visits_and_rewards(self, graph: Optional[nx.DiGraph] = None):
-        _accumulated = self.graph if graph is None else graph
-        accumulate_visits_and_rewards(_accumulated)
-        if graph is None:
-            return _accumulated
+        _graph = graph or self.graph
+        accumulate_visits_and_rewards(_graph)
 
     @property
     def terminal_states(self):
@@ -303,8 +296,9 @@ class ParameterTable:
     wrap_index: bool = True
 
     """Stores a table of parameter sets that are used as inputs for a stochastic game.
-    For each visit there is a random seed, a set of initial conditions, and a set of 
-    parameter values."""
+    Each time a state is sampled the sample index corresponds to a unique random seed, a 
+    set of initial conditions, and a set of parameter values. Once the table has been 
+    exhausted, sample indices wrap back from zero."""
 
     def __post_init__(self):
         n = len(self.seeds)
@@ -354,12 +348,13 @@ class ParameterTable:
 
 class TranspositionTable:
     """
-    Stores the history of reward payouts at each visit to each state in a decision tree.
+    Stores the history of reward payouts at each sample of each state in a decision tree.
     Used to store results and simulate playouts of a stochastic game.
 
-    In a stochastic game, each visit to a terminal state yields a different result.
+    In a stochastic game, each sample from a terminal state yields a different result.
     For a given random series of playouts, the reward values to a terminal state `s` are
-    stored in a list `vals`. The reward for visit `n` to state `s` can be accessed as:
+    stored in a list `vals`. The reward for sample number `n` to state `s` can be 
+    accessed as:
 
     ```TranspositionTable[s, n]```
 
@@ -390,64 +385,64 @@ class TranspositionTable:
     def table(self):
         return self._table
 
-    def __getitem__(self, state_wwo_visits):
-        """Access the results of visit(s) to a state. If no visit number is specified,
-        return the list of all visit results."""
-        match state_wwo_visits:
+    def __getitem__(self, state_wwo_samples):
+        """Access the results of sample(s) to a state. If no sample number is specified,
+        return the list of all sample results."""
+        match state_wwo_samples:
             case state, slice(start=start, stop=stop, step=step):
                 return self.table[state][start:stop:step]
-            case state, [*visits]:
+            case state, [*sample_nums]:
                 state_table = self.table[state]
-                return [state_table[visit] for visit in visits]
-            case state, visit:
-                return self.table[state][visit]
+                return [state_table[sample_num] for sample_num in sample_nums]
+            case state, sample_num:
+                return self.table[state][sample_num]
             case state:
                 return self.table[state]
 
-    def __missing__(self, state_wwo_visits):
+    def __missing__(self, state_wwo_samples):
         """If the state is not in the table, raise an error. If accessed without
-        visit number(s), create an empty entry for this state."""
-        n_visits = len(self.table[state])
-        match state_wwo_visits:
+        sample number(s), create an empty entry for this state."""
+        n_samples = len(self.table[state])
+        match state_wwo_samples:
             case state, slice(start=start, stop=stop, step=step):
                 raise IndexError(
                     f"Cannot index slice({start}, {stop}, {step}) for state {state} "
-                    f"with {n_visits} total visits."
+                    f"with {n_samples} total samples."
                 )
-            case state, [*visits]:
+            case state, [*sample_nums]:
                 try:
-                    for v in visits:
-                        _ = self[state, v]
+                    for n in sample_nums:
+                        _ = self[state, n]
                 except IndexError:
                     raise IndexError(
-                        f"Visit index {v} does not exist for state {state} with "
-                        f"{n_visits} total visits."
+                        f"Sample index {n} does not exist for state {state} with "
+                        f"{n_samples} total samples."
                     )
-            case (state, visit):
+            case (state, sample_num):
                 raise IndexError(
-                    f"Visit index {visit} does not exist for state {state} with "
-                    f"{n_visits} total visits."
+                    f"Sample index {sample_num} does not exist for state {state} with "
+                    f"{n_samples} total samples."
                 )
             case state:
                 return self.table[state]  # defaultdict will create a new entry
 
-    def __contains__(self, state_wwo_visit):
-        n_visits = len(self.table[state])
-        match state_wwo_visit:
+    def __contains__(self, state_wwo_sample):
+        n_samples = len(self.table[state])
+        match state_wwo_sample:
             case state, slice(start=start, stop=stop, step=step):
-                return state in self.table and stop <= n_visits
-            case state, [*visits]:
-                return state in self.table and all(v < n_visits for v in visits)
-            case (state, visit):
-                return state in self.table and visit < n_visits
+                return state in self.table and stop <= n_samples
+            case state, [*sample_nums]:
+                return state in self.table and all(v < n_samples for v in sample_nums)
+            case (state, sample_num):
+                return state in self.table and sample_num < n_samples
             case state:
                 return state in self.table
 
     def __len__(self):
         return len(self.table)
 
-    def n_visits(self, state):
-        """Return number of visits with triggering a default factory call."""
+    def n_samples(self, state):
+        """Return number of samples with triggering a default factory call."""
         if state in self.table:
             return len(self.table[state])
         else:
@@ -465,7 +460,7 @@ class TranspositionTable:
     def draw_random_reward(
         self, state: str, rg: Optional[np.random.Generator] = None
     ) -> tuple[int, float]:
-        """Draw a random visit number and resulting reward from state `state`."""
+        """Draw a random sample number and resulting reward from state `state`."""
         if rg is None:
             rg = np.random.default_rng()
         index = rg.integers(0, len(self.table[state]))
@@ -488,7 +483,7 @@ class TranspositionTable:
         src: Iterable[Path | str] | Path | str,
         progress: bool = False,
         state_col: str = "state",
-        visit_col: str = "visit",
+        sample_col: str = "visit",
         reward_col: str = "reward",
         **load_kwargs,
     ):
@@ -516,12 +511,12 @@ class TranspositionTable:
         if reward_col not in df.columns:
             raise ValueError(f"Dataframe does not have a column named '{reward_col}'.")
 
-        if visit_col not in df.columns:
-            df[visit_col] = df.groupby(state_col).cumcount()
+        if sample_col not in df.columns:
+            df[sample_col] = df.groupby(state_col).cumcount()
 
         return cls.from_dataframe(
             df,
-            visit_column=visit_col,
+            sample_column=sample_col,
             reward_column=reward_col,
         )
 
@@ -553,23 +548,23 @@ class TranspositionTable:
     def from_dataframe(
         cls,
         df: pd.DataFrame,
-        visit_column: str = "visit",
+        sample_column: str = "visit",
         reward_column: str = "reward",
     ):
         table = defaultdict(list)
         grouped = (
-            df[[visit_column, reward_column]]
-            .sort_values(visit_column)
+            df[[sample_column, reward_column]]
+            .sort_values(sample_column)
             .groupby(level=0)[reward_column]
         )
         for state, rewards in grouped:
             table[state] = rewards.to_list()
         return cls(table=table)
 
-    def to_dataframe(self, state_col: str = "state", visit_col: str = "visit"):
+    def to_dataframe(self, state_col: str = "state", sample_col: str = "visit"):
         df = pd.concat(
             {k: pd.Series(v) for k, v in self.table.items()},
-            names=[state_col, visit_col],
+            names=[state_col, sample_col],
         ).reset_index()
         df[state_col] = df[state_col].astype("category")
         return df
@@ -584,68 +579,74 @@ class TranspositionTable:
         self.to_dataframe().to_hdf(fname, index=True, **kwargs)
 
 
-class ParallelTree(CircuiTree):
-    """A parallelizable implementation of CircuiTree. Parallelism is achieved
-    via drawing multiple rewards at once. If boostrap is True, rewards for a
-    set of visits to a state are drawn as bootstrap samples from the transposition
-    table entries for that state. Otherwise, rewards are generated by indexing the
-    transposition table by visit number. If desired results are not present in the table,
-    they will be computed in parallel.
+# class ParallelTree(CircuiTree):
+#     """A parallelizable implementation of CircuiTree. Parallelism is achieved
+#     via multiple threads operating on the same tree (more specifically, green 
+#     threads/coroutines). After the selection step, visit count for each node in the 
+#     selection path is incremented. At this point, no reward is added, so the visit
+#     count is effectively a 'virtual loss'. The simulation step is then performed, 
+#     and the thread waits for the reward value. Once known, the reward value is 
+#     backpropagated along the selection path. Until then, other threads search the tree 
+#     under the assumption of virtual loss.
+    
+#     Rewards are generated by indexing the
+#     transposition table by visit number. If desired results are not present in the table,
+#     they will be computed in parallel.
 
-    Random seeds, parameter sets, and initial conditions are selected from the
-    parameter table `self.param_table`.
+#     Random seeds, parameter sets, and initial conditions are selected from the
+#     parameter table `self.param_table`.
 
-    The methods `simulate_visits` and `save_results` must be implemented in a subclass.
+#     The methods `simulate_visits` and `save_results` must be implemented in a subclass.
 
-    An invalid simulation result (e.g. a timeout) should be represented by a
-    NaN reward value. If all rewards in a batch are NaNs, a new batch will be
-    drawn from the transposition table. Otherwise, any NaN rewards will be
-    ignored and the mean of the remaining rewards will be returned as the
-    reward for the batch.
-    """
+#     An invalid simulation result (e.g. a timeout) should be represented by a
+#     NaN reward value. If all rewards in a batch are NaNs, a new batch will be
+#     drawn from the transposition table. Otherwise, any NaN rewards will be
+#     ignored and the mean of the remaining rewards will be returned as the
+#     reward for the batch.
+#     """
 
-    def __init__(
-        self,
-        *,
-        parameter_table: Optional[ParameterTable] = None,
-        transposition_table: Optional[TranspositionTable] = None,
-        counter: Counter = None,
-        seed_col: Optional[str] = None,
-        param_cols: Optional[Iterable[str]] = None,
-        init_cols: Optional[Iterable[str]] = None,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
+#     def __init__(
+#         self,
+#         *,
+#         parameter_table: Optional[ParameterTable] = None,
+#         transposition_table: Optional[TranspositionTable] = None,
+#         counter: Counter = None,
+#         seed_col: Optional[str] = None,
+#         param_cols: Optional[Iterable[str]] = None,
+#         init_cols: Optional[Iterable[str]] = None,
+#         **kwargs,
+#     ):
+#         super().__init__(**kwargs)
 
-        if isinstance(parameter_table, pd.DataFrame):
-            self._parameter_table = ParameterTable.from_dataframe(
-                parameter_table,
-                seed_col=seed_col,
-                param_cols=param_cols,
-                init_cols=init_cols,
-            )
-        else:
-            self._parameter_table = parameter_table
-        self._transposition_table = TranspositionTable(transposition_table)
+#         if isinstance(parameter_table, pd.DataFrame):
+#             self._parameter_table = ParameterTable.from_dataframe(
+#                 parameter_table,
+#                 seed_col=seed_col,
+#                 param_cols=param_cols,
+#                 init_cols=init_cols,
+#             )
+#         else:
+#             self._parameter_table = parameter_table
+#         self._transposition_table = TranspositionTable(transposition_table)
 
-        self.visit_counter = Counter(counter)
+#         self.visit_counter = Counter(counter)
 
-        # Specify any attributes that should not be serialized when dumping to file
-        self._non_serializable_attrs.extend(
-            [
-                "_parameter_table",
-                "_transposition_table",
-                "visit_counter",
-            ]
-        )
+#         # Specify any attributes that should not be serialized when dumping to file
+#         self._non_serializable_attrs.extend(
+#             [
+#                 "_parameter_table",
+#                 "_transposition_table",
+#                 "visit_counter",
+#             ]
+#         )
 
-    @property
-    def param_table(self) -> ParameterTable:
-        return self._parameter_table
+#     @property
+#     def param_table(self) -> ParameterTable:
+#         return self._parameter_table
 
-    @property
-    def ttable(self) -> TranspositionTable:
-        return self._transposition_table
+#     @property
+#     def ttable(self) -> TranspositionTable:
+#         return self._transposition_table
 
-    def reset_counter(self):
-        self.visit_counter.clear()
+#     def reset_counter(self):
+#         self.visit_counter.clear()
