@@ -11,23 +11,24 @@ __all__ = ["SimpleNetworkTree", "DimerNetworkTree"]
 
 
 class SimpleNetworkGrammar:
-    """A class implementing the grammar for simple network circuits. Can be combined with
-    a CircuiTree or MultithreadedCircuiTree class that implements the get_reward() method
-    ."""
+    """A class implementing the grammar for simple network circuits. It provides
+    all required methods for the CircuiTree and MultithreadedCircuiTree classes
+    except the get_reward() method."""
 
     def __init__(
         self,
         components: Iterable[Iterable[str]],
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
+        *args,
         **kwargs,
     ):
+        super().__init__(*args, **kwargs)
+
         if len(set(c[0] for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
         if len(set(c[0] for c in interactions)) < len(interactions):
             raise ValueError("First character of each interaction must be unique")
-
-        super().__init__(**kwargs)
 
         self.components = components
         self.component_map = {c[0]: c for c in self.components}
@@ -39,9 +40,12 @@ class SimpleNetworkGrammar:
         else:
             self.max_interactions = max_interactions
 
-        self._non_serializable_attrs.extend(
-            ["component_map", "interaction_map", "edge_options", "_recolor"]
-        )
+        # When combining with a CircuiTree or MultithreadedCircuiTree, don't serialize
+        # these attributes when saving the object to file.
+        if hasattr(self, "_non_serializable_attrs"):
+            self._non_serializable_attrs.extend(
+                ["component_map", "interaction_map", "edge_options", "_recolor"]
+            )
 
     @cached_property
     def edge_options(self):
