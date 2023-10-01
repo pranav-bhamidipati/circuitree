@@ -47,7 +47,7 @@ class MultithreadedCircuiTree(ABC):
 
         self.seed = seed
         seq = SeedSequence(seed)
-        self._random_generators = [default_rng(s) for s in seq.spawn(threads)]
+        self._random_generators: list[np.random.Generator] = [default_rng(s) for s in seq.spawn(threads)]
 
         self.root = root
         if graph is None:
@@ -106,13 +106,20 @@ class MultithreadedCircuiTree(ABC):
     def select(self, thread_idx: int):
         node = self.root
         selection_path = [node]
-        while not self.is_expandable(node):
+        while not self.is_leaf(node):
             node = self.best_child(thread_idx, node)
             selection_path.append(node)
         return selection_path
 
-    def is_expandable(self, node):
-        return self.graph.out_degree(node) < len(self.get_actions(node))
+    def next_expandable_child(self, thread_idx: int, node: Any) -> Any | None:
+        actions = self.get_actions(node)
+        rg = self._random_generators[thread_idx]
+        rg.shuffle(actions)
+        for action in actions:
+            child = self._do_action(node, action)
+            if not self.graph.has_edge(node, child):
+                return child
+        return None
 
     def expand(self, thread_idx: int, selection_path: list[Any]) -> list[Any]:
         """Expands a candidate selected node and returns the nodes in the resulting
@@ -120,20 +127,14 @@ class MultithreadedCircuiTree(ABC):
         selection path. Otherwise, does nothing."""
         selected_node = selection_path[-1]
 
-        if self.is_expandable(selected_node):
-            # Select a random child to expand
-            actions = self.get_actions(selected_node)
-            rg = self._random_generators[thread_idx]
-            rg.shuffle(actions)
-            for action in actions:
-                child = self._do_action(selected_node, action)
-                if not self.graph.has_edge(selected_node, child):
-                    if not self.graph.has_node(child):
-                        self.graph.add_node(child, **self.default_attrs)
-                    self.graph.add_edge(
-                        selected_node, child, action=action, **self.default_attrs
-                    )
-                    break
+        expandable_child = self.next_expandable_child(thread_idx, selected_node)
+        if expandable_child is not None:
+            if not self.graph.has_node(expandable_child):
+                self.graph.add_node(expandable_child, **self.default_attrs)
+            self.graph.add_edge(
+                selected_node, expandable_child, **self.default_attrs
+            )
+            selection_path.append(expandable_child)
 
         return selection_path
 
