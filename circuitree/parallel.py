@@ -115,7 +115,7 @@ class MultithreadedCircuiTree(ABC):
             state = self._do_action(state, action)
         return state
 
-    def select_and_expand(self, thread_idx: int) -> tuple[list[Any], Any]:
+    def select_and_expand(self, thread_idx: int) -> list[Any]:
         rg = self._random_generators[thread_idx]
 
         # Start at root
@@ -136,11 +136,11 @@ class MultithreadedCircuiTree(ABC):
                 ucb = self.get_ucb_score(node, child)
 
                 # An unexpanded edge has UCB score of infinity.
-                # In this case, expand the child and select the parent.
+                # In this case, expand and select the child.
                 if ucb == np.inf:
                     self.expand_edge(node, child)
-                    simulate_node = self.get_state_to_simulate(thread_idx, child)
-                    return selection_path, simulate_node
+                    selection_path.append(child)
+                    return selection_path
 
                 # Otherwise, track the child with the highest UCB score
                 if ucb > max_ucb:
@@ -156,9 +156,8 @@ class MultithreadedCircuiTree(ABC):
             actions = self.get_actions(node)
             rg.shuffle(actions)
 
-        # If the loop breaks, the selection path ends at a terminal state, so this is
-        # the state to simulate.
-        return selection_path, node
+        # If the loop breaks, we have reached a terminal state.
+        return selection_path
 
     def expand_edge(self, parent: Any, child: Any):
         if not self.graph.has_node(child):
@@ -171,58 +170,11 @@ class MultithreadedCircuiTree(ABC):
         else:
             return np.inf
 
-    # def select(self, thread_idx: int):
-    #     node = self.root
-    #     selection_path = [node]
-    #     while not self.is_leaf(node):
-    #         node = self.best_child(thread_idx, node)
-    #         selection_path.append(node)
-    #     return selection_path
-
-    # def next_expandable_child(self, thread_idx: int, node: Any) -> Any | None:
-    #     actions = self.get_actions(node)
-    #     rg = self._random_generators[thread_idx]
-    #     rg.shuffle(actions)
-    #     for action in actions:
-    #         child = self._do_action(node, action)
-    #         if not self.graph.has_edge(node, child):
-    #             return child
-    #     return None
-
-    # def expand(self, thread_idx: int, selection_path: list[Any]) -> list[Any]:
-    #     """Expands a candidate selected node and returns the nodes in the resulting
-    #     selection path. If the candidate is non-terminal, selects a random child and appends it to the
-    #     selection path. Otherwise, does nothing."""
-    #     selected_node = selection_path[-1]
-
-    #     expandable_child = self.next_expandable_child(thread_idx, selected_node)
-    #     if expandable_child is not None:
-    #         if not self.graph.has_node(expandable_child):
-    #             self.graph.add_node(expandable_child, **self.default_attrs)
-    #         self.graph.add_edge(selected_node, expandable_child, **self.default_attrs)
-    #         selection_path.append(expandable_child)
-
-    #     return selection_path
-
-    # def best_child(self, thread_idx, node):
-    #     rg: np.random.Generator = self._random_generators[thread_idx]
-    #     children = list(self.graph.neighbors(node))
-    #     rg.shuffle(children)
-    #     scores = [self.get_ucb_score(node, child) for child in children]
-    #     best = children[np.argmax(scores)]
-    #     return best
-
     def simulate(self, sim_node, **kwargs) -> float | int:
         sample_number = self.sample_counter[sim_node]
         self.sample_counter[sim_node] += 1
         reward = self.get_reward(sim_node, sample_number, **kwargs)
         return reward
-
-    def backpropagate_reward(self, selection_path: list, reward: float | int):
-        self._backpropagate(selection_path, "reward", reward)
-
-    def is_leaf(self, node):
-        return self.graph.out_degree(node) == 0
 
     def _backpropagate(self, path: list, attr: str, value: float | int):
         """Update the value of an attribute for each node and edge in the path."""
@@ -236,15 +188,24 @@ class MultithreadedCircuiTree(ABC):
             self.graph.nodes[child][attr] += value
 
     def backpropagate_visit(self, selection_path: list) -> None:
-        """Update the visit count for each node in the selection path. Happens
-        before simulation and reward calculation, so until the reward is known,
-        there is 'virtual loss' on each node in the selection path."""
+        """Update the visit count for each node and edge in the selection path.
+        Visit update happens before simulation and reward calculation, so until the
+        reward is computed and backpropagated, there is 'virtual loss' on each node in
+        the selection path."""
         self._backpropagate(selection_path, "visits", 1)
+
+    def backpropagate_reward(self, selection_path: list, reward: float | int):
+        """Update the reward for each node and edge in the selection path.
+        Visit update happens before simulation and reward calculation, so until the
+        reward is computed and backpropagated, there is 'virtual loss' on each node in
+        the selection path."""
+        self._backpropagate(selection_path, "reward", reward)
 
     def traverse(self, thread_idx: int, **kwargs):
         # Select the next state to sample and the terminal state to be simulated.
         # Expands a child if possible.
-        selection_path, sim_node = self.select_and_expand(thread_idx)
+        selection_path = self.select_and_expand(thread_idx)
+        sim_node = self.get_state_to_simulate(thread_idx, selection_path[-1])
 
         # Between backprop of visit and reward, we incur virtual loss
         self.backpropagate_visit(selection_path)

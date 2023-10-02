@@ -197,6 +197,109 @@ class CircuiTree(ABC):
 
         return spath_backup, reward, sim_node
 
+    # def get_state_to_simulate(self, start: Any) -> Any:
+    #     """Uses the random generator for the given thread to select a state to simulate,
+    #     starting from the given starting state. If the given starting state is terminal,
+    #     returns it. Otherwise, selects a random child recursively until a terminal state
+    #     is reached."""
+    #     state = start
+    #     while not self.is_terminal(state):
+    #         actions = self.get_actions(state)
+    #         action = self.rg.choice(actions)
+    #         state = self._do_action(state, action)
+    #     return state
+
+    # def select_and_expand(self) -> list[Any]:
+    #     # Start at root
+    #     node = self.root
+    #     selection_path = [node]
+
+    #     # Shuffle actions to prevent ordering bias
+    #     actions = self.get_actions(node)
+    #     self.rg.shuffle(actions)
+
+    #     # Recursively select the child with the highest UCB score until either a terminal
+    #     # state is reached or an unexpanded edge is found.
+    #     while actions:
+    #         max_ucb = -np.inf
+    #         best_child = None
+    #         for action in actions:
+    #             child = self._do_action(node, action)
+    #             ucb = self.get_ucb_score(node, child)
+
+    #             # An unexpanded edge has UCB score of infinity.
+    #             # In this case, expand and select the child.
+    #             if ucb == np.inf:
+    #                 self.expand_edge(node, child)
+    #                 selection_path.append(child)
+    #                 return selection_path
+
+    #             # Otherwise, track the child with the highest UCB score
+    #             if ucb > max_ucb:
+    #                 max_ucb = ucb
+    #                 best_child = child
+
+    #         # If no child can be expanded (all children have been visited at least once)
+    #         # then move on to the child with the highest UCB score and repeat.
+    #         node = best_child
+    #         selection_path.append(node)
+
+    #         # If the node is terminal, actions will be empty and the loop will break
+    #         actions = self.get_actions(node)
+    #         self.rg.shuffle(actions)
+
+    #     # If the loop breaks, we have reached a terminal state.
+    #     return selection_path
+
+    # def expand_edge(self, parent: Any, child: Any):
+    #     if not self.graph.has_node(child):
+    #         self.graph.add_node(child, **self.default_attrs)
+    #     self.graph.add_edge(parent, child, **self.default_attrs)
+
+    # def get_ucb_score(self, parent, child):
+    #     if self.graph.has_edge(parent, child):
+    #         return ucb_score(self.graph, parent, child, self.exploration_constant)
+    #     else:
+    #         return np.inf
+
+    # def _backpropagate(self, path: list, attr: str, value: float | int):
+    #     """Update the value of an attribute for each node and edge in the path."""
+    #     _path = path.copy()
+    #     child = _path.pop()
+    #     self.graph.nodes[child][attr] += value
+    #     while _path:
+    #         parent = _path.pop()
+    #         self.graph.edges[parent, child][attr] += value
+    #         child = parent
+    #         self.graph.nodes[child][attr] += value
+
+    # def backpropagate_visit(self, selection_path: list) -> None:
+    #     """Update the visit count for each node and edge in the selection path.
+    #     Visit update happens before simulation and reward calculation, so until the
+    #     reward is computed and backpropagated, there is 'virtual loss' on each node in
+    #     the selection path."""
+    #     self._backpropagate(selection_path, "visits", 1)
+
+    # def backpropagate_reward(self, selection_path: list, reward: float | int):
+    #     """Update the reward for each node and edge in the selection path.
+    #     Visit update happens before simulation and reward calculation, so until the
+    #     reward is computed and backpropagated, there is 'virtual loss' on each node in
+    #     the selection path."""
+    #     self._backpropagate(selection_path, "reward", reward)
+
+    # def traverse(self, **kwargs):
+    #     # Select the next state to sample and the terminal state to be simulated.
+    #     # Expands a child if possible.
+    #     selection_path = self.select_and_expand()
+    #     sim_node = self.get_state_to_simulate(selection_path[-1])
+
+    #     # Between backprop of visit and reward, we incur virtual loss
+    #     self.backpropagate_visit(selection_path)
+    #     reward = self.get_reward(sim_node, **kwargs)
+    #     self.backpropagate_reward(selection_path, reward)
+
+    #     return selection_path, reward, sim_node
+
     def accumulate_visits_and_rewards(self, graph: Optional[nx.DiGraph] = None):
         _accumulated = self.graph if graph is None else graph
         accumulate_visits_and_rewards(_accumulated)
