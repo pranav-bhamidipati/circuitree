@@ -94,13 +94,76 @@ class SimpleNetworkGrammar:
     def is_terminal(genotype: str) -> bool:
         return genotype.startswith("*")
 
+    @cached_property
+    def _recolor(self):
+        return [dict(zip(self.components, p)) for p in permutations(self.components)]
+
     @staticmethod
-    def get_unique_state(genotype: str) -> str:
-        prefix = "*" if genotype.startswith("*") else ""
-        components, interactions = genotype.strip("*").split("::")
-        unique_components = "".join(sorted(components))
-        unique_interactions = "_".join(sorted(interactions.split("_")))
-        return prefix + unique_components + "::" + unique_interactions
+    def _recolor_string(mapping, string):
+        return "".join([mapping.get(c, c) for c in string])
+
+    @cache
+    def get_interaction_recolorings(self, genotype: str) -> list[str]:
+        if "::" in genotype:
+            components, interactions = genotype.split("::")
+        else:
+            interactions = genotype
+
+        interaction_recolorings = []
+        for mapping in self._recolor:
+            recolored_interactions = sorted(
+                [self._recolor_string(mapping, ixn) for ixn in interactions.split("_")]
+            )
+            interaction_recolorings.append("_".join(recolored_interactions).strip("_"))
+
+        return interaction_recolorings
+
+    @cache
+    def get_component_recolorings(self, genotype: str) -> list[str]:
+        if "::" in genotype:
+            components, interactions = genotype.split("::")
+        else:
+            components = genotype
+
+        component_recolorings = []
+        for mapping in self._recolor:
+            recolored_components = "".join(
+                sorted(self._recolor_string(mapping, components))
+            )
+            component_recolorings.append(recolored_components)
+
+        return component_recolorings
+
+    def get_recolorings(self, genotype: str) -> Iterable[str]:
+        ris = self.get_interaction_recolorings(genotype)
+        rcs = self.get_component_recolorings(genotype)
+        recolorings = ["::".join([rc, ri]) for rc, ri in zip(rcs, ris)]
+
+        return recolorings
+
+    def get_unique_state(self, genotype: str) -> str:
+        return min(self.get_recolorings(genotype))
+
+    def has_motif(self, state, motif):
+        if ("::" in motif) or ("*" in motif):
+            raise ValueError(
+                "Motif code should only contain interactions, no components"
+            )
+        if "::" not in state:
+            raise ValueError(
+                "State code should contain both components and interactions"
+            )
+
+        interaction_code = state.split("::")[1]
+        if not interaction_code:
+            return False
+        state_interactions = set(interaction_code.split("_"))
+
+        for recoloring in self.get_interaction_recolorings(motif):
+            motif_interactions = set(recoloring.split("_"))
+            if motif_interactions.issubset(state_interactions):
+                return True
+        return False
 
     @staticmethod
     def parse_genotype(genotype: str, nonterminal_ok: bool = False):
