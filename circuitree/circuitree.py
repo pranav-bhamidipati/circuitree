@@ -335,7 +335,7 @@ class CircuiTree(ABC):
             callback = lambda *a, **kw: None
 
         iterator = self.bfs_iterator(root=self.root, shuffle=shuffle)
-        if (n_steps is None) ^ (n_cycles is None):
+        if not ((n_steps is None) ^ (n_cycles is None)):
             raise ValueError("Must specify exactly one of n_steps or n_cycles.")
 
         ### Iterate in BFS order
