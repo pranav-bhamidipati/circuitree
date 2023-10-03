@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from itertools import cycle, chain, repeat
+from itertools import cycle, chain, islice, repeat
 import json
 from pathlib import Path
 from typing import Callable, Literal, Optional, Iterable, Any
@@ -242,27 +242,16 @@ class CircuiTree(ABC):
     def search_mcts(
         self,
         n_steps: int,
-        root: Optional[Any] = None,
-        metric_func: Optional[Callable] = None,
-        save_every: int = 1,
+        callback_every: int = 1,
+        callback: Optional[Callable] = None,
         exploration_constant: Optional[float] = None,
-        accumulate: bool = True,
-        accumulate_post: bool = False,
         progress_bar: bool = False,
-        **kwargs,
-    ):
-        if accumulate and accumulate_post:
-            raise ValueError(
-                "Cannot set accumulate=True and accumulate_post=True."
-                "Accumulation should occur either during or after search."
-            )
-
+        run_kwargs: Optional[dict] = None,
+    ) -> None | list[Any]:
         if exploration_constant is None:
             exploration_constant = self.exploration_constant
-        if root is None:
-            root = self.root
-        if root not in self.graph.nodes:
-            self.graph.add_node(root, visits=0, reward=0)
+
+        run_kwargs = {} if run_kwargs is None else run_kwargs
 
         if progress_bar:
             from tqdm import trange
@@ -271,30 +260,22 @@ class CircuiTree(ABC):
         else:
             iterator = range(n_steps)
 
-        if metric_func is None:
-            for i in iterator:
-                selection_path, reward, sim_node = self.traverse(
-                    root, accumulate=accumulate, **kwargs
-                )
-
+        cb_results = []
+        if callback is None:
+            return_results = False
+            callback = lambda *a, **kw: None
+            callback_every = np.inf
         else:
-            metrics = [metric_func(self.graph, [], root, None, **kwargs)]
-            for i in iterator:
-                selection_path, reward, sim_node = self.traverse(
-                    root, accumulate=accumulate, **kwargs
-                )
-                if i % save_every == 0:
-                    m = metric_func(
-                        self.graph, selection_path, sim_node, reward, **kwargs
-                    )
-                    metrics.append(m)
+            return_results = True
+            cb_results.append(callback(self.graph, [], None, None))
+        for i in iterator:
+            selection_path, reward, sim_node = self.traverse(**run_kwargs)
+            if i % callback_every == 0:
+                cb_result = callback(self.graph, selection_path, sim_node, reward)
+                cb_results.append(cb_result)
 
-        # Accumulate results from edges onto nodes
-        if accumulate_post:
-            self.accumulate_visits_and_rewards()
-
-        if metric_func is not None:
-            return metrics
+        if return_results:
+            return cb_results
         else:
             return None
 
@@ -323,32 +304,6 @@ class CircuiTree(ABC):
                 if not self.graph.has_edge(node, next_node):
                     self.graph.add_edge(node, next_node, visits=n_visits, reward=0)
 
-    def grow_tree_recursive(self, root=None):
-        if root is None:
-            root = self.root
-            self.graph.add_node(root, visits=0, reward=0)
-
-        def _grow_tree_recursive(node, action):
-            if self.is_terminal(node):
-                return
-            next_node = self._do_action(node, action)
-            if next_node not in self.graph:
-                self.graph.add_node(next_node, visits=0, reward=0)
-                for action in self.get_actions(next_node):
-                    _grow_tree_recursive(next_node, action)
-            self.graph.add_edge(
-                node,
-                next_node,
-                visits=0,
-                reward=0,
-            )
-
-        def _grow_tree(root):
-            for action in self.get_actions(root):
-                _grow_tree_recursive(root, action)
-
-        _grow_tree(root)
-
     def bfs_iterator(self, root=None, shuffle=False):
         root = self.root if root is None else root
         layers = (l for l in nx.bfs_layers(self.graph, root))
@@ -358,101 +313,70 @@ class CircuiTree(ABC):
             for l in layers:
                 self.rg.shuffle(l)
 
-        return chain(*layers)
-
-    def make_bfs_search_generator(
-        self,
-        root: Optional[Any] = None,
-        n_steps_per_node: int = 1,
-        metric_func: Optional[Callable] = None,
-        shuffle: bool = False,
-        max_steps: Optional[int] = None,
-        **kwargs,
-    ):
-        """
-        Returns a generator that performs breadth-first search step-wise. Repeats the
-        search indefinitely, or until the maximum number of steps is reached.
-        Should be performed on a tree that has already been grown (all leaves are known)
-        """
-
-        if root is None:
-            root = self.root
-
-        if metric_func is None:
-            metric_func = lambda *a, **kw: None
-
-        if max_steps is None:
-            max_steps = np.inf
-
-        leaf_is_nonterminal = lambda n: (
-            len(self.graph.neighbors(n)) == 0
-        ) and not self.is_terminal(n)
-        if any(leaf_is_nonterminal(n) for n in self.graph.nodes):
-            self.grow_tree(root=root, n_visits=0)
-
-        # Make an iterator that repeats each leaf n_steps_per_node times, cycling
-        # endlessly in BFS order
-        leaves = [
-            repeat(n, n_steps_per_node)
-            for n in self.bfs_iterator(root, shuffle=shuffle)
-            if self.is_terminal(n)
-        ]
-        bfs = cycle(chain(*leaves))
-
-        def bfs_do_one_iteration():
-            k = 0
-            while k < max_steps:
-                n = next(bfs)
-                reward = self.get_reward(n)
-                self.graph.nodes[n]["reward"] += reward
-                self.graph.nodes[n]["visits"] += 1
-                k += 1
-                yield reward
-
-        return bfs_do_one_iteration
+        # Iterate over all terminal nodes in BFS order
+        return filter(self.is_terminal, chain.from_iterable(layers))
 
     def search_bfs(
         self,
-        n_steps_per_node: int,
-        n_repeats: int = 1,
-        max_steps: int = np.inf,
-        root: Optional[Any] = None,
-        metric_func: Optional[Callable] = None,
+        n_steps: Optional[int] = None,
+        n_repeats: Optional[int] = None,
+        n_cycles: Optional[int] = None,
+        callback: Optional[Callable] = None,
+        callback_every: int = 1,
         shuffle: bool = False,
         progress: bool = False,
         **kwargs,
     ):
-        if root is None:
-            root = self.root
-
-        if metric_func is None:
-            metric_func = lambda *a, **kw: None
-
         if self.graph.number_of_nodes() < 2:
-            self.graph.add_node(root, visits=0, reward=0)
-            self.grow_tree(root=root, n_visits=0)
+            self.graph.add_node(self.root, visits=0, reward=0)
+            self.grow_tree(root=self.root, n_visits=0)
 
-        metrics = [metric_func(self.graph, root, None, **kwargs)]
+        if callback is None:
+            callback = lambda *a, **kw: None
 
-        leaves = [
-            n for n in self.bfs_iterator(root, shuffle=shuffle) if self.is_terminal(n)
-        ]
-        bfs = cycle(leaves)
-        n_steps = min(n_repeats * len(leaves), max_steps)
-        iterator = range(n_steps)
+        iterator = self.bfs_iterator(root=self.root, shuffle=shuffle)
+        if n_steps is None and n_repeats is None and n_cycles is None:
+            raise ValueError(
+                "Must specify at least one of n_steps, n_repeats, or n_cycles."
+            )
+
+        ### Iterate in BFS order
+        # If n_repeats is specified, repeat each node n_repeats times before moving on
+        # If n_cycles is specified, repeat the entire BFS traversal n_cycles times
+        # If n_steps is specified, stop after n_steps total iterations
+        if n_repeats is not None:
+            iterator = chain.from_iterable(repeat(elem, n_repeats) for elem in iterator)
+        if n_cycles is not None:
+            iterator = chain.from_iterable(repeat(iterator, n_cycles))
+        iterator = islice(iterator, n_steps)
+
         if progress:
             from tqdm import tqdm
 
             iterator = tqdm(iterator, desc="BFS search")
-        for i in iterator:
-            n = next(bfs)
-            reward = sum(self.get_reward(n) for _ in range(n_steps_per_node))
-            self.graph.nodes[n]["reward"] += reward
-            self.graph.nodes[n]["visits"] += n_steps_per_node
-            # self.graph.nodes[n]["history"].append(reward)
-            metrics.append(metric_func(self.graph, n, reward, **kwargs))
 
-        return metrics
+        cb_results = []
+        if callback is None:
+            return_results = False
+            callback = lambda *a, **kw: None
+            callback_every = np.inf
+        else:
+            return_results = True
+            cb_results.append(callback(self.graph, None, None))
+
+        for i, node in enumerate(iterator):
+            self.graph.nodes[node]["visits"] += 1
+            reward = self.get_reward(node)
+            self.graph.nodes[node]["reward"] += reward
+
+            if i % callback_every == 0:
+                cb_result = callback(self.graph, node, reward)
+                cb_results.append(cb_result)
+
+        if return_results:
+            return cb_results
+        else:
+            return None
 
     def is_success(self, state) -> bool:
         """Must be defined to calculate modularity."""
