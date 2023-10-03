@@ -335,20 +335,19 @@ class CircuiTree(ABC):
             callback = lambda *a, **kw: None
 
         iterator = self.bfs_iterator(root=self.root, shuffle=shuffle)
-        if n_steps is None and n_repeats is None and n_cycles is None:
-            raise ValueError(
-                "Must specify at least one of n_steps, n_repeats, or n_cycles."
-            )
+        if (n_steps is None) ^ (n_cycles is None):
+            raise ValueError("Must specify exactly one of n_steps or n_cycles.")
 
         ### Iterate in BFS order
         # If n_repeats is specified, repeat each node n_repeats times before moving on
         # If n_cycles is specified, repeat the entire BFS traversal n_cycles times
-        # If n_steps is specified, stop after n_steps total iterations
+        # Otherwise if n_steps is specified, stop after n_steps total iterations
         if n_repeats is not None:
             iterator = chain.from_iterable(repeat(elem, n_repeats) for elem in iterator)
         if n_cycles is not None:
             iterator = chain.from_iterable(repeat(iterator, n_cycles))
-        iterator = islice(iterator, n_steps)
+        elif n_steps is not None:
+            iterator = islice(cycle(iterator), n_steps)
 
         if progress:
             from tqdm import tqdm
