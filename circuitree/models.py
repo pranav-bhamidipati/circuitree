@@ -8,7 +8,12 @@ from typing import Iterable, Literal, Optional
 from .circuitree import CircuiTree
 from .grammar import CircuitGrammar
 
-__all__ = ["SimpleNetworkTree", "DimerNetworkTree"]
+__all__ = [
+    "SimpleNetworkGrammar",
+    "SimpleNetworkTree",
+    "DimersGrammar",
+    "DimerNetworkTree",
+]
 
 """Classes for modeling different types of circuits."""
 
@@ -20,10 +25,10 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
     def __init__(
         self,
-        root: str,
         components: Iterable[Iterable[str]],
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
+        root: Optional[str] = None,
     ):
         super().__init__()
 
@@ -324,10 +329,10 @@ class SimpleNetworkTree(CircuiTree):
 
     def __init__(
         self,
-        root: str,
         components: Iterable[Iterable[str]],
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
+        root: Optional[str] = None,
         exploration_constant: float | None = None,
         seed: int = 2023,
         graph: nx.DiGraph | None = None,
@@ -335,10 +340,10 @@ class SimpleNetworkTree(CircuiTree):
         **kwargs,
     ):
         grammar = SimpleNetworkGrammar(
-            root=root,
             components=components,
             interactions=interactions,
             max_interactions=max_interactions,
+            root=root,
         )
         super().__init__(
             grammar=grammar,
@@ -356,12 +361,12 @@ class DimersGrammar(CircuitGrammar):
 
     def __init__(
         self,
-        root: str,
         components: Iterable[str],
         regulators: Iterable[str],
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
         max_interactions_per_promoter: int = 2,
+        root: Optional[str] = None,
     ):
         super().__init__()
 
@@ -381,6 +386,8 @@ class DimersGrammar(CircuitGrammar):
 
         self.max_interactions = max_interactions or np.inf
         self.max_interactions_per_promoter = max_interactions_per_promoter
+
+        self.root = root
 
         # The following attributes/cached properties should not be serialized when
         # saving the object to file
@@ -686,7 +693,7 @@ class DimersGrammar(CircuitGrammar):
             for recoloring in self.get_interaction_recolorings(motif)
         ]
 
-    def has_motif(self, state, motif):
+    def has_pattern(self, state, motif):
         if ("::" in motif) or ("*" in motif):
             raise ValueError(
                 "Motif code should only contain interactions, no components"
@@ -749,12 +756,12 @@ class DimerNetworkTree(CircuiTree):
 
     def __init__(
         self,
-        root: str,
         components: Iterable[str],
         regulators: Iterable[str],
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
         max_interactions_per_promoter: int = 2,
+        root: Optional[str] = None,
         exploration_constant: float | None = None,
         seed: int = 2023,
         graph: nx.DiGraph | None = None,
@@ -762,12 +769,12 @@ class DimerNetworkTree(CircuiTree):
         **kwargs,
     ):
         grammar = DimersGrammar(
-            root=root,
             components=components,
             regulators=regulators,
             interactions=interactions,
             max_interactions=max_interactions,
             max_interactions_per_promoter=max_interactions_per_promoter,
+            root=root,
         )
         super().__init__(
             grammar=grammar,
