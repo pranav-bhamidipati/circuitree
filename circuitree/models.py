@@ -1,35 +1,38 @@
 from collections import Counter
 from functools import cached_property, cache
-from itertools import product, permutations
+from itertools import chain, product, permutations
+import networkx as nx
 import numpy as np
-from typing import Iterable, Optional
+from typing import Iterable, Literal, Optional
+
 from .circuitree import CircuiTree
+from .grammar import CircuitGrammar
 
 __all__ = ["SimpleNetworkTree", "DimerNetworkTree"]
 
 """Classes for modeling different types of circuits."""
 
 
-class SimpleNetworkGrammar:
+class SimpleNetworkGrammar(CircuitGrammar):
     """A class implementing the grammar for simple network circuits. It provides
     all required methods for the CircuiTree and MultithreadedCircuiTree classes
     except the get_reward() method."""
 
     def __init__(
         self,
+        root: str,
         components: Iterable[Iterable[str]],
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
-        *args,
-        **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
         if len(set(c[0] for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
         if len(set(c[0] for c in interactions)) < len(interactions):
             raise ValueError("First character of each interaction must be unique")
 
+        self.root = root
         self.components = components
         self.component_map = {c[0]: c for c in self.components}
         self.interactions = interactions
@@ -40,12 +43,16 @@ class SimpleNetworkGrammar:
         else:
             self.max_interactions = max_interactions
 
-        # When combining with a CircuiTree or MultithreadedCircuiTree, don't serialize
-        # these attributes when saving the object to file.
-        if hasattr(self, "_non_serializable_attrs"):
-            self._non_serializable_attrs.extend(
-                ["component_map", "interaction_map", "edge_options", "_recolor"]
-            )
+        # Attributes that should not be serialized when saving the object to file
+        self._non_serializable_attrs.extend(
+            [
+                "component_map",
+                "interaction_map",
+                "edge_options",
+                "component_codes",
+                "_recolor",
+            ]
+        )
 
     @cached_property
     def edge_options(self):
@@ -54,26 +61,84 @@ class SimpleNetworkGrammar:
             for c1, c2 in product(self.components, self.components)
         ]
 
+    @cached_property
+    def component_codes(self) -> set[str]:
+        return set(c[0] for c in self.components)
+
     def get_actions(self, genotype: str) -> Iterable[str]:
+        # If terminal already, no actions can be taken
         if self.is_terminal(genotype):
             return list()
 
         # Terminating assembly is always an option
         actions = ["*terminate*"]
 
+        # Get the components and interactions in the current genotype
         components_joined, interactions_joined = genotype.strip("*").split("::")
         components = set(components_joined)
         interactions = set(ixn[:2] for ixn in interactions_joined.split("_") if ixn)
-        if len(interactions) >= self.max_interactions:
+        n_interactions = len(interactions)
+
+        # If we have reached the limit on interactions, only termination is an option
+        if n_interactions >= self.max_interactions:
             return actions
-        actions.extend(list(set(c[0] for c in self.components) - components))
+
+        # We can add at most one more component not already in the genotype
+        if len(components) < len(self.components):
+            actions.append(next(c for c in self.component_codes if c not in components))
+
+        # If we have no interactions yet, don't need to check for connectedness
+        elif n_interactions == 0:
+            possible_edge_options = [
+                grp
+                for grp in self.edge_options
+                if grp and set(grp[0][:2]).issubset(components)
+            ]
+            return list(chain.from_iterable(possible_edge_options))
+
+        # Otherwise, add all valid interactions
         for action_group in self.edge_options:
             if action_group:
                 c1_c2 = action_group[0][:2]
-                if set(c1_c2) <= components and c1_c2 not in interactions:
+                c1, c2 = c1_c2
+
+                # Add the interaction the necessary components are present, that edge
+                # isn't already taken, and the added edge would be contiguous with the
+                # existing edges (i.e. the circuit should be fully connected)
+                has_necessary_components = c1 in components and c2 in components
+                connected_to_current_edges = (
+                    c1_c2[0] in interactions_joined or c1_c2[1] in interactions_joined
+                )
+                no_existing_edge = c1_c2 not in interactions
+                if (
+                    has_necessary_components
+                    and connected_to_current_edges
+                    and no_existing_edge
+                ):
                     actions.extend(action_group)
 
         return actions
+
+    # def get_actions(self, genotype: str) -> Iterable[str]:
+    #     if self.is_terminal(genotype):
+    #         return list()
+
+    #     # Terminating assembly is always an option
+    #     actions = ["*terminate*"]
+
+    #     components_joined, interactions_joined = genotype.strip("*").split("::")
+    #     components = set(components_joined)
+    #     interactions = set(ixn[:2] for ixn in interactions_joined.split("_") if ixn)
+    #     if len(interactions) >= self.max_interactions:
+    #         return actions
+    #     actions.extend(list(set(c[0] for c in self.components) - components))
+    #     for action_group in self.edge_options:
+    #         if action_group:
+    #             c1_c2 = action_group[0][:2]
+    #             if set(c1_c2) <= components and c1_c2 not in interactions:
+    #                 actions.extend(action_group)
+
+    #     return actions
 
     def do_action(self, genotype: str, action: str) -> str:
         if action == "*terminate*":
@@ -89,6 +154,51 @@ class SimpleNetworkGrammar:
                     delim = ""
                 new_genotype = "::".join([components, interactions + delim + action])
         return new_genotype
+
+    def get_undo_actions(self, genotype: str) -> Iterable[str]:
+        if genotype == self.root:
+            return []
+        if self.is_terminal(genotype):
+            return ["*undo_terminate*"]
+
+        undo_actions = []
+        components, interactions_joined = genotype.split("::")
+
+        # Can only remove an edge if it keeps the circuit connected
+        if interactions_joined:
+            interactions = interactions_joined.split("_")
+            components_in_ixn = [set(ixn[:2]) for ixn in interactions_joined.split("_")]
+            for i, ixn in enumerate(interactions):
+                # If we remove this interaction, will the circuit remain connected?
+                distinct_sets_without_ixn = self.merge_overlapping_sets(
+                    components_in_ixn[:i] + components_in_ixn[i + 1 :]
+                )
+                if len(distinct_sets_without_ixn) == 1:
+                    undo_actions.append(ixn)
+
+        # Can only remove a component if it has no edges and we have more components
+        # than the root circuit
+        if len(components) - len(self.root.split("::")[0]):
+            undo_actions.extend(set(components) - set(interactions_joined))
+
+        return undo_actions
+
+    def undo_action(self, genotype: str, action: str) -> str:
+        if action == "*undo_terminate*":
+            if genotype.startswith("*"):
+                return genotype[1:]
+            else:
+                raise ValueError(
+                    f"Cannot undo termination on a non-terminal genotype: {genotype}"
+                )
+
+        components, interactions = genotype.split("::")
+        if len(action) == 1:
+            if action in components:
+                return components.replace(action, "")
+            return components.replace(action, "")
+        elif len(action) == 3:
+            return interactions.replace(action, "")
 
     @staticmethod
     def is_terminal(genotype: str) -> bool:
@@ -144,10 +254,10 @@ class SimpleNetworkGrammar:
     def get_unique_state(self, genotype: str) -> str:
         return min(self.get_recolorings(genotype))
 
-    def has_motif(self, state, motif):
-        if ("::" in motif) or ("*" in motif):
+    def has_pattern(self, state: str, pattern: str):
+        if ("::" in pattern) or ("*" in pattern):
             raise ValueError(
-                "Motif code should only contain interactions, no components"
+                "Pattern code should only contain interactions, no components"
             )
         if "::" not in state:
             raise ValueError(
@@ -159,9 +269,9 @@ class SimpleNetworkGrammar:
             return False
         state_interactions = set(interaction_code.split("_"))
 
-        for recoloring in self.get_interaction_recolorings(motif):
-            motif_interactions = set(recoloring.split("_"))
-            if motif_interactions.issubset(state_interactions):
+        for recoloring in self.get_interaction_recolorings(pattern):
+            pattern_interactions = set(recoloring.split("_"))
+            if pattern_interactions.issubset(state_interactions):
                 return True
         return False
 
@@ -190,7 +300,7 @@ class SimpleNetworkGrammar:
         return components, activations, inhbitions
 
 
-class SimpleNetworkTree(SimpleNetworkGrammar, CircuiTree):
+class SimpleNetworkTree(CircuiTree):
     """
     SimpleNetworkTree
     =================
@@ -212,10 +322,89 @@ class SimpleNetworkTree(SimpleNetworkGrammar, CircuiTree):
             ``*ABC::ABa_ACa_BCi``
     """
 
+    def __init__(
+        self,
+        root: str,
+        components: Iterable[Iterable[str]],
+        interactions: Iterable[str],
+        max_interactions: Optional[int] = None,
+        exploration_constant: float | None = None,
+        seed: int = 2023,
+        graph: nx.DiGraph | None = None,
+        tree_shape: Literal["tree", "dag"] = "dag",
+        **kwargs,
+    ):
+        grammar = SimpleNetworkGrammar(
+            root=root,
+            components=components,
+            interactions=interactions,
+            max_interactions=max_interactions,
+        )
+        super().__init__(
+            grammar=grammar,
+            root=root,
+            exploration_constant=exploration_constant,
+            seed=seed,
+            graph=graph,
+            tree_shape=tree_shape,
+            **kwargs,
+        )
 
-class DimersGrammar:
-    """A mixin class for dimerizing network circuits. Can be combined with the CircuiTree
-    or MultithreadedCircuiTree base classes."""
+
+class DimersGrammar(CircuitGrammar):
+    """A grammar class for circuits consisting of dimerizing molecules."""
+
+    def __init__(
+        self,
+        root: str,
+        components: Iterable[str],
+        regulators: Iterable[str],
+        interactions: Iterable[str],
+        max_interactions: Optional[int] = None,
+        max_interactions_per_promoter: int = 2,
+    ):
+        super().__init__()
+
+        if len(set(c[0] for c in components)) < len(components):
+            raise ValueError("First character of each component must be unique")
+        if len(set(c[0] for c in regulators)) < len(regulators):
+            raise ValueError("First character of each component must be unique")
+        if len(set(c[0] for c in interactions)) < len(interactions):
+            raise ValueError("First character of each interaction must be unique")
+
+        self.components = components
+        self.component_map = {c[0]: c for c in self.components}
+        self.regulators = regulators
+        self.regulator_map = {r[0]: r for r in self.regulators}
+        self.interactions = interactions
+        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
+
+        self.max_interactions = max_interactions or np.inf
+        self.max_interactions_per_promoter = max_interactions_per_promoter
+
+        # The following attributes/cached properties should not be serialized when
+        # saving the object to file
+        self._non_serializable_attrs.extend(
+            [
+                "component_map",
+                "regulator_map",
+                "interaction_map",
+                "component_codes",
+                "regulator_codes",
+                "dimer_options",
+                "edge_options",
+                "_recolor_components",
+                "_recolor_regulators",
+            ]
+        )
+
+    @cached_property
+    def component_codes(self) -> set[str]:
+        return set(c[0] for c in self.components)
+
+    @cached_property
+    def regulator_codes(self) -> set[str]:
+        return set(c[0] for c in self.regulators)
 
     @cached_property
     def dimer_options(self):
@@ -226,6 +415,10 @@ class DimersGrammar:
                 continue
             dimers.add("".join(sorted([c1[0], c2[0]])))
         return list(dimers)
+
+    @property
+    def edges(self):
+        return product(self.dimer_options, self.components)
 
     @cached_property
     def edge_options(self):
@@ -239,24 +432,97 @@ class DimersGrammar:
         return genotype.startswith("*")
 
     def get_actions(self, genotype: str) -> Iterable[str]:
+        # If terminal already, no actions can be taken
         if self.is_terminal(genotype):
             return list()
 
         # Terminating assembly is always an option
         actions = ["*terminate*"]
 
-        components, regulators, interactions_joined = self.get_genotype_parts(genotype)
-        actions.extend(list(set(self.components) - set(components)))
-        regulators_to_add = set(self.regulators) - set(regulators)
-        actions.extend([f"+{r}" for r in regulators_to_add])
-        n_bound = Counter(ixn[3] for ixn in interactions_joined.split("_") if ixn)
-        for action_group in self.edge_options:
-            if action_group:
-                promoter = action_group[0][-1]
-                if n_bound[promoter] < self.n_binding_sites:
-                    actions.extend(action_group)
+        # Get the components and interactions in the current genotype
+        (
+            components_joined,
+            regulators_joined,
+            interactions_joined,
+        ) = self.get_genotype_parts(genotype)
+        # components_joined, interactions_joined = genotype.strip("*").split("::")
+        components = set(components_joined)
+        regulators = set(regulators_joined)
+        components_and_regulators = components | regulators
+        interactions = set(
+            ixn[:2] + ixn[3] for ixn in interactions_joined.split("_") if ixn
+        )
+        n_interactions = len(interactions)
+
+        # If we have reached the limit on interactions, only termination is an option
+        if n_interactions >= self.max_interactions:
+            return actions
+
+        # We can add a molecule not already in the genotype
+        if len(components) < len(self.components):
+            actions.append(next(c for c in self.component_codes if c not in components))
+        if len(regulators) < len(self.regulators):
+            actions.append(
+                next("+" + r for r in self.regulator_codes if r not in regulators)
+            )
+
+        # If we have no interactions yet, don't need to check for connectedness
+        elif n_interactions == 0:
+            possible_edge_options = [
+                options
+                for (dimer, promoter), options in zip(self.edges, self.edge_options)
+                if set(dimer + promoter).issubset(components_and_regulators)
+            ]
+            return list(chain.from_iterable(possible_edge_options))
+
+        # Otherwise, add all valid interactions
+        n_ixn_per_promoter = Counter(
+            ixn[3] for ixn in interactions_joined.split("_") if ixn
+        )
+        for (dimer, promoter), edge_options in zip(self.edges, self.edge_options):
+            if edge_options:
+                # Add the interaction the necessary components are present, that edge
+                # isn't already taken, and the added edge would be contiguous with the
+                # existing edges (i.e. the circuit should be fully connected)
+                edge = dimer + promoter
+                edge_set = set(edge)
+                has_necessary_components = edge_set.issubset(components_and_regulators)
+                connected_to_current_edges = (
+                    len(edge_set & components_and_regulators) > 0
+                )
+                no_existing_edge = edge not in interactions
+                promoter_not_saturated = (
+                    n_ixn_per_promoter[promoter] < self.max_interactions_per_promoter
+                )
+                if (
+                    has_necessary_components
+                    and connected_to_current_edges
+                    and no_existing_edge
+                    and promoter_not_saturated
+                ):
+                    actions.extend(edge_options)
 
         return actions
+
+    # def get_actions(self, genotype: str) -> Iterable[str]:
+    #     if self.is_terminal(genotype):
+    #         return list()
+
+    #     # Terminating assembly is always an option
+    #     actions = ["*terminate*"]
+
+    #     components, regulators, interactions_joined = self.get_genotype_parts(genotype)
+    #     actions.extend(list(set(self.components) - set(components)))
+    #     regulators_to_add = set(self.regulators) - set(regulators)
+    #     actions.extend([f"+{r}" for r in regulators_to_add])
+    #     n_bound = Counter(ixn[3] for ixn in interactions_joined.split("_") if ixn)
+    #     for action_group in self.edge_options:
+    #         if action_group:
+    #             promoter = action_group[0][-1]
+    #             if n_bound[promoter] < self.max_interactions_per_promoter:
+    #                 actions.extend(action_group)
+
+    #     return actions
 
     def do_action(self, genotype: str, action: str) -> str:
         action_len = len(action)
@@ -309,12 +575,7 @@ class DimersGrammar:
         return components, regulators, interactions
 
     @staticmethod
-    def parse_genotype(genotype: str, nonterminal_ok: bool = False):
-        if not genotype.startswith("*") and not nonterminal_ok:
-            raise ValueError(
-                f"Assembly incomplete. Genotype {genotype} is not a terminal genotype."
-            )
-
+    def parse_genotype(genotype: str):
         components_and_regulators, interaction_codes = genotype.strip("*").split("::")
         components, regulators = components_and_regulators.split("+")
         component_indices = {c: i for i, c in enumerate(components + regulators)}
@@ -438,15 +699,15 @@ class DimersGrammar:
         interaction_code = state.split("::")[1]
         if not interaction_code:
             return False
-        state_interactions = set(interaction_code.split("_"))
 
+        state_interactions = set(interaction_code.split("_"))
         for motif_interactions_set in self._motif_recolorings(motif):
             if motif_interactions_set.issubset(state_interactions):
                 return True
         return False
 
 
-class DimerNetworkTree(DimersGrammar, CircuiTree):
+class DimerNetworkTree(CircuiTree):
     """
     DimerNetworkTree
     =================
@@ -488,30 +749,32 @@ class DimerNetworkTree(DimersGrammar, CircuiTree):
 
     def __init__(
         self,
+        root: str,
         components: Iterable[str],
         regulators: Iterable[str],
         interactions: Iterable[str],
-        n_binding_sites: int = 2,
+        max_interactions: Optional[int] = None,
+        max_interactions_per_promoter: int = 2,
+        exploration_constant: float | None = None,
+        seed: int = 2023,
+        graph: nx.DiGraph | None = None,
+        tree_shape: Literal["tree", "dag"] = "dag",
         **kwargs,
     ):
-        if len(set(c[0] for c in components)) < len(components):
-            raise ValueError("First character of each component must be unique")
-        if len(set(c[0] for c in regulators)) < len(regulators):
-            raise ValueError("First character of each component must be unique")
-        if len(set(c[0] for c in interactions)) < len(interactions):
-            raise ValueError("First character of each interaction must be unique")
-
-        super().__init__(**kwargs)
-
-        self.components = components
-        self.component_map = {c[0]: c for c in self.components}
-        self.regulators = regulators
-        self.regulator_map = {r[0]: r for r in self.regulators}
-        self.interactions = interactions
-        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
-
-        self.n_binding_sites = n_binding_sites
-
-        self._non_serializable_attrs.extend(
-            ["component_map", "regulator_map", "interaction_map"]
+        grammar = DimersGrammar(
+            root=root,
+            components=components,
+            regulators=regulators,
+            interactions=interactions,
+            max_interactions=max_interactions,
+            max_interactions_per_promoter=max_interactions_per_promoter,
+        )
+        super().__init__(
+            grammar=grammar,
+            root=root,
+            exploration_constant=exploration_constant,
+            seed=seed,
+            graph=graph,
+            tree_shape=tree_shape,
+            **kwargs,
         )
