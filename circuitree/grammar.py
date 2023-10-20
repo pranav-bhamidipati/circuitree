@@ -38,7 +38,11 @@ class CircuitGrammar(ABC):
         raise NotImplementedError
 
     def get_dict_serializable(self) -> dict:
-        return {k: v for k, v in self.__dict__ if k not in self._non_serializable_attrs}
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in self._non_serializable_attrs
+        }
 
     def to_dict(self):
         return {
