@@ -1,59 +1,32 @@
-from math import ceil
-from typing import Mapping
-from numpy import vectorize
-from abc import ABC
+from itertools import combinations
+from typing import Sequence
 
 __all__ = [
-    "DefaultMapping",
-    "DefaultFactoryDict",
-    "ceiling",
-    "vround",
+    "merge_overlapping_sets",
 ]
 
 
-class DefaultMapping(ABC, Mapping):
-    """Abstract base class for mappings that implement a __missing__ method.
-    Can be used to check whether a class performs defaultdict-like behavior
-
-    Example:
-    >>> class MyDict(dict):
-    >>>     def __missing__(self, key):
-    >>>         return 0
-    >>> ...
-    >>> isinstance(MyDict(), DefaultMapping) # True
-    >>> issubclass(MyDict, DefaultMapping) # True
-    """
-
-    @classmethod
-    def __subclasshook__(cls, subclass):
-        if cls is DefaultMapping:
-            if any("__missing__" in C.__dict__ for C in subclass.__mro__):
-                return True
-        return NotImplemented
+## set operations
 
 
-class DefaultFactoryDict(dict):
-    """Similar to a defaultdict, but the default value is a function of the key."""
+def merge_overlapping_sets(sets: Sequence[set]) -> list[set]:
+    """Given an iterable of non-empty sets, merges any sets that have non-empty
+    intersection"""
 
-    def __init__(self, *args, default_factory=None, **kwargs):
-        if default_factory is None:
-            raise ValueError("Must provide a default_factory")
-        super().__init__(*args, **kwargs)
-        self._default_factory = default_factory
+    if any(len(s) == 0 for s in sets):
+        raise ValueError("Sets must be non-empty")
 
-    def __missing__(self, key):
-        self[key] = self._default_factory(key)
-        return self[key]
+    sets = list(sets)
+    found_merge = True
+    while found_merge:
+        found_merge = False
+        n_sets = len(sets)
+        for i, j in combinations(range(n_sets), 2):
+            set_i = sets[i]
+            set_j = sets[j]
+            if set_i & set_j:
+                sets[i] |= sets.pop(j)
+                found_merge = True
+                break
 
-
-## vectorized integer operations
-
-
-@vectorize
-def ceiling(x):
-    return ceil(x)
-
-
-@vectorize
-def vround(x):
-    return round(x)
+    return sets
