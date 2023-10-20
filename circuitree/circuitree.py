@@ -217,34 +217,6 @@ class CircuiTree(ABC):
         if graph is None:
             return _accumulated
 
-    def search_mcts(
-        self,
-        n_steps: int,
-        callback_every: int = 1,
-        callback: Optional[Callable] = None,
-        exploration_constant: Optional[float] = None,
-        progress_bar: bool = False,
-        run_kwargs: Optional[dict] = None,
-    ) -> None:
-        if exploration_constant is None:
-            exploration_constant = self.exploration_constant
-
-        run_kwargs = {} if run_kwargs is None else run_kwargs
-
-        if progress_bar:
-            from tqdm import trange
-
-            iterator = trange(n_steps, desc="MCTS search")
-        else:
-            iterator = range(n_steps)
-
-        if callback is None:
-            callback_every = np.inf
-        for i in iterator:
-            selection_path, reward, sim_node = self.traverse(**run_kwargs)
-            if i % callback_every == 0:
-                _ = callback(self.graph, selection_path, sim_node, reward)
-
     def grow_tree(
         self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
     ):
@@ -293,14 +265,14 @@ class CircuiTree(ABC):
         callback_every: int = 1,
         shuffle: bool = False,
         progress: bool = False,
-        **kwargs,
-    ):
+        run_kwargs: Optional[dict] = None,
+    ) -> None:
         if self.graph.number_of_nodes() < 2:
-            self.graph.add_node(self.root, visits=0, reward=0)
+            self.graph.add_node(self.root, **self.default_attrs)
             self.grow_tree(root=self.root, n_visits=0)
 
-        if callback is None:
-            callback = lambda *a, **kw: None
+        if run_kwargs is None:
+            run_kwargs = {}
 
         iterator = self.bfs_iterator(root=self.root, shuffle=shuffle)
         if not ((n_steps is None) ^ (n_cycles is None)):
@@ -323,27 +295,40 @@ class CircuiTree(ABC):
             iterator = tqdm(iterator, desc="BFS search")
 
         cb_results = []
-        if callback is None:
-            return_results = False
-            callback = lambda *a, **kw: None
-            callback_every = np.inf
-        else:
-            return_results = True
-            cb_results.append(callback(self.graph, None, None))
+        if callback is not None:
+            callback(self, None, None)
 
         for i, node in enumerate(iterator):
             self.graph.nodes[node]["visits"] += 1
-            reward = self.get_reward(node)
+            reward = self.get_reward(node, **run_kwargs)
             self.graph.nodes[node]["reward"] += reward
 
-            if i % callback_every == 0:
-                cb_result = callback(self.graph, node, reward)
-                cb_results.append(cb_result)
+            if callback is not None and i % callback_every == 0:
+                _ = callback(self.graph, node, reward)
 
-        if return_results:
-            return cb_results
+    def search_mcts(
+        self,
+        n_steps: int,
+        callback_every: int = 1,
+        callback: Optional[Callable] = None,
+        progress_bar: bool = False,
+        run_kwargs: Optional[dict] = None,
+    ) -> None:
+        if progress_bar:
+            from tqdm import trange
+
+            iterator = trange(n_steps, desc="MCTS search")
         else:
-            return None
+            iterator = range(n_steps)
+
+        run_kwargs = {} if run_kwargs is None else run_kwargs
+        if callback is not None:
+            callback(self, -1, [None], None, None)
+
+        for i in iterator:
+            selection_path, reward, sim_node = self.traverse(**run_kwargs)
+            if callback is not None and i % callback_every == 0:
+                _ = callback(self, i, selection_path, sim_node, reward)
 
     def is_success(self, state: Hashable) -> bool:
         """Returns whether or not a state is successful. Used to infer which patterns
