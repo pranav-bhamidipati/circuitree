@@ -3,12 +3,16 @@ from collections import Counter
 from numpy.random import default_rng, SeedSequence
 import numpy as np
 from multiprocessing import cpu_count
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
+
+from .models import DimersGrammar, SimpleNetworkGrammar
 
 from .circuitree import CircuiTree
 
 __all__ = [
     "MultithreadedCircuiTree",
+    "ParallelNetworkTree",
+    "ParallelDimerTree",
     "search_mcts_in_thread",
 ]
 
@@ -64,6 +68,85 @@ class MultithreadedCircuiTree(CircuiTree):
         self.backpropagate_reward(selection_path, reward)
 
         return selection_path, reward, sim_node
+
+
+class ParallelNetworkTree(MultithreadedCircuiTree):
+    def __init__(
+        self,
+        components: Iterable[Iterable[str]],
+        interactions: Iterable[str],
+        max_interactions: Optional[int] = None,
+        root: Optional[str] = None,
+        **kwargs,
+    ):
+        grammar = SimpleNetworkGrammar(
+            components=components,
+            interactions=interactions,
+            max_interactions=max_interactions,
+            root=root,
+        )
+        super().__init__(grammar=grammar, root=root, **kwargs)
+
+
+class DimerNetworkTree(CircuiTree):
+    """
+    DimerNetworkTree
+    =================
+    A CircuiTree for the design space of dimerizing TF networks. Intended to recapitulate
+    the dimerization of zinc-finger proteins.
+
+    Models a system of dimerizing transcription factors (e.g. zinc-fingers) that regulate
+    each other's transcription. The circuit consists a set of ``components``, which
+    represent transcription factors that are being regulated. Components can form homo-
+    or heterodimers that bind to a component's promoter region and regulate
+    transcription. There is also a set of ``regulators``, which can dimerize and regulate
+    transcription but are not themselves regulated. Regulator-regulator homodimers and
+    regulator-component heterodimers can act as TFs, but regulator-regulator homodimers
+    are assumed to be inactive.
+
+    The circuit topology (also referred to as the "state" during search) is encoded using
+    a string representation (aka "genotype") with the following rules:
+        - Components and regulators are represented by single uppercase characters
+        - Interactions are represented by a 4-character string
+            - Characters 1-2 (uppercase): the dimerizing species (components/regulators)
+            - Character 3 (lowercase): the type of regulation upon binding
+            - Character 4 (uppercase): the target of regulation (a component)
+        - Components are separated from regulators by a ``+``
+        - Components/regulators are separated from interactions by a ``::``
+        - Interactions are separated from one another by underscores ``_``
+        - A terminal assembly is denoted with a leading asterisk ``*``
+
+        For example, the following string represents a 2-component MultiFate system that
+        has not been fully assembled (lacks the terminal asterisk):
+
+            ``AB+::AAa_BBa``
+
+        While the following string represents a terminally assembled 2-component
+        MultiFate system with a regulator L that flips the system into the A state:
+
+            ``*AB+L::AAa_ALa_BBa_BLi``
+
+    """
+
+    def __init__(
+        self,
+        components: Iterable[str],
+        regulators: Iterable[str],
+        interactions: Iterable[str],
+        max_interactions: Optional[int] = None,
+        max_interactions_per_promoter: int = 2,
+        root: Optional[str] = None,
+        **kwargs,
+    ):
+        grammar = DimersGrammar(
+            components=components,
+            regulators=regulators,
+            interactions=interactions,
+            max_interactions=max_interactions,
+            max_interactions_per_promoter=max_interactions_per_promoter,
+            root=root,
+        )
+        super().__init__(grammar=grammar, root=root, **kwargs)
 
 
 def search_mcts_in_thread(
