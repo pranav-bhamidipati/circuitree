@@ -2,12 +2,14 @@ from abc import ABC, abstractmethod
 from itertools import cycle, chain, islice, repeat
 import json
 from pathlib import Path
-from typing import Callable, Literal, Optional, Iterable, Any
+from typing import Callable, Hashable, Literal, Optional, Iterable, Any
 import numpy as np
 import networkx as nx
+import pandas as pd
+from scipy import stats
 
 from .modularity import tree_modularity, tree_modularity_estimate
-
+from .grammar import CircuitGrammar
 
 __all__ = ["CircuiTree"]
 
@@ -42,30 +44,15 @@ def ucb_score(
 class CircuiTree(ABC):
     def __init__(
         self,
+        grammar: CircuitGrammar,
         root: str,
         exploration_constant: Optional[float] = None,
-        variance_constant: float = 0.0,
         seed: int = 2023,
-        rg: Optional[np.random.Generator] = None,
         graph: Optional[nx.DiGraph] = None,
         tree_shape: Literal["tree", "dag"] = "dag",
-        score_func: Optional[Callable] = None,
         **kwargs,
     ):
-        if exploration_constant is None:
-            self.exploration_constant = np.sqrt(2)
-        else:
-            self.exploration_constant = exploration_constant
-
-        self.variance_constant = variance_constant
-
-        if rg is None:
-            if seed is None:
-                raise ValueError("Must specify seed if rg is not specified")
-            else:
-                rg = np.random.default_rng(seed)
-
-        self.rg = rg
+        self.rg = np.random.default_rng(seed)
         self.seed = self.rg.bit_generator._seed_seq.entropy
 
         self.root = root
@@ -84,74 +71,74 @@ class CircuiTree(ABC):
             raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
         self.tree_shape = tree_shape
 
-        if score_func is None:
-            self._score_func = ucb_score
+        self.grammar = grammar
+
+        if exploration_constant is None:
+            self.exploration_constant = np.sqrt(2)
         else:
-            self._score_func = score_func
+            self.exploration_constant = exploration_constant
 
         self._non_serializable_attrs = [
             "_non_serializable_attrs",
             "rg",
             "graph",
-            "_score_func",
         ]
-
-    def _do_action(self, state: Any, action: Any):
-        new_state = self.do_action(state, action)
-        if self.tree_shape == "dag":
-            new_state = self.get_unique_state(new_state)
-        return new_state
-
-    @abstractmethod
-    def get_actions(self, state: Any) -> Iterable[Any]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def do_action(self, state: Any, action: Any) -> Any:
-        raise NotImplementedError
-
-    @abstractmethod
-    def is_terminal(self, state) -> bool:
-        raise NotImplementedError
 
     @abstractmethod
     def get_reward(self, state) -> float | int:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_unique_state(self, state: Any) -> Any:
         raise NotImplementedError
 
     @property
     def default_attrs(self):
         return dict(visits=0, reward=0)
 
-    def get_state_to_simulate(self, start: Any) -> Any:
-        """Uses the random generator for the given thread to select a state to simulate,
-        starting from the given starting state. If the given starting state is terminal,
-        returns it. Otherwise, selects a random child recursively until a terminal state
-        is reached."""
+    @property
+    def terminal_states(self):
+        return (node for node in self.graph.nodes if self.grammar.is_terminal(node))
+
+    def _do_action(self, state: Hashable, action: Hashable):
+        new_state = self.grammar.do_action(state, action)
+        if self.tree_shape == "dag":
+            new_state = self.grammar.get_unique_state(new_state)
+        return new_state
+
+    def _undo_action(self, state: Hashable, action: Hashable) -> Hashable:
+        """Undo one action from the given state."""
+        if state == self.root:
+            return None
+        new_state = self.grammar.undo_action(state, action)
+        if self.tree_shape == "dag":
+            new_state = self.grammar.get_unique_state(new_state)
+        return new_state
+
+    def get_random_terminal_descendant(
+        self, start: Hashable, rg: Optional[np.random.Generator] = None
+    ) -> Hashable:
+        """Starting from the state `start`, select cs random actions until termination."""
+        rg = self.rg if rg is None else rg
         state = start
-        while not self.is_terminal(state):
-            actions = self.get_actions(state)
-            action = self.rg.choice(actions)
+        while not self.grammar.is_terminal(state):
+            actions = self.grammar.get_actions(state)
+            action = rg.choice(actions)
             state = self._do_action(state, action)
         return state
 
-    def select_and_expand(self) -> list[Any]:
+    def select_and_expand(
+        self, rg: Optional[np.random.Generator] = None
+    ) -> list[Hashable]:
+        rg = self.rg if rg is None else rg
+
         # Start at root
         node = self.root
         selection_path = [node]
+        actions = self.grammar.get_actions(node)
 
-        # Shuffle actions to prevent ordering bias
-        actions = self.get_actions(node)
-        self.rg.shuffle(actions)
-
-        # Recursively select the child with the highest UCB score until either a terminal
-        # state is reached or an unexpanded edge is found.
+        # Select the child with the highest UCB score until you reach a terminal
+        # state or an unexpanded edge
         while actions:
             max_ucb = -np.inf
             best_child = None
+            rg.shuffle(actions)
             for action in actions:
                 child = self._do_action(node, action)
                 ucb = self.get_ucb_score(node, child)
@@ -168,19 +155,14 @@ class CircuiTree(ABC):
                     max_ucb = ucb
                     best_child = child
 
-            # If no child can be expanded (all children have been visited at least once)
-            # then move on to the child with the highest UCB score and repeat.
             node = best_child
             selection_path.append(node)
-
-            # If the node is terminal, actions will be empty and the loop will break
-            actions = self.get_actions(node)
-            self.rg.shuffle(actions)
+            actions = self.grammar.get_actions(node)
 
         # If the loop breaks, we have reached a terminal state.
         return selection_path
 
-    def expand_edge(self, parent: Any, child: Any):
+    def expand_edge(self, parent: Hashable, child: Hashable):
         if not self.graph.has_node(child):
             self.graph.add_node(child, **self.default_attrs)
         self.graph.add_edge(parent, child, **self.default_attrs)
@@ -220,7 +202,7 @@ class CircuiTree(ABC):
         # Select the next state to sample and the terminal state to be simulated.
         # Expands a child if possible.
         selection_path = self.select_and_expand()
-        sim_node = self.get_state_to_simulate(selection_path[-1])
+        sim_node = self.get_random_terminal_descendant(selection_path[-1])
 
         # Between backprop of visit and reward, we incur virtual loss
         self.backpropagate_visit(selection_path)
@@ -235,10 +217,6 @@ class CircuiTree(ABC):
         if graph is None:
             return _accumulated
 
-    @property
-    def terminal_states(self):
-        return (node for node in self.graph.nodes if self.is_terminal(node))
-
     def search_mcts(
         self,
         n_steps: int,
@@ -247,7 +225,7 @@ class CircuiTree(ABC):
         exploration_constant: Optional[float] = None,
         progress_bar: bool = False,
         run_kwargs: Optional[dict] = None,
-    ) -> None | list[Any]:
+    ) -> None:
         if exploration_constant is None:
             exploration_constant = self.exploration_constant
 
@@ -260,24 +238,12 @@ class CircuiTree(ABC):
         else:
             iterator = range(n_steps)
 
-        cb_results = []
         if callback is None:
-            return_results = False
-            callback = lambda *a, **kw: None
             callback_every = np.inf
-        else:
-            return_results = True
-            cb_results.append(callback(self.graph, [], None, None))
         for i in iterator:
             selection_path, reward, sim_node = self.traverse(**run_kwargs)
             if i % callback_every == 0:
-                cb_result = callback(self.graph, selection_path, sim_node, reward)
-                cb_results.append(cb_result)
-
-        if return_results:
-            return cb_results
-        else:
-            return None
+                _ = callback(self.graph, selection_path, sim_node, reward)
 
     def grow_tree(
         self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
@@ -288,16 +254,18 @@ class CircuiTree(ABC):
                 print(f"Adding root: {root}")
             self.graph.add_node(root, visits=n_visits, reward=0)
 
-        stack = [(root, action) for action in self.get_actions(root)]
+        stack = [(root, action) for action in self.grammar.get_actions(root)]
         n_added = 1
         while stack:
             node, action = stack.pop()
-            if not self.is_terminal(node):
+            if not self.grammar.is_terminal(node):
                 next_node = self._do_action(node, action)
                 if next_node not in self.graph.nodes:
                     n_added += 1
                     self.graph.add_node(next_node, visits=n_visits, reward=0)
-                    stack.extend([(next_node, a) for a in self.get_actions(next_node)])
+                    stack.extend(
+                        [(next_node, a) for a in self.grammar.get_actions(next_node)]
+                    )
                     if print_updates:
                         if n_added % print_every == 0:
                             print(f"Graph size: {n_added} nodes.")
@@ -314,7 +282,7 @@ class CircuiTree(ABC):
                 self.rg.shuffle(l)
 
         # Iterate over all terminal nodes in BFS order
-        return filter(self.is_terminal, chain.from_iterable(layers))
+        return filter(self.grammar.is_terminal, chain.from_iterable(layers))
 
     def search_bfs(
         self,
@@ -377,75 +345,23 @@ class CircuiTree(ABC):
         else:
             return None
 
-    def is_success(self, state) -> bool:
-        """Must be defined to calculate modularity."""
+    def is_success(self, state: Hashable) -> bool:
+        """Returns whether or not a state is successful. Used to infer which patterns
+        lead to more successes (i.e. motif candidates)."""
         raise NotImplementedError
-
-    @property
-    def modularity(self) -> float:
-        return tree_modularity(self.graph, self.root, self.is_terminal, self.is_success)
-
-    @property
-    def modularity_estimate(self) -> float:
-        return tree_modularity_estimate(self.graph, self.root)
-
-    @staticmethod
-    def complexity_graph_from_mcts(
-        search_graph: nx.DiGraph,
-        selection_path: Optional[Iterable[str]] = None,
-        sim_node: Optional[str] = None,
-        reward: Optional[int | float] = None,
-    ) -> nx.DiGraph:
-        graph = search_graph.copy()
-        nodes_to_remove = []
-        for n in graph.nodes:
-            if n[0] == "*":
-                p = n[1:]
-                nodes_to_remove.append(n)
-                data = graph.edges[p, n]
-                graph.nodes[p]["visits"] = data.get("visits", 0)
-                graph.nodes[p]["reward"] = data.get("reward", 0)
-                # graph.nodes[p]["history"] = data.get("history", ())
-        graph.remove_nodes_from(nodes_to_remove)
-        empty_nodes = [n for n, v in graph.nodes("visits") if v is None]
-        graph.remove_nodes_from(empty_nodes)
-
-        return graph, selection_path, sim_node, reward
-
-    @staticmethod
-    def complexity_graph_from_bfs(
-        search_graph: nx.DiGraph,
-        node: Optional[Iterable[str]] = None,
-        reward: Optional[float | int] = None,
-    ) -> nx.DiGraph:
-        graph: nx.DiGraph = search_graph.copy()
-        nodes_to_remove = []
-        for n, d in graph.nodes(data=True):
-            if n[0] == "*":
-                nodes_to_remove.append(n)
-                if d.get("visits", 0) == 0:
-                    nodes_to_remove.append(n[1:])
-                else:
-                    graph.nodes[n[1:]].update(d)
-            else:
-                if d.get("visits") is None:
-                    nodes_to_remove.append(n)
-
-        graph.remove_nodes_from(nodes_to_remove)
-
-        for n1, n2 in graph.edges:
-            graph.edges[n1, n2].update(graph.nodes[n2])
-
-        return graph, node, reward
 
     def to_file(
         self,
         gml_file: str | Path,
         json_file: Optional[str | Path] = None,
         save_attrs: Optional[Iterable[str]] = None,
+        compress: bool = False,
         **kwargs,
     ):
-        gml_target = Path(gml_file).with_suffix(".gml")
+        if compress:
+            gml_target = Path(gml_file).with_suffix(".gml.gz")
+        else:
+            gml_target = Path(gml_file).with_suffix(".gml")
         nx.write_gml(self.graph, gml_target, **kwargs)
 
         if json_file is not None:
@@ -459,7 +375,14 @@ class CircuiTree(ABC):
                         f"Attempting to save non-serializable attributes: {repr_non_ser}."
                     )
 
-            attrs = {k: v for k, v in self.__dict__.items() if k in keys}
+            attrs = {}
+            for k, v in self.__dict__.items():
+                if k not in keys:
+                    continue
+                if hasattr(v, "to_dict"):
+                    attrs[k] = v.to_dict()
+                else:
+                    attrs[k] = v
 
             json_target = Path(json_file).with_suffix(".json")
             with json_target.open("w") as f:
@@ -472,19 +395,287 @@ class CircuiTree(ABC):
 
     @classmethod
     def from_file(
-        cls, graph_gml: str | Path, attrs_json: Optional[str | Path] = None, **kwargs
+        cls,
+        graph_gml: str | Path,
+        attrs_json: str | Path,
+        grammar_cls: Optional[CircuitGrammar] = None,
+        **kwargs,
     ):
-        if attrs_json is not None:
-            with open(attrs_json, "r") as f:
-                kwargs.update(json.load(f))
+        """Load a CircuiTree from a gml file and a JSON file containing the object's
+        attributes.
 
+        The grammar attribute is loaded by looking for a key "grammar" in the JSON file,
+        whose value should be a dict `grammar_kwargs` used to create a grammar object.
+        The grammar_cls keyword can be passed to specify the class constructor for the
+        grammar object. Alternatively, if `grammar_kwargs` contains a key
+        "__grammar_cls__" that specifies a class name string, that class will be found
+        in globals() and used to construct the grammar object.
+
+        When dumping a CircuiTree to a JSON file, the grammar object is dumped using
+        the method `to_dict()`, which automatically creates the "__grammar_cls__"
+        key-value entry.
+        """
+        # Load the attributes from the json file
+        with open(attrs_json, "r") as f:
+            kwargs.update(json.load(f))
+
+        # Load the keywords for the grammar __init__() method from the json file
+        grammar_kwargs: dict[str, Any] = kwargs.pop("grammar", {})
+        _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
+        if grammar_cls is None:
+            if _grammar_cls_name is None:
+                raise ValueError(
+                    "Must specify grammar class as a keyword argument "
+                    "(to_file(grammar_cls=...)) or in the attributes json file "
+                    "(grammar = {'__grammar_cls__': ..., **grammar_kws})."
+                )
+            if _grammar_cls_name not in globals():
+                raise ValueError(
+                    f"Grammar class {_grammar_cls_name} not found in global scope. "
+                    "Did you import it?"
+                )
+            _grammar_cls = globals()[_grammar_cls_name]
+        else:
+            _grammar_cls = grammar_cls
+
+        grammar = _grammar_cls(**kwargs.pop("grammar", {}))
         graph = nx.read_gml(graph_gml)
 
-        return cls(graph=graph, **kwargs)
+        return cls(grammar=grammar, graph=graph, **kwargs)
+
+    def sample_terminal_states(self, n_samples: int) -> list[Hashable]:
+        """Sample n_samples random terminal states."""
+        return [
+            self.get_random_terminal_descendant(self.root) for _ in range(n_samples)
+        ]
+
+    def sample_successful_circuits(
+        self, n_samples: int, max_iter: int = 10_000_000
+    ) -> list[Hashable]:
+        """Sample a random successful state with rejection sampling. Starts from the
+        root state, selects random actions until termination, and accepts the sample if
+        it is successful."""
+
+        # Use rejection sampling to sample paths with the given pattern
+        samples = []
+        for _ in range(max_iter):
+            state = self.get_random_terminal_descendant(self.root)
+            if self.is_success(state):
+                samples.append(state)
+            if len(samples) == n_samples:
+                break
+
+        if len(samples) < n_samples:
+            raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
+
+        return samples
+
+    def test_contingency(
+        table: np.ndarray,
+        test: Literal["chi2", "barnard", "auto"] = "auto",
+        correction: bool = True,
+    ) -> stats._hypotests.BarnardExactResult | stats.contingency.Chi2ContingencyResult:
+        """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
+        if test == "auto":
+            if table.min() < 5:
+                print(
+                    f"Contingency table has one or more entries < 5. "
+                    "Using Barnard's exact test."
+                )
+                test = "barnard"
+            else:
+                print(
+                    f"Contingency table has all entries >= 5. Using chi-squared test."
+                )
+                test = "chi2"
+        elif test not in ("chi2", "barnard"):
+            raise ValueError("Argument `test` must be 'chi2', 'barnard', or 'auto'.")
+
+        if test == "barnard":
+            res = stats.barnard_exact(table, alternative="two-sided")
+        else:
+            res = stats.chi2_contingency(table, correction=correction)
+        return res
+
+    def test_pattern_success_by_sampling(
+        self,
+        pattern: Any,
+        n_samples: int,
+        max_iter: int = 10_000_000,
+        test: Literal["chi2", "barnard", "auto"] = "auto",
+        correction: bool = True,
+    ) -> tuple[pd.DataFrame]:
+        """Test whether a pattern is successful by sampling random paths from the
+        design space. Returns the contingency table (Pandas DataFrame) and the p-value
+        for significance.
+
+        Samples `n_samples` paths from the overall design space and uses rejection
+        sampling to sample `n_samples` paths that terminate in a successful circuit as
+        determined by the is_successful() method."""
+        null_samples = self.sample_terminal_states(n_samples)
+        success_samples = self.sample_successful_circuits(
+            n_samples, max_iter=max_iter, path=False
+        )
+
+        pattern_cache: dict[Hashable, bool] = {}
+
+        def _has_pattern(state):
+            """Check if the given state contains the pattern. Caches results."""
+            has_pattern = pattern_cache.get(state)
+            if has_pattern is None:
+                has_pattern = self.grammar.has_pattern(state, pattern)
+                pattern_cache[state] = has_pattern
+            return has_pattern
+
+        pattern_in_null = sum(_has_pattern(s) for s in null_samples)
+        pattern_in_successes = sum(_has_pattern(s) for s in success_samples)
+
+        # Create the contingency table. Rows represent whether or not the pattern is
+        # present, columns represent whether or not the path is successful. Columns
+        # sum to n_samples.
+        table = np.array(
+            [
+                [pattern_in_successes, pattern_in_null],
+                [n_samples - pattern_in_successes, n_samples - pattern_in_null],
+            ]
+        )
+        test_result = self.test_contingency(table, test=test, correction=correction)
+        table_df = pd.DataFrame(
+            data=table,
+            index=["has_pattern", "lacks_pattern"],
+            columns=["successful_paths", "overall_paths"],
+        )
+
+        return test_result, table_df
+
+    def grow_tree_from_leaves(self, leaves: Iterable[Hashable]) -> nx.DiGraph:
+        """Returns the tree (or DAG) of all paths that start at the root and ending at
+        a node in ``leaves``."""
+
+        # Maintain a stack of (state, undo_action) pairs to add to the tree
+        stack = []
+        for leaf in leaves:
+            stack.extend([(leaf, a) for a in self.grammar.get_undo_actions(leaf)])
+
+        # Build the tree by undoing actions from each leaf
+        tree = nx.DiGraph()
+        while stack:
+            state, undo_action = stack.pop()
+            if state == self.root:
+                continue
+            parent = self._undo_action(state, undo_action)
+            if parent not in tree:
+                tree.add_node(parent, **self.default_attrs)
+            tree.add_edge(parent, state, **self.default_attrs)
+            stack.extend([(parent, a) for a in self.grammar.get_undo_actions(parent)])
+
+        return tree
+
+    def to_complexity_graph(self, successes: bool = False) -> nx.DiGraph:
+        # Keep only the successful nodes
+        if successes:
+            parent_to_child: dict[Hashable, tuple[Hashable, float, int]] = {}
+            for child in self.graph.nodes:
+                if self.grammar.is_terminal(child) and self.is_success(child):
+                    parent = list(self.graph.in_edges(child))[0][0]
+                    parent_to_child[parent] = (
+                        child,
+                        self.graph.nodes[child]["reward"],
+                        self.graph.nodes[child]["visits"],
+                    )
+            complexity_graph: nx.DiGraph = self.graph.subgraph(
+                parent_to_child.keys()
+            ).copy()
+            for parent, (child, reward, visits) in parent_to_child.items():
+                complexity_graph.nodes[parent]["terminal_state"] = dict(
+                    name=child, reward=reward, visits=visits
+                )
+
+        # Keep everything
+        else:
+            complexity_graph = self.graph.copy()
+            nodes_to_remove = []
+            for child in self.graph.nodes:
+                if self.grammar.is_terminal(child):
+                    parent = list(self.graph.in_edges(child))[0][0]
+                    complexity_graph.nodes[parent]["terminal_state"] = dict(
+                        name=child,
+                        reward=self.graph.nodes[child]["reward"],
+                        visits=self.graph.nodes[child]["visits"],
+                    )
+                    nodes_to_remove.append(child)
+            complexity_graph.remove_nodes_from(nodes_to_remove)
+
+        return complexity_graph
+
+    # def sample_random_path(self) -> list[Hashable]:
+    #     """Sample a random path from the root to a terminal state."""
+    #     path = []
+    #     state = self.root
+    #     while not self.grammar.is_terminal(state):
+    #         actions = self.grammar.get_actions(state)
+    #         action = self.rg.choice(actions)
+    #         path.append(action)
+    #         state = self._do_action(state, action)
+    #     return path
+
+    # def sample_circuits_with_pattern(
+    #     self,
+    #     pattern: Hashable,
+    #     n_samples: int,
+    #     max_iter: int = 10_000_000,
+    #     return_terminal: bool = True,
+    # ) -> list[Hashable]:
+    #     """Sample a random path from the root to a terminal state that contains the
+    #     given pattern. Uses rejection sampling."""
+
+    #     pattern_cache: dict[Hashable, bool] = {}
+
+    #     def _path_has_pattern(path):
+    #         """Check if the given path contains the given pattern. Use cached results to
+    #         speed up search."""
+    #         for i, node in enumerate(path):
+    #             has_pattern = pattern_cache.get(node)
+    #             if has_pattern is None:
+    #                 has_pattern = self.grammar.has_pattern(node, pattern)
+    #                 pattern_cache[node] = has_pattern
+    #             if has_pattern:
+    #                 pattern_cache.update({n: True for n in path[i + 1 :]})
+    #                 return True
+    #         return False
+
+    #     samples = []
+    #     if return_terminal:
+    #         _append_sample = lambda path: samples.append(path[-1])
+    #     else:
+    #         _append_sample = lambda path: samples.append(path)
+
+    #     # Use rejection sampling to sample paths with the given pattern
+    #     for _ in range(max_iter):
+    #         path = self.sample_random_path()
+    #         if _path_has_pattern(path):
+    #             _append_sample(path)
+    #         if len(samples) == n_samples:
+    #             break
+
+    #     if len(samples) < n_samples:
+    #         raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
+
+    #     return samples
+
+    @property
+    def modularity(self) -> float:
+        return tree_modularity(
+            self.graph, self.root, self.grammar.is_terminal, self.is_success
+        )
+
+    @property
+    def modularity_estimate(self) -> float:
+        return tree_modularity_estimate(self.graph, self.root)
 
 
 def accumulate_visits_and_rewards(
-    graph: nx.DiGraph, visits_attr: Any = "visits", reward_attr: Any = "reward"
+    graph: nx.DiGraph, visits_attr: str = "visits", reward_attr: str = "reward"
 ):
     """Accumulate results on nodes post-hoc"""
     for n in graph.nodes:
