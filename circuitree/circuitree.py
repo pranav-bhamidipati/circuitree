@@ -445,10 +445,13 @@ class CircuiTree(ABC):
         it is successful."""
 
         # Use rejection sampling to sample paths with the given pattern
+        successful_terminals = set(
+            s for s in self.terminal_states if self.is_success(s)
+        )
         samples = []
         for _ in range(max_iter):
             state = self.get_random_terminal_descendant(self.root)
-            if self.is_success(state):
+            if state in successful_terminals:
                 samples.append(state)
             if len(samples) == n_samples:
                 break
