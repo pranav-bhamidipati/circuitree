@@ -384,6 +384,7 @@ class CircuiTree(ABC):
         graph_gml: str | Path,
         attrs_json: str | Path,
         grammar_cls: Optional[CircuitGrammar] = None,
+        grammar_kwargs: Optional[dict] = None,
         **kwargs,
     ):
         """Load a CircuiTree from a gml file and a JSON file containing the object's
@@ -404,10 +405,12 @@ class CircuiTree(ABC):
         with open(attrs_json, "r") as f:
             kwargs.update(json.load(f))
 
-        # Load the keywords for the grammar __init__() method from the json file
-        grammar_kwargs: dict[str, Any] = kwargs.pop("grammar", {})
-        _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
+        # Make the grammar object 
+        # Get kwargs from the grammar_kwargs in this function and/or from the json
+        grammar_kwargs = kwargs.pop("grammar", {}) | (grammar_kwargs or {})
+        
         if grammar_cls is None:
+            _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
             if _grammar_cls_name is None:
                 raise ValueError(
                     "Must specify grammar class as a keyword argument "
@@ -423,7 +426,7 @@ class CircuiTree(ABC):
         else:
             _grammar_cls = grammar_cls
 
-        grammar = _grammar_cls(**kwargs.pop("grammar", {}))
+        grammar = _grammar_cls(**grammar_kwargs)
         graph = nx.read_gml(graph_gml)
 
         return cls(grammar=grammar, graph=graph, **kwargs)
