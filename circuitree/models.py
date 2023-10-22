@@ -329,8 +329,9 @@ class SimpleNetworkTree(CircuiTree):
 
     def __init__(
         self,
-        components: Iterable[Iterable[str]],
-        interactions: Iterable[str],
+        grammar: Optional[SimpleNetworkGrammar] = None,
+        components: Iterable[Iterable[str]] = None,
+        interactions: Iterable[str] = None,
         max_interactions: Optional[int] = None,
         root: Optional[str] = None,
         exploration_constant: float | None = None,
@@ -339,12 +340,13 @@ class SimpleNetworkTree(CircuiTree):
         tree_shape: Literal["tree", "dag"] = "dag",
         **kwargs,
     ):
-        grammar = SimpleNetworkGrammar(
-            components=components,
-            interactions=interactions,
-            max_interactions=max_interactions,
-            root=root,
-        )
+        if grammar is None:
+            grammar = SimpleNetworkGrammar(
+                components=components,
+                interactions=interactions,
+                max_interactions=max_interactions,
+                root=root,
+            )
         super().__init__(
             grammar=grammar,
             root=root,
