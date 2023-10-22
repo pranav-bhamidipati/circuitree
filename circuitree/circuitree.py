@@ -405,11 +405,11 @@ class CircuiTree(ABC):
         with open(attrs_json, "r") as f:
             kwargs.update(json.load(f))
 
-        # Make the grammar object 
+        # Make the grammar object
         # Get kwargs from the grammar_kwargs in this function and/or from the json
         grammar_kwargs = kwargs.pop("grammar", {}) | (grammar_kwargs or {})
         _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
-        
+
         if grammar_cls is None:
             if _grammar_cls_name is None:
                 raise ValueError(
@@ -501,9 +501,7 @@ class CircuiTree(ABC):
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
         null_samples = self.sample_terminal_states(n_samples)
-        success_samples = self.sample_successful_circuits(
-            n_samples, max_iter=max_iter, path=False
-        )
+        success_samples = self.sample_successful_circuits(n_samples, max_iter=max_iter)
 
         pattern_cache: dict[Hashable, bool] = {}
 
