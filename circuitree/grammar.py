@@ -8,7 +8,7 @@ __all__ = ["CircuitGrammar"]
 
 class CircuitGrammar(ABC):
     def __init__(self, *args, **kwargs):
-        self._non_serializable_attrs = []
+        self._non_serializable_attrs = ["_non_serializable_attrs"]
 
     @abstractmethod
     def get_actions(self, state: Hashable) -> Iterable[Any]:
