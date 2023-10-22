@@ -462,6 +462,7 @@ class CircuiTree(ABC):
         return samples
 
     def test_contingency(
+        self,
         table: np.ndarray,
         test: Literal["chi2", "barnard", "auto"] = "auto",
         correction: bool = True,
@@ -495,7 +496,7 @@ class CircuiTree(ABC):
         max_iter: int = 10_000_000,
         test: Literal["chi2", "barnard", "auto"] = "auto",
         correction: bool = True,
-    ) -> tuple[pd.DataFrame]:
+    ) -> tuple[Any, pd.DataFrame]:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
         for significance.
