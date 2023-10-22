@@ -408,9 +408,9 @@ class CircuiTree(ABC):
         # Make the grammar object 
         # Get kwargs from the grammar_kwargs in this function and/or from the json
         grammar_kwargs = kwargs.pop("grammar", {}) | (grammar_kwargs or {})
+        _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
         
         if grammar_cls is None:
-            _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
             if _grammar_cls_name is None:
                 raise ValueError(
                     "Must specify grammar class as a keyword argument "
