@@ -26,7 +26,7 @@ class CircuitGrammar(ABC):
     def get_unique_state(self, state: Hashable) -> Any:
         raise NotImplementedError
 
-    def has_pattern(self, state: Hashable) -> Hashable:
+    def has_pattern(self, state: Hashable, pattern: Hashable) -> bool:
         raise NotImplementedError
 
     def get_undo_actions(self, state: Hashable) -> Iterable[Any]:
