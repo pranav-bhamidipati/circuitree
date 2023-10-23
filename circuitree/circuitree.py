@@ -528,7 +528,7 @@ class CircuiTree(ABC):
                 data=table,
                 index=["has_pattern", "lacks_pattern"],
                 columns=["successful_paths", "overall_paths"],
-            )
+            ).reset_index()
             table_df["pattern"] = pat
             table_df["pvalue"] = test_result.pvalue
             if isinstance(test_result, BarnardExactResult):
