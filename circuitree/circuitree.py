@@ -511,8 +511,12 @@ class CircuiTree(ABC):
 
             iterator = tqdm(iterator, desc="Testing patterns")
         for pat in iterator:
-            pattern_in_null = sum(self.grammar.has_pattern(s, pat) for s in null_samples)
-            pattern_in_succ = sum(self.grammar.has_pattern(s, pat) for s in succ_samples)
+            pattern_in_null = sum(
+                self.grammar.has_pattern(s, pat) for s in null_samples
+            )
+            pattern_in_succ = sum(
+                self.grammar.has_pattern(s, pat) for s in succ_samples
+            )
 
             # Create the contingency table. Rows represent whether or not the pattern is
             # present, columns represent whether or not the path is successful. Columns
@@ -528,7 +532,8 @@ class CircuiTree(ABC):
                 data=table,
                 index=["has_pattern", "lacks_pattern"],
                 columns=["successful_paths", "overall_paths"],
-            ).reset_index()
+            )
+            table_df.index.name = "pattern_present"
             table_df["pattern"] = pat
             table_df["pvalue"] = test_result.pvalue
             if isinstance(test_result, BarnardExactResult):
@@ -539,12 +544,12 @@ class CircuiTree(ABC):
                 table_df["statistic"] = test_result.statistic
             else:
                 raise ValueError(f"Unexpected test result type: {type(test_result)}")
-            
+
             results.append(test_result)
             dfs.append(table_df)
 
         results_df = pd.concat(dfs, ignore_index=True)
-        
+
         return results_df
 
     def grow_tree_from_leaves(self, leaves: Iterable[Hashable]) -> nx.DiGraph:
