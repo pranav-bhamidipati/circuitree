@@ -513,7 +513,9 @@ class CircuiTree(ABC):
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
         null_samples = self.sample_terminal_states(n_samples, progress=progress)
-        succ_samples = self.sample_successful_circuits(n_samples, max_iter=max_iter)
+        succ_samples = self.sample_successful_circuits(
+            n_samples, max_iter=max_iter, progress=progress
+        )
 
         results = []
         dfs = []
