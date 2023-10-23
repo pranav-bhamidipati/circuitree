@@ -491,6 +491,7 @@ class CircuiTree(ABC):
         max_iter: int = 10_000_000,
         test: Literal["chi2", "barnard", "auto"] = "auto",
         correction: bool = True,
+        progress: bool = False,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
@@ -504,7 +505,12 @@ class CircuiTree(ABC):
 
         results = []
         dfs = []
-        for pat in patterns:
+        iterator = patterns
+        if progress:
+            from tqdm import tqdm
+
+            iterator = tqdm(iterator, desc="Testing patterns")
+        for pat in iterator:
             pattern_in_null = sum(self.grammar.has_pattern(s, pat) for s in null_samples)
             pattern_in_succ = sum(self.grammar.has_pattern(s, pat) for s in succ_samples)
 
