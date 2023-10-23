@@ -65,6 +65,7 @@ def plot_network(
     text_kwargs=None,
     plot_labels=True,
     ax: Optional[Axis] = None,
+    colormap=None,
 ):
     """Plot an N-component network as a circular diagram.
 
@@ -94,7 +95,8 @@ def plot_network(
     theta = theta % (2 * np.pi)
     xy = np.column_stack([x, y])
 
-    colormap = plt.get_cmap(cmap)
+    if colormap is None:
+        colormap = plt.get_cmap(cmap)
     colors = colormap(range(n_components))
 
     radius = node_shrink * _compute_radius(n_components)
