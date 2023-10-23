@@ -433,14 +433,20 @@ class CircuiTree(ABC):
 
         return cls(grammar=grammar, graph=graph, **kwargs)
 
-    def sample_terminal_states(self, n_samples: int) -> list[Hashable]:
+    def sample_terminal_states(
+        self, n_samples: int, progress: bool = False
+    ) -> list[Hashable]:
         """Sample n_samples random terminal states."""
-        return [
-            self.get_random_terminal_descendant(self.root) for _ in range(n_samples)
-        ]
+        if progress:
+            from tqdm import trange
+
+            _range = trange(n_samples, desc="Sampling all terminal circuits")
+        else:
+            _range = range(n_samples)
+        return [self.get_random_terminal_descendant(self.root) for _ in _range]
 
     def sample_successful_circuits(
-        self, n_samples: int, max_iter: int = 10_000_000
+        self, n_samples: int, max_iter: int = 10_000_000, progress: bool = False
     ) -> list[Hashable]:
         """Sample a random successful state with rejection sampling. Starts from the
         root state, selects random actions until termination, and accepts the sample if
@@ -451,9 +457,15 @@ class CircuiTree(ABC):
             s for s in self.terminal_states if self.is_success(s)
         )
         samples = []
+        if progress:
+            from tqdm import trange
+
+            pbar = trange(n_samples, desc="Sampling successful terminal circuits")
         for _ in range(max_iter):
             state = self.get_random_terminal_descendant(self.root)
             if state in successful_terminals:
+                if progress:
+                    pbar.update(1)
                 samples.append(state)
             if len(samples) == n_samples:
                 break
@@ -500,7 +512,7 @@ class CircuiTree(ABC):
         Samples `n_samples` paths from the overall design space and uses rejection
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
-        null_samples = self.sample_terminal_states(n_samples)
+        null_samples = self.sample_terminal_states(n_samples, progress=progress)
         succ_samples = self.sample_successful_circuits(n_samples, max_iter=max_iter)
 
         results = []
