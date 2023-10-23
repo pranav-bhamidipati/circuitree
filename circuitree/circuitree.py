@@ -562,7 +562,7 @@ class CircuiTree(ABC):
             results.append(test_result)
             dfs.append(table_df)
 
-        results_df = pd.concat(dfs, ignore_index=True)
+        results_df = pd.concat(dfs)
 
         return results_df
 
