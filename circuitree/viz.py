@@ -58,6 +58,7 @@ def plot_network(
     offset=0.4,
     auto_shrink=0.6,
     color="k",
+    ec="k",
     lw=2,
     hw=0.15,
     padding=0.15,
@@ -102,7 +103,7 @@ def plot_network(
     radius = node_shrink * _compute_radius(n_components)
     molecules = []
     for xy_i, c in zip(xy, colors):
-        mlc = Circle(xy_i, radius=radius, fc=c, ec="k", lw=node_lw)
+        mlc = Circle(xy_i, radius=radius, fc=c, ec=ec, lw=node_lw)
         ax.add_patch(mlc)
         molecules.append(mlc)
 
