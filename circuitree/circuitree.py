@@ -7,6 +7,8 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from scipy import stats
+from scipy.stats._hypotests import BarnardExactResult
+from scipy.stats.contingency import Chi2ContingencyResult
 
 from .modularity import tree_modularity, tree_modularity_estimate
 from .grammar import CircuitGrammar
@@ -466,19 +468,12 @@ class CircuiTree(ABC):
         table: np.ndarray,
         test: Literal["chi2", "barnard", "auto"] = "auto",
         correction: bool = True,
-    ) -> stats._hypotests.BarnardExactResult | stats.contingency.Chi2ContingencyResult:
+    ) -> BarnardExactResult | Chi2ContingencyResult:
         """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
         if test == "auto":
             if table.min() < 5:
-                print(
-                    f"Contingency table has one or more entries < 5. "
-                    "Using Barnard's exact test."
-                )
                 test = "barnard"
             else:
-                print(
-                    f"Contingency table has all entries >= 5. Using chi-squared test."
-                )
                 test = "chi2"
         elif test not in ("chi2", "barnard"):
             raise ValueError("Argument `test` must be 'chi2', 'barnard', or 'auto'.")
@@ -489,14 +484,14 @@ class CircuiTree(ABC):
             res = stats.chi2_contingency(table, correction=correction)
         return res
 
-    def test_pattern_success_by_sampling(
+    def test_pattern_significance(
         self,
-        pattern: Any,
+        patterns: Iterable[Any],
         n_samples: int,
         max_iter: int = 10_000_000,
         test: Literal["chi2", "barnard", "auto"] = "auto",
         correction: bool = True,
-    ) -> tuple[Any, pd.DataFrame]:
+    ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
         for significance.
@@ -505,38 +500,46 @@ class CircuiTree(ABC):
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
         null_samples = self.sample_terminal_states(n_samples)
-        success_samples = self.sample_successful_circuits(n_samples, max_iter=max_iter)
+        succ_samples = self.sample_successful_circuits(n_samples, max_iter=max_iter)
 
-        pattern_cache: dict[Hashable, bool] = {}
+        results = []
+        dfs = []
+        for pat in patterns:
+            pattern_in_null = sum(self.grammar.has_pattern(s, pat) for s in null_samples)
+            pattern_in_succ = sum(self.grammar.has_pattern(s, pat) for s in succ_samples)
 
-        def _has_pattern(state):
-            """Check if the given state contains the pattern. Caches results."""
-            has_pattern = pattern_cache.get(state)
-            if has_pattern is None:
-                has_pattern = self.grammar.has_pattern(state, pattern)
-                pattern_cache[state] = has_pattern
-            return has_pattern
+            # Create the contingency table. Rows represent whether or not the pattern is
+            # present, columns represent whether or not the path is successful. Columns
+            # sum to n_samples.
+            table = np.array(
+                [
+                    [pattern_in_succ, pattern_in_null],
+                    [n_samples - pattern_in_succ, n_samples - pattern_in_null],
+                ]
+            )
+            test_result = self.test_contingency(table, test=test, correction=correction)
+            table_df = pd.DataFrame(
+                data=table,
+                index=["has_pattern", "lacks_pattern"],
+                columns=["successful_paths", "overall_paths"],
+            )
+            table_df["pattern"] = pat
+            table_df["pvalue"] = test_result.pvalue
+            if isinstance(test_result, BarnardExactResult):
+                table_df["test"] = "barnard"
+                table_df["statistic"] = test_result.statistic
+            elif isinstance(test_result, Chi2ContingencyResult):
+                table_df["test"] = "chi2"
+                table_df["statistic"] = test_result.statistic
+            else:
+                raise ValueError(f"Unexpected test result type: {type(test_result)}")
+            
+            results.append(test_result)
+            dfs.append(table_df)
 
-        pattern_in_null = sum(_has_pattern(s) for s in null_samples)
-        pattern_in_successes = sum(_has_pattern(s) for s in success_samples)
-
-        # Create the contingency table. Rows represent whether or not the pattern is
-        # present, columns represent whether or not the path is successful. Columns
-        # sum to n_samples.
-        table = np.array(
-            [
-                [pattern_in_successes, pattern_in_null],
-                [n_samples - pattern_in_successes, n_samples - pattern_in_null],
-            ]
-        )
-        test_result = self.test_contingency(table, test=test, correction=correction)
-        table_df = pd.DataFrame(
-            data=table,
-            index=["has_pattern", "lacks_pattern"],
-            columns=["successful_paths", "overall_paths"],
-        )
-
-        return test_result, table_df
+        results_df = pd.concat(dfs, ignore_index=True)
+        
+        return results_df
 
     def grow_tree_from_leaves(self, leaves: Iterable[Hashable]) -> nx.DiGraph:
         """Returns the tree (or DAG) of all paths that start at the root and ending at
