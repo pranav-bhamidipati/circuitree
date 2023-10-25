@@ -28,17 +28,11 @@ def ucb_score(
     visits = attrs["visits"]
     if visits == 0:
         return np.inf
-
     reward = attrs["reward"]
-    parent_in_edges = graph.in_edges(parent, data="visits")
-    if parent_in_edges:
-        parent_visits = sum(v for _, _, v in parent_in_edges)
-    else:
-        parent_visits = graph.nodes[parent]["visits"]
-
+    parent_visits = graph.nodes[parent]["visits"]
+    
     mean_reward = reward / visits
     exploration_term = exploration_constant * np.sqrt(np.log(parent_visits) / visits)
-
     ucb = mean_reward + exploration_term
     return ucb
 
@@ -474,6 +468,45 @@ class CircuiTree(ABC):
             raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
 
         return samples
+
+    def enumerate_terminal_states(
+        self,
+        root: Optional[Hashable] = None,
+        progress: bool = False,
+        max_iter: int = None,
+    ) -> Iterable[Hashable]:
+        """Enumerate all terminal states reachable from the given root state."""
+
+        root = self.root if root is None else root
+        max_iter = np.inf if max_iter is None else max_iter
+        if progress:
+            from tqdm import tqdm
+
+            pbar = tqdm(max_iter, desc="Enumerating terminal states...")
+            _callback = lambda: pbar.update(1)
+        else:
+            _callback = lambda: None
+
+        # Use a post-order traversal to enumerate all terminal states
+        visited = set()
+        terminal_set = set()
+        stack = [root]
+        k = 0
+        while stack and k < max_iter:
+            state = stack.pop()
+            visited.add(state)
+            if self.grammar.is_terminal(state):
+                terminal_set.add(state)
+            else:
+                descendants = set(
+                    self._do_action(state, a) for a in self.grammar.get_actions(state)
+                )
+                stack.extend(descendants - visited)
+            k += 1
+            _callback()
+
+        print(f"Found {len(terminal_set)} terminal states.")
+        return terminal_set
 
     def test_contingency(
         self,
