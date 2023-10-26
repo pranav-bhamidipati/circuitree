@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import partial
 from itertools import cycle, chain, islice, repeat
 import json
 from pathlib import Path
@@ -107,17 +108,25 @@ class CircuiTree(ABC):
             new_state = self.grammar.get_unique_state(new_state)
         return new_state
 
+    @staticmethod
+    def _get_random_terminal_descendant(
+        grammar: CircuitGrammar, start: Hashable, rg: np.random.Generator
+    ) -> Hashable:
+        """Starting from the state `start`, select random actions until termination."""
+        state = start
+        while not grammar.is_terminal(state):
+            actions = grammar.get_actions(state)
+            action = rg.choice(actions)
+            state = grammar.do_action(state, action)
+            state = grammar.get_unique_state(state)
+        return state
+
     def get_random_terminal_descendant(
         self, start: Hashable, rg: Optional[np.random.Generator] = None
     ) -> Hashable:
-        """Starting from the state `start`, select cs random actions until termination."""
+        """Starting from the state `start`, select random actions until termination."""
         rg = self.rg if rg is None else rg
-        state = start
-        while not self.grammar.is_terminal(state):
-            actions = self.grammar.get_actions(state)
-            action = rg.choice(actions)
-            state = self._do_action(state, action)
-        return state
+        return self._get_random_terminal_descendant(self.grammar, start, rg)
 
     def select_and_expand(
         self, rg: Optional[np.random.Generator] = None
@@ -428,16 +437,40 @@ class CircuiTree(ABC):
         return cls(grammar=grammar, graph=graph, **kwargs)
 
     def sample_terminal_states(
-        self, n_samples: int, progress: bool = False
+        self, n_samples: int, progress: bool = False, nprocs: int = 1
     ) -> list[Hashable]:
         """Sample n_samples random terminal states."""
-        if progress:
-            from tqdm import trange
+        if nprocs == 1:
+            if progress:
+                from tqdm import trange
 
-            _range = trange(n_samples, desc="Sampling all terminal circuits")
+                _range = trange(n_samples, desc="Sampling all terminal circuits")
+            else:
+                _range = range(n_samples)
+            return [self.get_random_terminal_descendant(self.root) for _ in _range]
         else:
-            _range = range(n_samples)
-        return [self.get_random_terminal_descendant(self.root) for _ in _range]
+            from multiprocessing import Pool
+
+            if progress:
+                from tqdm import tqdm
+
+                pbar = tqdm(desc="Sampling all terminal circuits", total=n_samples)
+
+            rgs = [np.random.default_rng() for _ in range(nprocs)]
+            samples = []
+            draw_one_sample = partial(
+                self._get_random_terminal_descendant, self.grammar, self.root
+            )
+            i = 0
+            with Pool(nprocs) as pool:
+                for sample in pool.imap_unordered(draw_one_sample, repeat(rgs)):
+                    samples.append(sample)
+                    if progress:
+                        pbar.update(1)
+                    i += 1
+                    if i == n_samples:
+                        break
+            return samples
 
     def sample_successful_circuits(
         self,
@@ -454,12 +487,12 @@ class CircuiTree(ABC):
         successful_terminals = set(
             s for s in self.terminal_states if self.is_success(s)
         )
-        samples = []
         if progress:
             from tqdm import tqdm
 
             pbar = tqdm(n_samples, desc="Sampling successful terminal circuits")
         if nprocs == 1:
+            samples = []
             for _ in range(max_iter):
                 state = self.get_random_terminal_descendant(self.root)
                 if state in successful_terminals:
@@ -471,23 +504,18 @@ class CircuiTree(ABC):
         else:
             from multiprocessing import Pool
 
-            def _sample(*args):
-                state = self.get_random_terminal_descendant(self.root)
-                if state in successful_terminals:
-                    return state
-                else:
-                    return None
-
+            seed_seq = np.random.SeedSequence(self.seed)
+            rgs = (np.random.default_rng(seed_seq.spawn(1)[0]) for _ in range(max_iter))
+            draw_one_sample = partial(
+                self._get_random_terminal_descendant, self.grammar, self.root
+            )
+            samples = []
             with Pool(nprocs) as pool:
-                for state in pool.imap_unordered(
-                    _sample, range(max_iter), chunksize=100
-                ):
-                    if state is not None:
+                for state in pool.imap_unordered(draw_one_sample, rgs):
+                    if state in successful_terminals:
+                        samples.append(state)
                         if progress:
                             pbar.update(1)
-                        samples.append(state)
-                    if len(samples) == n_samples:
-                        break
 
         if len(samples) < n_samples:
             raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
@@ -536,31 +564,36 @@ class CircuiTree(ABC):
     @staticmethod
     def test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
         """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
+        return _test_contingency(table, correction=correction)
 
-        table_df = pd.DataFrame(
-            data=table,
-            index=["has_pattern", "lacks_pattern"],
-            columns=["successful_paths", "overall_paths"],
+    @staticmethod
+    def _do_one_contingency_test(
+        pattern: Hashable,
+        grammar: CircuitGrammar,
+        null_samples: list[Hashable],
+        succ_samples: list[Hashable],
+        correction: bool = True,
+    ):
+        """Returns a contingency table with test results for the given pattern."""
+
+        pattern_in_null = sum(grammar.has_pattern(s, pattern) for s in null_samples)
+        pattern_in_succ = sum(grammar.has_pattern(s, pattern) for s in succ_samples)
+        n_null_samples = len(null_samples)
+        n_succ_samples = len(succ_samples)
+
+        # Create the contingency table. Rows represent whether or not the pattern is
+        # present, columns represent whether or not the path is successful. Columns
+        # sum to n_samples.
+        table = np.array(
+            [
+                [pattern_in_succ, pattern_in_null],
+                [n_succ_samples - pattern_in_succ, n_null_samples - pattern_in_null],
+            ]
         )
-        table_df.index.name = "pattern_present"
 
-        if table.min() < 5:
-            try:
-                res = stats.barnard_exact(table, alternative="two-sided")
-                table_df["test"] = "barnard"
-                table_df["statistic"] = res.statistic
-                table_df["pvalue"] = res.pvalue
-            except MemoryError:
-                print("Barnard's exact test not performed due to insufficient memory.")
-                table_df["test"] = pd.NA
-                table_df["statistic"] = np.nan
-                table_df["pvalue"] = np.nan
-        else:
-            res = stats.chi2_contingency(table, correction=correction)
-            table_df["test"] = "chi2"
-            table_df["statistic"] = res.statistic
-            table_df["pvalue"] = res.pvalue
-
+        # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
+        table_df = _test_contingency(table, correction=correction)
+        table_df["pattern"] = pattern
         return table_df
 
     def test_pattern_significance(
@@ -579,35 +612,22 @@ class CircuiTree(ABC):
         Samples `n_samples` paths from the overall design space and uses rejection
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
-        null_samples = self.sample_terminal_states(n_samples, progress=progress)
+        null_samples = self.sample_terminal_states(
+            n_samples, progress=progress, nprocs=nprocs
+        )
         succ_samples = self.sample_successful_circuits(
             n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs
         )
 
+        do_one_contingency_test = partial(
+            self._do_one_contingency_test,
+            grammar=self.grammar,
+            null_samples=null_samples,
+            succ_samples=succ_samples,
+            correction=correction,
+        )
+
         dfs = []
-        iterator = patterns
-
-        def do_one_contingency_test(pat, grammar=self.grammar):
-            """Returns a contingency table with test results for the given pattern."""
-
-            pattern_in_null = sum(grammar.has_pattern(s, pat) for s in null_samples)
-            pattern_in_succ = sum(grammar.has_pattern(s, pat) for s in succ_samples)
-
-            # Create the contingency table. Rows represent whether or not the pattern is
-            # present, columns represent whether or not the path is successful. Columns
-            # sum to n_samples.
-            table = np.array(
-                [
-                    [pattern_in_succ, pattern_in_null],
-                    [n_samples - pattern_in_succ, n_samples - pattern_in_null],
-                ]
-            )
-
-            # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
-            table_df = self.test_contingency(table, correction=correction)
-            table_df["pattern"] = pat
-            return table_df
-
         if nprocs == 1:
             iterator = patterns
             if progress:
@@ -616,6 +636,7 @@ class CircuiTree(ABC):
                 iterator = tqdm(iterator, desc="Testing patterns")
             for pat in iterator:
                 dfs.append(do_one_contingency_test(pat))
+
         else:
             from multiprocessing import Pool
 
@@ -633,7 +654,6 @@ class CircuiTree(ABC):
                         pbar.update(1)
 
         results_df = pd.concat(dfs)
-
         return results_df
 
     def grow_tree_from_leaves(self, leaves: Iterable[Hashable]) -> nx.DiGraph:
@@ -760,6 +780,36 @@ class CircuiTree(ABC):
     @property
     def modularity_estimate(self) -> float:
         return tree_modularity_estimate(self.graph, self.root)
+
+
+def _test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
+    """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
+
+    table_df = pd.DataFrame(
+        data=table,
+        index=["has_pattern", "lacks_pattern"],
+        columns=["successful_paths", "overall_paths"],
+    )
+    table_df.index.name = "pattern_present"
+
+    if table.min() < 5:
+        try:
+            res = stats.barnard_exact(table, alternative="two-sided")
+            table_df["test"] = "barnard"
+            table_df["statistic"] = res.statistic
+            table_df["pvalue"] = res.pvalue
+        except MemoryError:
+            print("Barnard's exact test not performed due to insufficient memory.")
+            table_df["test"] = pd.NA
+            table_df["statistic"] = np.nan
+            table_df["pvalue"] = np.nan
+    else:
+        res = stats.chi2_contingency(table, correction=correction)
+        table_df["test"] = "chi2"
+        table_df["statistic"] = res.statistic
+        table_df["pvalue"] = res.pvalue
+
+    return table_df
 
 
 def accumulate_visits_and_rewards(
