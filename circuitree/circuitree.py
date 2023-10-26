@@ -8,8 +8,6 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from scipy import stats
-from scipy.stats._hypotests import BarnardExactResult
-from scipy.stats.contingency import Chi2ContingencyResult
 
 from .modularity import tree_modularity, tree_modularity_estimate
 from .grammar import CircuitGrammar
@@ -563,12 +561,7 @@ class CircuiTree(ABC):
         return terminal_set
 
     @staticmethod
-    def test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
-        """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
-        return _test_contingency(table, correction=correction)
-
-    @staticmethod
-    def _do_one_contingency_test(
+    def _contingency_test(
         pattern: Hashable,
         grammar: CircuitGrammar,
         null_samples: list[Hashable],
@@ -593,19 +586,25 @@ class CircuiTree(ABC):
         )
 
         # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
-        table_df = _test_contingency(table, correction=correction)
-        table_df["pattern"] = pattern
+        table_df = _contingency_test(table, correction=correction)
+
+        # Make a multi-index with the pattern and presence/absence of the pattern
+        table_df.index = pd.MultiIndex.from_tuples(
+            [(pattern, True), (pattern, False)],
+            names=["pattern", "has_pattern"],
+        )
         return table_df
 
     def test_pattern_significance(
         self,
         patterns: Iterable[Any],
         n_samples: int,
-        max_iter: int = 10_000_000,
+        confidence: float | None = 0.95,
         correction: bool = True,
         progress: bool = False,
         nprocs_sampling: int = 1,
         nprocs_testing: int = 1,
+        max_iter: int = 10_000_000,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
@@ -622,7 +621,7 @@ class CircuiTree(ABC):
         )
 
         do_one_contingency_test = partial(
-            self._do_one_contingency_test,
+            self._contingency_test,
             grammar=self.grammar,
             null_samples=null_samples,
             succ_samples=succ_samples,
@@ -648,14 +647,59 @@ class CircuiTree(ABC):
                 pbar = tqdm(desc="Testing patterns", total=len(patterns))
 
             with Pool(nprocs_testing) as pool:
-                for df in pool.imap_unordered(
+                for results_df in pool.imap_unordered(
                     do_one_contingency_test, patterns, chunksize=5
                 ):
-                    dfs.append(df)
+                    dfs.append(results_df)
                     if progress:
                         pbar.update(1)
 
-        results_df = pd.concat(dfs)
+        ## Concatenate the results and wrangle the data
+        # Pivot the 2x2 contingency table columns into 4 separate columns
+        results_df = pd.concat(dfs).reset_index()
+        pivoted = results_df.pivot_table(
+            index="pattern",
+            columns="has_pattern",
+            values=["successful_paths", "overall_paths"],
+        )
+        pivoted = pivoted.astype(int)
+        pivoted.columns = pivoted.columns.map(
+            {
+                ("overall_paths", False): "others_in_null",
+                ("overall_paths", True): "pattern_in_null",
+                ("successful_paths", False): "others_in_succ",
+                ("successful_paths", True): "pattern_in_succ",
+            }
+        )
+
+        # Drop the columns that are not needed anymore
+        results_df = (
+            results_df.loc[results_df["has_pattern"]]
+            .set_index("pattern")
+            .drop(columns=["has_motif", "successful_paths", "overall_paths"])
+        )
+        results_df = pd.concat([results_df, pivoted], axis=1).reset_index()
+
+        # Perform multiple test correction (Bonferroni)
+        results_df["p_corrected"] = results_df["pvalue"] * len(results_df)
+
+        # Compute confidence intervals for the odds ratio
+        abcd = results_df[
+            ["pattern_in_succ", "pattern_in_null", "others_in_succ", "others_in_null"]
+        ].values
+
+        if confidence is None:
+            results_df["odds_ratio"] = compute_odds_ratios(abcd, progress=progress)
+        else:
+            odds_ratios, cis_low, cis_high = compute_odds_ratios_with_ci(
+                abcd, confidence_level=confidence, progress=progress
+            )
+            ci_level = f"{int(confidence * 100)}%"
+            results_df["odds_ratio"] = odds_ratios
+            results_df[f"ci_{ci_level}_low"] = cis_low
+            results_df[f"ci_{ci_level}_high"] = cis_high
+
+        results_df = results_df.sort_values("odds_ratio", ascending=False)
         return results_df
 
     def grow_tree_from_leaves(self, leaves: Iterable[Hashable]) -> nx.DiGraph:
@@ -718,61 +762,6 @@ class CircuiTree(ABC):
 
         return complexity_graph
 
-    # def sample_random_path(self) -> list[Hashable]:
-    #     """Sample a random path from the root to a terminal state."""
-    #     path = []
-    #     state = self.root
-    #     while not self.grammar.is_terminal(state):
-    #         actions = self.grammar.get_actions(state)
-    #         action = self.rg.choice(actions)
-    #         path.append(action)
-    #         state = self._do_action(state, action)
-    #     return path
-
-    # def sample_circuits_with_pattern(
-    #     self,
-    #     pattern: Hashable,
-    #     n_samples: int,
-    #     max_iter: int = 10_000_000,
-    #     return_terminal: bool = True,
-    # ) -> list[Hashable]:
-    #     """Sample a random path from the root to a terminal state that contains the
-    #     given pattern. Uses rejection sampling."""
-
-    #     pattern_cache: dict[Hashable, bool] = {}
-
-    #     def _path_has_pattern(path):
-    #         """Check if the given path contains the given pattern. Use cached results to
-    #         speed up search."""
-    #         for i, node in enumerate(path):
-    #             has_pattern = pattern_cache.get(node)
-    #             if has_pattern is None:
-    #                 has_pattern = self.grammar.has_pattern(node, pattern)
-    #                 pattern_cache[node] = has_pattern
-    #             if has_pattern:
-    #                 pattern_cache.update({n: True for n in path[i + 1 :]})
-    #                 return True
-    #         return False
-
-    #     samples = []
-    #     if return_terminal:
-    #         _append_sample = lambda path: samples.append(path[-1])
-    #     else:
-    #         _append_sample = lambda path: samples.append(path)
-
-    #     # Use rejection sampling to sample paths with the given pattern
-    #     for _ in range(max_iter):
-    #         path = self.sample_random_path()
-    #         if _path_has_pattern(path):
-    #             _append_sample(path)
-    #         if len(samples) == n_samples:
-    #             break
-
-    #     if len(samples) < n_samples:
-    #         raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
-
-    #     return samples
-
     @property
     def modularity(self) -> float:
         return tree_modularity(
@@ -784,7 +773,79 @@ class CircuiTree(ABC):
         return tree_modularity_estimate(self.graph, self.root)
 
 
-def _test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
+def compute_odds_ratio_and_ci(
+    table: np.ndarray, confidence_level: float
+) -> tuple[float, tuple[float, float]]:
+    """Compute the odds ratio and confidence interval for a 2x2 contingency table."""
+    # Compute the odds ratio
+    (a, b), (c, d) = table
+    odds_ratio = (a / b) / (c / d)
+
+    # Compute the confidence interval
+    if any(table.flatten() == 0):
+        return odds_ratio, (np.nan, np.nan)
+    else:
+        upper_quantile = (1 + confidence_level) / 2
+        log_odds_ratio = np.log(odds_ratio)
+        std_err_log_OR = np.sqrt(1 / a + 1 / b + 1 / c + 1 / d)
+        log_ci_width = stats.norm.ppf(upper_quantile) * std_err_log_OR
+        ci_low = np.exp(log_odds_ratio - log_ci_width)
+        ci_high = np.exp(log_odds_ratio + log_ci_width)
+        return odds_ratio, (ci_low, ci_high)
+
+
+def compute_odds_ratios(abcd: np.ndarray, progress: bool = False) -> np.ndarray:
+    """Compute the odds ratio for multiple 2x2 contingency tables. Takes a 2D array of
+    shape (n, 4) where n is the number of contingency tables.
+    Each row [a, b, c, d] in the array corresponds to the 2x2 contingnecy table:
+
+            [[a, b],
+             [c, d]]
+
+    """
+    tables = abcd.reshape(-1, 2, 2)
+    odds_ratios = np.zeros(len(tables))
+    iterator = tables
+    if progress:
+        from tqdm import tqdm
+
+        iterator = tqdm(iterator, desc="Computing odds ratios")
+    for i, table in enumerate(iterator):
+        (a, b), (c, d) = table
+        bc = b * c
+        if bc == 0:
+            odds_ratios[i] = np.inf
+        else:
+            odds_ratios[i] = (a * d) / (b * c)
+    return odds_ratios
+
+
+def compute_odds_ratios_with_ci(
+    abcd: np.ndarray, confidence_level: float, progress: bool = False
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Compute the odds ratio and confidence intervals for multiple 2x2 contingency
+    tables. Takes a 2D array of shape (n, 4) where n is the number of contingency
+    tables.
+    Each row [a, b, c, d] in the array corresponds to the 2x2 table:
+
+            [[a, b],
+             [c, d]]
+
+    """
+    tables = abcd.reshape(-1, 2, 2)
+    odds_ratios = np.zeros(len(tables))
+    cis = np.zeros((len(tables), 2))
+    iterator = tables
+    if progress:
+        from tqdm import tqdm
+
+        iterator = tqdm(iterator, desc="Computing odds ratios +/- CI")
+    for i, table in enumerate(iterator):
+        odds_ratios[i], cis[i] = compute_odds_ratio_and_ci(table, confidence_level)
+    return odds_ratios, *cis.T
+
+
+def _contingency_test(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
     """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
 
     table_df = pd.DataFrame(
@@ -794,7 +855,12 @@ def _test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFram
     )
     table_df.index.name = "pattern_present"
 
-    if table.min() < 5:
+    minval = table.min()
+    if minval == 0:
+        table_df["test"] = pd.NA
+        table_df["statistic"] = np.nan
+        table_df["pvalue"] = np.nan
+    elif table.min() < 5:
         try:
             res = stats.barnard_exact(table, alternative="two-sided")
             table_df["test"] = "barnard"
