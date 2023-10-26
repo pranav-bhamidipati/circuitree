@@ -456,20 +456,19 @@ class CircuiTree(ABC):
 
                 pbar = tqdm(desc="Sampling all terminal circuits", total=n_samples)
 
-            rgs = [np.random.default_rng() for _ in range(nprocs)]
-            samples = []
+            seed_seq = np.random.SeedSequence(self.seed)
+            rgs = (
+                np.random.default_rng(seed_seq.spawn(1)[0]) for _ in range(n_samples)
+            )
             draw_one_sample = partial(
                 self._get_random_terminal_descendant, self.grammar, self.root
             )
-            i = 0
+            samples = []
             with Pool(nprocs) as pool:
-                for sample in pool.imap_unordered(draw_one_sample, repeat(rgs)):
-                    samples.append(sample)
+                for sample in pool.imap_unordered(draw_one_sample, rgs, chunksize=100):
                     if progress:
                         pbar.update(1)
-                    i += 1
-                    if i == n_samples:
-                        break
+                    samples.append(sample)
             return samples
 
     def sample_successful_circuits(
