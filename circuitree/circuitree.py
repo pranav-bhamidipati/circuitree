@@ -676,7 +676,7 @@ class CircuiTree(ABC):
         results_df = (
             results_df.loc[results_df["has_pattern"]]
             .set_index("pattern")
-            .drop(columns=["has_motif", "successful_paths", "overall_paths"])
+            .drop(columns=["has_pattern", "successful_paths", "overall_paths"])
         )
         results_df = pd.concat([results_df, pivoted], axis=1).reset_index()
 
