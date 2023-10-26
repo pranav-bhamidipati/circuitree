@@ -586,7 +586,7 @@ class CircuiTree(ABC):
         )
 
         # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
-        table_df = _contingency_test(table, correction=correction)
+        table_df = contingency_test(table, correction=correction)
 
         # Make a multi-index with the pattern and presence/absence of the pattern
         table_df.index = pd.MultiIndex.from_tuples(
@@ -779,7 +779,11 @@ def compute_odds_ratio_and_ci(
     """Compute the odds ratio and confidence interval for a 2x2 contingency table."""
     # Compute the odds ratio
     (a, b), (c, d) = table
-    odds_ratio = (a / b) / (c / d)
+    bc = b * c
+    if bc == 0:
+        odds_ratio = np.inf
+    else:
+        odds_ratio = (a * d) / bc
 
     # Compute the confidence interval
     if any(table.flatten() == 0):
@@ -845,7 +849,7 @@ def compute_odds_ratios_with_ci(
     return odds_ratios, *cis.T
 
 
-def _contingency_test(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
+def contingency_test(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
     """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
 
     table_df = pd.DataFrame(
