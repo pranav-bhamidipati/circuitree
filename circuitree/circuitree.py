@@ -510,7 +510,7 @@ class CircuiTree(ABC):
             )
             samples = []
             with Pool(nprocs) as pool:
-                for state in pool.imap_unordered(draw_one_sample, rgs):
+                for state in pool.imap_unordered(draw_one_sample, rgs, chunksize=100):
                     if state in successful_terminals:
                         samples.append(state)
                         if progress:
