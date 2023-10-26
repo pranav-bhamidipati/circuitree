@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "circuitree"
-version = "0.9.3"
+version = "0.9.4"
 description = "Genetic circuit design using Monte Carlo tree search"
 authors = ["pranav-bhamidipati <pbhamidi@usc.edu>"]
 license = "GPLv3"
