@@ -440,7 +440,11 @@ class CircuiTree(ABC):
         return [self.get_random_terminal_descendant(self.root) for _ in _range]
 
     def sample_successful_circuits(
-        self, n_samples: int, max_iter: int = 10_000_000, progress: bool = False
+        self,
+        n_samples: int,
+        max_iter: int = 10_000_000,
+        progress: bool = False,
+        nprocs: int = 1,
     ) -> list[Hashable]:
         """Sample a random successful state with rejection sampling. Starts from the
         root state, selects random actions until termination, and accepts the sample if
@@ -452,17 +456,38 @@ class CircuiTree(ABC):
         )
         samples = []
         if progress:
-            from tqdm import trange
+            from tqdm import tqdm
 
-            pbar = trange(n_samples, desc="Sampling successful terminal circuits")
-        for _ in range(max_iter):
-            state = self.get_random_terminal_descendant(self.root)
-            if state in successful_terminals:
-                if progress:
-                    pbar.update(1)
-                samples.append(state)
-            if len(samples) == n_samples:
-                break
+            pbar = tqdm(n_samples, desc="Sampling successful terminal circuits")
+        if nprocs == 1:
+            for _ in range(max_iter):
+                state = self.get_random_terminal_descendant(self.root)
+                if state in successful_terminals:
+                    if progress:
+                        pbar.update(1)
+                    samples.append(state)
+                if len(samples) == n_samples:
+                    break
+        else:
+            from multiprocessing import Pool
+
+            def _sample(*args):
+                state = self.get_random_terminal_descendant(self.root)
+                if state in successful_terminals:
+                    return state
+                else:
+                    return None
+
+            with Pool(nprocs) as pool:
+                for state in pool.imap_unordered(
+                    _sample, range(max_iter), chunksize=100
+                ):
+                    if state is not None:
+                        if progress:
+                            pbar.update(1)
+                        samples.append(state)
+                    if len(samples) == n_samples:
+                        break
 
         if len(samples) < n_samples:
             raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
@@ -508,9 +533,8 @@ class CircuiTree(ABC):
         print(f"Found {len(terminal_set)} terminal states.")
         return terminal_set
 
-    def test_contingency(
-        self, table: np.ndarray, correction: bool = True
-    ) -> pd.DataFrame:
+    @staticmethod
+    def test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
         """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
 
         table_df = pd.DataFrame(
@@ -546,6 +570,7 @@ class CircuiTree(ABC):
         max_iter: int = 10_000_000,
         correction: bool = True,
         progress: bool = False,
+        nprocs: int = 1,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
@@ -556,22 +581,17 @@ class CircuiTree(ABC):
         determined by the is_successful() method."""
         null_samples = self.sample_terminal_states(n_samples, progress=progress)
         succ_samples = self.sample_successful_circuits(
-            n_samples, max_iter=max_iter, progress=progress
+            n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs
         )
 
         dfs = []
         iterator = patterns
-        if progress:
-            from tqdm import tqdm
 
-            iterator = tqdm(iterator, desc="Testing patterns")
-        for pat in iterator:
-            pattern_in_null = sum(
-                self.grammar.has_pattern(s, pat) for s in null_samples
-            )
-            pattern_in_succ = sum(
-                self.grammar.has_pattern(s, pat) for s in succ_samples
-            )
+        def do_one_contingency_test(pat, grammar=self.grammar):
+            """Returns a contingency table with test results for the given pattern."""
+
+            pattern_in_null = sum(grammar.has_pattern(s, pat) for s in null_samples)
+            pattern_in_succ = sum(grammar.has_pattern(s, pat) for s in succ_samples)
 
             # Create the contingency table. Rows represent whether or not the pattern is
             # present, columns represent whether or not the path is successful. Columns
@@ -586,7 +606,31 @@ class CircuiTree(ABC):
             # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
             table_df = self.test_contingency(table, correction=correction)
             table_df["pattern"] = pat
-            dfs.append(table_df)
+            return table_df
+
+        if nprocs == 1:
+            iterator = patterns
+            if progress:
+                from tqdm import tqdm
+
+                iterator = tqdm(iterator, desc="Testing patterns")
+            for pat in iterator:
+                dfs.append(do_one_contingency_test(pat))
+        else:
+            from multiprocessing import Pool
+
+            if progress:
+                from tqdm import tqdm
+
+                pbar = tqdm(desc="Testing patterns", total=len(patterns))
+
+            with Pool(nprocs) as pool:
+                for df in pool.imap_unordered(
+                    do_one_contingency_test, patterns, chunksize=5
+                ):
+                    dfs.append(df)
+                    if progress:
+                        pbar.update(1)
 
         results_df = pd.concat(dfs)
 
