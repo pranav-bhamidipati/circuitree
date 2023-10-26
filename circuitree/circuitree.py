@@ -489,7 +489,7 @@ class CircuiTree(ABC):
         if progress:
             from tqdm import tqdm
 
-            pbar = tqdm(n_samples, desc="Sampling successful terminal circuits")
+            pbar = tqdm(desc="Sampling successful terminal circuits", total=n_samples)
         if nprocs == 1:
             samples = []
             for _ in range(max_iter):
@@ -798,7 +798,6 @@ def _test_contingency(table: np.ndarray, correction: bool = True) -> pd.DataFram
             table_df["statistic"] = res.statistic
             table_df["pvalue"] = res.pvalue
         except MemoryError:
-            print("Barnard's exact test not performed due to insufficient memory.")
             table_df["test"] = pd.NA
             table_df["statistic"] = np.nan
             table_df["pvalue"] = np.nan
