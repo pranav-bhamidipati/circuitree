@@ -512,9 +512,11 @@ class CircuiTree(ABC):
             with Pool(nprocs) as pool:
                 for state in pool.imap_unordered(draw_one_sample, rgs, chunksize=100):
                     if state in successful_terminals:
-                        samples.append(state)
                         if progress:
                             pbar.update(1)
+                        samples.append(state)
+                        if len(samples) == n_samples:
+                            break
 
         if len(samples) < n_samples:
             raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
