@@ -604,7 +604,8 @@ class CircuiTree(ABC):
         max_iter: int = 10_000_000,
         correction: bool = True,
         progress: bool = False,
-        nprocs: int = 1,
+        nprocs_sampling: int = 1,
+        nprocs_testing: int = 1,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
@@ -614,10 +615,10 @@ class CircuiTree(ABC):
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
         null_samples = self.sample_terminal_states(
-            n_samples, progress=progress, nprocs=nprocs
+            n_samples, progress=progress, nprocs=nprocs_sampling
         )
         succ_samples = self.sample_successful_circuits(
-            n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs
+            n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs_sampling
         )
 
         do_one_contingency_test = partial(
@@ -629,7 +630,7 @@ class CircuiTree(ABC):
         )
 
         dfs = []
-        if nprocs == 1:
+        if nprocs_testing == 1:
             iterator = patterns
             if progress:
                 from tqdm import tqdm
@@ -646,7 +647,7 @@ class CircuiTree(ABC):
 
                 pbar = tqdm(desc="Testing patterns", total=len(patterns))
 
-            with Pool(nprocs) as pool:
+            with Pool(nprocs_testing) as pool:
                 for df in pool.imap_unordered(
                     do_one_contingency_test, patterns, chunksize=5
                 ):
