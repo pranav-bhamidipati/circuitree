@@ -30,7 +30,7 @@ def ucb_score(
         return np.inf
     reward = attrs["reward"]
     parent_visits = graph.nodes[parent]["visits"]
-    
+
     mean_reward = reward / visits
     exploration_term = exploration_constant * np.sqrt(np.log(parent_visits) / visits)
     ucb = mean_reward + exploration_term
@@ -509,32 +509,41 @@ class CircuiTree(ABC):
         return terminal_set
 
     def test_contingency(
-        self,
-        table: np.ndarray,
-        test: Literal["chi2", "barnard", "auto"] = "auto",
-        correction: bool = True,
-    ) -> BarnardExactResult | Chi2ContingencyResult:
+        self, table: np.ndarray, correction: bool = True
+    ) -> pd.DataFrame:
         """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
-        if test == "auto":
-            if table.min() < 5:
-                test = "barnard"
-            else:
-                test = "chi2"
-        elif test not in ("chi2", "barnard"):
-            raise ValueError("Argument `test` must be 'chi2', 'barnard', or 'auto'.")
 
-        if test == "barnard":
-            res = stats.barnard_exact(table, alternative="two-sided")
+        table_df = pd.DataFrame(
+            data=table,
+            index=["has_pattern", "lacks_pattern"],
+            columns=["successful_paths", "overall_paths"],
+        )
+        table_df.index.name = "pattern_present"
+
+        if table.min() < 5:
+            try:
+                res = stats.barnard_exact(table, alternative="two-sided")
+                table_df["test"] = "barnard"
+                table_df["statistic"] = res.statistic
+                table_df["pvalue"] = res.pvalue
+            except MemoryError:
+                print("Barnard's exact test not performed due to insufficient memory.")
+                table_df["test"] = pd.NA
+                table_df["statistic"] = np.nan
+                table_df["pvalue"] = np.nan
         else:
             res = stats.chi2_contingency(table, correction=correction)
-        return res
+            table_df["test"] = "chi2"
+            table_df["statistic"] = res.statistic
+            table_df["pvalue"] = res.pvalue
+
+        return table_df
 
     def test_pattern_significance(
         self,
         patterns: Iterable[Any],
         n_samples: int,
         max_iter: int = 10_000_000,
-        test: Literal["chi2", "barnard", "auto"] = "auto",
         correction: bool = True,
         progress: bool = False,
     ) -> pd.DataFrame:
@@ -550,7 +559,6 @@ class CircuiTree(ABC):
             n_samples, max_iter=max_iter, progress=progress
         )
 
-        results = []
         dfs = []
         iterator = patterns
         if progress:
@@ -574,25 +582,10 @@ class CircuiTree(ABC):
                     [n_samples - pattern_in_succ, n_samples - pattern_in_null],
                 ]
             )
-            test_result = self.test_contingency(table, test=test, correction=correction)
-            table_df = pd.DataFrame(
-                data=table,
-                index=["has_pattern", "lacks_pattern"],
-                columns=["successful_paths", "overall_paths"],
-            )
-            table_df.index.name = "pattern_present"
-            table_df["pattern"] = pat
-            table_df["pvalue"] = test_result.pvalue
-            if isinstance(test_result, BarnardExactResult):
-                table_df["test"] = "barnard"
-                table_df["statistic"] = test_result.statistic
-            elif isinstance(test_result, Chi2ContingencyResult):
-                table_df["test"] = "chi2"
-                table_df["statistic"] = test_result.statistic
-            else:
-                raise ValueError(f"Unexpected test result type: {type(test_result)}")
 
-            results.append(test_result)
+            # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
+            table_df = self.test_contingency(table, correction=correction)
+            table_df["pattern"] = pat
             dfs.append(table_df)
 
         results_df = pd.concat(dfs)
