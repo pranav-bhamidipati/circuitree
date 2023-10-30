@@ -384,7 +384,7 @@ class CircuiTree(ABC):
     @classmethod
     def from_file(
         cls,
-        graph_gml: str | Path,
+        graph_gml: str | Path | None,
         attrs_json: str | Path,
         grammar_cls: Optional[CircuitGrammar] = None,
         grammar_kwargs: Optional[dict] = None,
@@ -430,7 +430,7 @@ class CircuiTree(ABC):
             _grammar_cls = grammar_cls
 
         grammar = _grammar_cls(**grammar_kwargs)
-        graph = nx.read_gml(graph_gml)
+        graph = None if graph_gml is None else nx.read_gml(graph_gml)
 
         return cls(grammar=grammar, graph=graph, **kwargs)
 
