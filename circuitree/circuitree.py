@@ -429,6 +429,9 @@ class CircuiTree(ABC):
         else:
             _grammar_cls = grammar_cls
 
+        # Patch an external bug where _non_serializable_attrs is saved to the json file
+        grammar_kwargs.pop("_non_serializable_attrs", None)
+
         grammar = _grammar_cls(**grammar_kwargs)
         graph = None if graph_gml is None else nx.read_gml(graph_gml)
 
