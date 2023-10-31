@@ -826,25 +826,28 @@ class CircuiTree(ABC):
     def grow_tree_from_leaves(self, leaves: Iterable[Hashable]) -> nx.DiGraph:
         """Returns the tree (or DAG) of all paths that start at the root and ending at
         a node in ``leaves``."""
-
-        # Maintain a stack of (state, undo_action) pairs to add to the tree
-        stack = []
-        for leaf in leaves:
-            stack.extend([(leaf, a) for a in self.grammar.get_undo_actions(leaf)])
-
+        # Maintain a stack of leaves or (state, undo_action) pairs to add to the tree
         # Grow the tree in reverse, from the leaves to the root, by undoing actions
         graph = nx.DiGraph()
+        graph.add_nodes_from(leaves)
+        stack = list(leaves)
         while stack:
-            state, undo_action = stack.pop()
-            parent = self._undo_action(state, undo_action)
-            if (parent, state) in graph.edges:
-                continue
-            if parent not in graph:
-                graph.add_node(parent, **self.default_attrs)
-                stack.extend(
-                    [(parent, a) for a in self.grammar.get_undo_actions(parent)]
-                )
-            graph.add_edge(parent, state, **self.default_attrs)
+            item = stack.pop()
+            if not isinstance(item, tuple):
+                leaf = item
+                graph.add_node(leaf, **self.default_attrs)
+                stack.extend([(leaf, a) for a in self.grammar.get_undo_actions(leaf)])
+            else:
+                state, undo_action = item
+                parent = self._undo_action(state, undo_action)
+                if (parent, state) in graph.edges:
+                    continue
+                if parent not in graph:
+                    graph.add_node(parent, **self.default_attrs)
+                    stack.extend(
+                        [(parent, a) for a in self.grammar.get_undo_actions(parent)]
+                    )
+                graph.add_edge(parent, state, **self.default_attrs)
 
         return graph
 

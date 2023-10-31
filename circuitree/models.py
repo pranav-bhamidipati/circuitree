@@ -178,7 +178,12 @@ class SimpleNetworkGrammar(CircuitGrammar):
                 distinct_sets_without_ixn = self.merge_overlapping_sets(
                     components_in_ixn[:i] + components_in_ixn[i + 1 :]
                 )
-                if len(distinct_sets_without_ixn) == 1:
+
+                # If there is just one distinct set of weakly connected components,
+                # then the circuit will remain connected. If there are more than one,
+                # then the circuit will be disconnected. If there are zero, then the
+                # circuit will have no interactions (also allowed).
+                if len(distinct_sets_without_ixn) < 2:
                     undo_actions.append(ixn)
 
         # Can only remove a component if it has no edges and we have more components
@@ -197,13 +202,15 @@ class SimpleNetworkGrammar(CircuitGrammar):
                     f"Cannot undo termination on a non-terminal genotype: {genotype}"
                 )
 
-        components, interactions = genotype.split("::")
+        components, interactions_joined = genotype.split("::")
         if len(action) == 1:
             if action in components:
-                return components.replace(action, "")
-            return components.replace(action, "")
+                components = components.replace(action, "")
         elif len(action) == 3:
-            return interactions.replace(action, "")
+            interactions = interactions_joined.split("_")
+            interactions.remove(action)
+            interactions_joined = "_".join(interactions)
+        return "::".join([components, interactions_joined])
 
     @staticmethod
     def is_terminal(genotype: str) -> bool:
