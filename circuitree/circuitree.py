@@ -545,26 +545,8 @@ class CircuiTree(ABC):
             s for s in self.terminal_states if self.is_success(s)
         )
 
-        # Maintain a stack of (state, undo_action) pairs to add to the tree
-        stack = []
-        for leaf in successful_terminals:
-            stack.extend([(leaf, a) for a in self.grammar.get_undo_actions(leaf)])
-
-        # Grow the tree in reverse, from the leaves to the root
-        all_paths_to_success = nx.DiGraph()
-        while stack:
-            state, undo_action = stack.pop()
-            if state == self.root:
-                continue
-            parent = self._undo_action(state, undo_action)
-            if (parent, state) in all_paths_to_success.edges:
-                continue
-            if parent not in all_paths_to_success:
-                all_paths_to_success.add_node(parent, **self.default_attrs)
-                stack.extend(
-                    [(parent, a) for a in self.grammar.get_undo_actions(parent)]
-                )
-            all_paths_to_success.add_edge(parent, state, **self.default_attrs)
+        # Generate the graph with all possible paths to success
+        all_paths_to_success = self.grow_tree_from_leaves(successful_terminals)
 
         if nprocs == 1:
             samples = self._sample_leaves(
@@ -850,19 +832,21 @@ class CircuiTree(ABC):
         for leaf in leaves:
             stack.extend([(leaf, a) for a in self.grammar.get_undo_actions(leaf)])
 
-        # Build the tree by undoing actions from each leaf
-        tree = nx.DiGraph()
+        # Grow the tree in reverse, from the leaves to the root, by undoing actions
+        graph = nx.DiGraph()
         while stack:
             state, undo_action = stack.pop()
-            if state == self.root:
-                continue
             parent = self._undo_action(state, undo_action)
-            if parent not in tree:
-                tree.add_node(parent, **self.default_attrs)
-            tree.add_edge(parent, state, **self.default_attrs)
-            stack.extend([(parent, a) for a in self.grammar.get_undo_actions(parent)])
+            if (parent, state) in graph.edges:
+                continue
+            if parent not in graph:
+                graph.add_node(parent, **self.default_attrs)
+                stack.extend(
+                    [(parent, a) for a in self.grammar.get_undo_actions(parent)]
+                )
+            graph.add_edge(parent, state, **self.default_attrs)
 
-        return tree
+        return graph
 
     def to_complexity_graph(
         self, successes: bool | Iterable[Hashable] = False
