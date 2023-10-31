@@ -725,40 +725,35 @@ class CircuiTree(ABC):
 
         return tree
 
-    def to_complexity_graph(self, successes: bool = False) -> nx.DiGraph:
-        # Keep only the successful nodes
-        if successes:
-            parent_to_child: dict[Hashable, tuple[Hashable, float, int]] = {}
-            for child in self.graph.nodes:
-                if self.grammar.is_terminal(child) and self.is_success(child):
-                    parent = list(self.graph.in_edges(child))[0][0]
-                    parent_to_child[parent] = (
-                        child,
-                        self.graph.nodes[child]["reward"],
-                        self.graph.nodes[child]["visits"],
-                    )
-            complexity_graph: nx.DiGraph = self.graph.subgraph(
-                parent_to_child.keys()
-            ).copy()
-            for parent, (child, reward, visits) in parent_to_child.items():
-                complexity_graph.nodes[parent]["terminal_state"] = dict(
-                    name=child, reward=reward, visits=visits
-                )
-
-        # Keep everything
+    def to_complexity_graph(
+        self, successes: bool | Iterable[Hashable] = False
+    ) -> nx.DiGraph:
+        if isinstance(successes, Iterable):
+            successful_children = set(successes)
+        elif successes is True:
+            # Keep only the successful nodes
+            successful_children = set(
+                c for c in self.terminal_states if self.is_success(c)
+            )
+        elif successes is False:
+            # keep all terminal nodes
+            successful_children = set(self.terminal_states)
         else:
-            complexity_graph = self.graph.copy()
-            nodes_to_remove = []
-            for child in self.graph.nodes:
-                if self.grammar.is_terminal(child):
-                    parent = list(self.graph.in_edges(child))[0][0]
-                    complexity_graph.nodes[parent]["terminal_state"] = dict(
-                        name=child,
-                        reward=self.graph.nodes[child]["reward"],
-                        visits=self.graph.nodes[child]["visits"],
-                    )
-                    nodes_to_remove.append(child)
-            complexity_graph.remove_nodes_from(nodes_to_remove)
+            raise ValueError(f"Invalid value for successes: {successes}")
+
+        # Store the attributes of the terminal states
+        child_attrs: dict[Hashable, dict[str, Any]] = {}
+        for child in successful_children:
+            parents = [p for p, _ in self.graph.in_edges(child)]
+            for p in parents:
+                child_attrs[(p, child)] = self.graph.edges[(p, child)]
+
+        complexity_graph: nx.DiGraph = self.graph.subgraph(
+            (p for p, c in child_attrs.keys())
+        ).copy()
+
+        for (parent, child), d in child_attrs.items():
+            complexity_graph.nodes[parent]["terminal_state"] = d | {"name": child}
 
         return complexity_graph
 
