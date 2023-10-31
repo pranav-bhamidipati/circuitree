@@ -437,7 +437,7 @@ class CircuiTree(ABC):
     def sample_terminal_states(
         self, n_samples: int, progress: bool = False, nprocs: int = 1
     ) -> list[Hashable]:
-        """Sample n_samples random terminal states."""
+        """Sample n_samples random terminal states from the grammar."""
         if nprocs == 1:
             if progress:
                 from tqdm import trange
@@ -469,7 +469,134 @@ class CircuiTree(ABC):
                     samples.append(sample)
             return samples
 
-    def sample_successful_circuits(
+    @staticmethod
+    def _sample_leaf(
+        graph: nx.DiGraph,
+        root: Hashable,
+        rg: np.random.Generator,
+    ):
+        node = root
+        children = list(graph.successors(node))
+        while children:
+            node = rg.choice(children)
+            children = list(graph.successors(node))
+        return node
+
+    def _sample_leaves(
+        self,
+        n_leaves: int,
+        graph: Optional[nx.DiGraph] = None,
+        root: Optional[Hashable] = True,
+        rg: Optional[np.random.Generator] = None,
+        terminal: bool = True,
+        progress: bool = False,
+        max_iter: int = 10_000_000,
+    ) -> list[Hashable]:
+        """Sample a leaf by traversing randomly from the root. Only samples along edges
+        in the supplied graph, unlike get_random_terminal_descendant().
+        Note that leaves of the search graph (nodes without out-edges) are not
+        necessarily terminal states. If terminal=True, rejection sampling is used to
+        enforce that the samples are all terminal states."""
+        graph = self.graph if graph is None else graph
+        root = self.root if root is True else root
+        rg = self.rg if rg is None else rg
+        sample_leaf = partial(self._sample_leaf, graph, root, rg)
+
+        if terminal:
+            term = next((n for n in graph.nodes if self.grammar.is_terminal(n)), None)
+            if term is None:
+                raise ValueError("No terminal states in the graph.")
+
+        if progress:
+            from tqdm import tqdm
+
+            pbar = tqdm(desc="Sampling leaves", total=n_leaves)
+
+        samples = []
+        for _ in range(max_iter):
+            sample = sample_leaf()
+
+            # If a terminal state is required and this is not terminal, reject
+            if terminal and not self.grammar.is_terminal(sample):
+                continue
+
+            # else, accept the sample
+            if progress:
+                pbar.update(1)
+            samples.append(sample)
+
+            if len(samples) == n_leaves:
+                break
+
+        if len(samples) < n_leaves:
+            raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
+
+        return samples
+
+    def sample_successful_circuits_by_enumeration(
+        self, n_samples: int, progress: bool = False, nprocs: int = 1
+    ) -> list[Hashable]:
+        """Sample a random successful state by first creating a new graph that contains
+        all possible paths from the root to a successful terminal state. Then, sample
+        paths by random traversal from the root."""
+
+        ## Create a graph with all possible paths to success
+        successful_terminals = set(
+            s for s in self.terminal_states if self.is_success(s)
+        )
+
+        # Maintain a stack of (state, undo_action) pairs to add to the tree
+        stack = []
+        for leaf in successful_terminals:
+            stack.extend([(leaf, a) for a in self.grammar.get_undo_actions(leaf)])
+
+        # Grow the tree in reverse, from the leaves to the root
+        all_paths_to_success = nx.DiGraph()
+        while stack:
+            state, undo_action = stack.pop()
+            if state == self.root:
+                continue
+            parent = self._undo_action(state, undo_action)
+            if (parent, state) in all_paths_to_success.edges:
+                continue
+            if parent not in all_paths_to_success:
+                all_paths_to_success.add_node(parent, **self.default_attrs)
+                stack.extend(
+                    [(parent, a) for a in self.grammar.get_undo_actions(parent)]
+                )
+            all_paths_to_success.add_edge(parent, state, **self.default_attrs)
+
+        if nprocs == 1:
+            samples = self._sample_leaves(
+                n_samples, graph=all_paths_to_success, terminal=True, progress=progress
+            )
+        else:
+            if progress:
+                from tqdm import tqdm
+
+                pbar = tqdm(
+                    desc="Sampling successful terminal circuits", total=n_samples
+                )
+
+            from multiprocessing import Pool
+
+            seed_seq = np.random.SeedSequence(self.seed)
+            rgs = (
+                np.random.default_rng(seed_seq.spawn(1)[0]) for _ in range(n_samples)
+            )
+            draw_one_sample = partial(
+                self._sample_leaf, all_paths_to_success, self.root
+            )
+            samples = []
+            with Pool(nprocs) as pool:
+                for state in pool.imap_unordered(draw_one_sample, rgs, chunksize=500):
+                    if progress:
+                        pbar.update(1)
+                    samples.append(state)
+
+        return samples
+
+    def sample_successful_circuits_by_rejection(
         self,
         n_samples: int,
         max_iter: int = 10_000_000,
@@ -602,6 +729,7 @@ class CircuiTree(ABC):
         confidence: float | None = 0.95,
         correction: bool = True,
         progress: bool = False,
+        sampling_method: Literal["rejection", "enumeration"] = "rejection",
         nprocs_sampling: int = 1,
         nprocs_testing: int = 1,
         max_iter: int = 10_000_000,
@@ -616,9 +744,20 @@ class CircuiTree(ABC):
         null_samples = self.sample_terminal_states(
             n_samples, progress=progress, nprocs=nprocs_sampling
         )
-        succ_samples = self.sample_successful_circuits(
-            n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs_sampling
-        )
+
+        if sampling_method == "enumeration":
+            succ_samples = self.sample_successful_circuits_by_enumeration(
+                n_samples, progress=progress, nprocs=nprocs_sampling
+            )
+        elif sampling_method == "rejection":
+            succ_samples = self.sample_successful_circuits_by_rejection(
+                n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs_sampling
+            )
+        else:
+            raise ValueError(
+                f"Invalid sampling method: {sampling_method}. "
+                "Must be one of ['rejection', 'enumeration']."
+            )
 
         do_one_contingency_test = partial(
             self._contingency_test,
