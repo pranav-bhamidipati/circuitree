@@ -438,7 +438,11 @@ class CircuiTree(ABC):
         return cls(grammar=grammar, graph=graph, **kwargs)
 
     def sample_terminal_states(
-        self, n_samples: int, progress: bool = False, nprocs: int = 1
+        self,
+        n_samples: int,
+        progress: bool = False,
+        nprocs: int = 1,
+        chunksize: int = 100,
     ) -> list[Hashable]:
         """Sample n_samples random terminal states from the grammar."""
         if nprocs == 1:
@@ -466,7 +470,9 @@ class CircuiTree(ABC):
             )
             samples = []
             with Pool(nprocs) as pool:
-                for sample in pool.imap_unordered(draw_one_sample, rgs, chunksize=100):
+                for sample in pool.imap_unordered(
+                    draw_one_sample, rgs, chunksize=chunksize
+                ):
                     if progress:
                         pbar.update(1)
                     samples.append(sample)
@@ -537,7 +543,11 @@ class CircuiTree(ABC):
         return samples
 
     def sample_successful_circuits_by_enumeration(
-        self, n_samples: int, progress: bool = False, nprocs: int = 1
+        self,
+        n_samples: int,
+        progress: bool = False,
+        nprocs: int = 1,
+        chunksize: int = 100,
     ) -> list[Hashable]:
         """Sample a random successful state by first creating a new graph that contains
         all possible paths from the root to a successful terminal state. Then, sample
@@ -574,7 +584,9 @@ class CircuiTree(ABC):
             )
             samples = []
             with Pool(nprocs) as pool:
-                for state in pool.imap_unordered(draw_one_sample, rgs, chunksize=500):
+                for state in pool.imap_unordered(
+                    draw_one_sample, rgs, chunksize=chunksize
+                ):
                     if progress:
                         pbar.update(1)
                     samples.append(state)
@@ -587,6 +599,7 @@ class CircuiTree(ABC):
         max_iter: int = 10_000_000,
         progress: bool = False,
         nprocs: int = 1,
+        chunksize: int = 100,
     ) -> list[Hashable]:
         """Sample a random successful state with rejection sampling. Starts from the
         root state, selects random actions until termination, and accepts the sample if
@@ -620,7 +633,9 @@ class CircuiTree(ABC):
             )
             samples = []
             with Pool(nprocs) as pool:
-                for state in pool.imap_unordered(draw_one_sample, rgs, chunksize=100):
+                for state in pool.imap_unordered(
+                    draw_one_sample, rgs, chunksize=chunksize
+                ):
                     if state in successful_terminals:
                         if progress:
                             pbar.update(1)
@@ -718,6 +733,8 @@ class CircuiTree(ABC):
         nprocs_sampling: int = 1,
         nprocs_testing: int = 1,
         max_iter: int = 10_000_000,
+        null_kwargs: Optional[dict] = None,
+        succ_kwargs: Optional[dict] = None,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
@@ -726,17 +743,23 @@ class CircuiTree(ABC):
         Samples `n_samples` paths from the overall design space and uses rejection
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
+        null_kwargs = {} if null_kwargs is None else null_kwargs
         null_samples = self.sample_terminal_states(
-            n_samples, progress=progress, nprocs=nprocs_sampling
+            n_samples, progress=progress, nprocs=nprocs_sampling, **null_kwargs
         )
 
+        succ_kwargs = {} if succ_kwargs is None else succ_kwargs
         if sampling_method == "enumeration":
             succ_samples = self.sample_successful_circuits_by_enumeration(
-                n_samples, progress=progress, nprocs=nprocs_sampling
+                n_samples, progress=progress, nprocs=nprocs_sampling, **succ_kwargs
             )
         elif sampling_method == "rejection":
             succ_samples = self.sample_successful_circuits_by_rejection(
-                n_samples, max_iter=max_iter, progress=progress, nprocs=nprocs_sampling
+                n_samples,
+                max_iter=max_iter,
+                progress=progress,
+                nprocs=nprocs_sampling,
+                **succ_kwargs,
             )
         else:
             raise ValueError(
@@ -772,7 +795,7 @@ class CircuiTree(ABC):
 
             with Pool(nprocs_testing) as pool:
                 for results_df in pool.imap_unordered(
-                    do_one_contingency_test, patterns, chunksize=5
+                    do_one_contingency_test, patterns
                 ):
                     dfs.append(results_df)
                     if progress:
@@ -855,7 +878,7 @@ class CircuiTree(ABC):
         return graph
 
     def to_complexity_graph(
-        self, successes: bool | Iterable[Hashable] = False
+        self, successes: bool | Iterable[Hashable] = True
     ) -> nx.DiGraph:
         if isinstance(successes, Iterable):
             successful_children = set(successes)
