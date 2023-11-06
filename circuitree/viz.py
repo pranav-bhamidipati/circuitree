@@ -62,6 +62,7 @@ def plot_network(
     lw=2,
     hw=0.15,
     padding=0.15,
+    auto_padding: Optional[float] = None,
     fontsize=None,
     text_kwargs=None,
     plot_labels=True,
@@ -107,6 +108,9 @@ def plot_network(
         ax.add_patch(mlc)
         molecules.append(mlc)
 
+    if auto_padding is None:
+        auto_padding = padding
+
     kw = dict(
         radius=radius,
         width=width,
@@ -115,7 +119,6 @@ def plot_network(
         color=color,
         lw=lw,
         hw=hw,
-        padding=padding,
         ax=ax,
     )
     if text_kwargs is None:
@@ -130,18 +133,22 @@ def plot_network(
     interactions = activations.tolist() + inhibitions.tolist()
     for lhs, rhs in activations:
         if lhs == rhs:
-            plot_autoactivation(x[lhs], y[lhs], theta[lhs], **kw)
+            plot_autoactivation(x[lhs], y[lhs], theta[lhs], padding=auto_padding, **kw)
         else:
             displace = [rhs, lhs] in interactions
-            plot_activation(x[lhs], y[lhs], x[rhs], y[rhs], displace=displace, **kw)
+            plot_activation(
+                x[lhs], y[lhs], x[rhs], y[rhs], displace=displace, padding=padding, **kw
+            )
 
     # Plot inhibitions
     for lhs, rhs in inhibitions:
         if lhs == rhs:
-            plot_autoinhibition(x[lhs], y[lhs], theta[lhs], **kw)
+            plot_autoinhibition(x[lhs], y[lhs], theta[lhs], padding=auto_padding, **kw)
         else:
             displace = [rhs, lhs] in interactions
-            plot_inhibition(x[lhs], y[lhs], x[rhs], y[rhs], displace=displace, **kw)
+            plot_inhibition(
+                x[lhs], y[lhs], x[rhs], y[rhs], displace=displace, padding=padding, **kw
+            )
 
     # Component labels
     if plot_labels:
