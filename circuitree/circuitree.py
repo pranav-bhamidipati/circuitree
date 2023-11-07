@@ -119,6 +119,29 @@ class CircuiTree(ABC):
             state = grammar.get_unique_state(state)
         return state
 
+    @staticmethod
+    def _sample_from_terminals_with_rejection(
+        terminals: set[Any],
+        grammar: CircuitGrammar,
+        start: Hashable,
+        seed: int,
+        max_iter: Optional[int] = None,
+    ):
+        max_iter = max_iter or 100_000_000
+        rg = np.random.default_rng(seed)
+        terminals = set(terminals)
+
+        for _ in range(max_iter):
+            state = start
+            while not grammar.is_terminal(state):
+                actions = grammar.get_actions(state)
+                action = rg.choice(actions)
+                state = grammar.do_action(state, action)
+                state = grammar.get_unique_state(state)
+            if state in terminals:
+                return state
+        raise RuntimeError(f"Maximum number of iterations reached: {max_iter}")
+
     def get_random_terminal_descendant(
         self, start: Hashable, rg: Optional[np.random.Generator] = None
     ) -> Hashable:
@@ -626,15 +649,18 @@ class CircuiTree(ABC):
         else:
             from multiprocessing import Pool
 
-            seed_seq = np.random.SeedSequence(self.seed)
-            rgs = (np.random.default_rng(seed_seq.spawn(1)[0]) for _ in range(max_iter))
+            prng_seeds = np.random.SeedSequence(self.seed).generate_state(n_samples)
             draw_one_sample = partial(
-                self._get_random_terminal_descendant, self.grammar, self.root
+                self._sample_from_terminals_with_rejection,
+                successful_terminals,
+                self.grammar,
+                self.root,
+                max_iter=max_iter,
             )
             samples = []
             with Pool(nprocs) as pool:
                 for state in pool.imap_unordered(
-                    draw_one_sample, rgs, chunksize=chunksize
+                    draw_one_sample, prng_seeds, chunksize=chunksize
                 ):
                     if state in successful_terminals:
                         if progress:
@@ -694,6 +720,7 @@ class CircuiTree(ABC):
         null_samples: list[Hashable],
         succ_samples: list[Hashable],
         correction: bool = True,
+        barnard_ok: bool = True,
     ):
         """Returns a contingency table with test results for the given pattern."""
 
@@ -713,7 +740,7 @@ class CircuiTree(ABC):
         )
 
         # Test using chi2 (or Barnard's exact test if chi2 is not appropriate)
-        table_df = contingency_test(table, correction=correction)
+        table_df = contingency_test(table, correction=correction, barnard_ok=barnard_ok)
 
         # Make a multi-index with the pattern and presence/absence of the pattern
         table_df.index = pd.MultiIndex.from_tuples(
@@ -735,6 +762,7 @@ class CircuiTree(ABC):
         max_iter: int = 10_000_000,
         null_kwargs: Optional[dict] = None,
         succ_kwargs: Optional[dict] = None,
+        barnard_ok: bool = True,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
         design space. Returns the contingency table (Pandas DataFrame) and the p-value
@@ -773,6 +801,7 @@ class CircuiTree(ABC):
             null_samples=null_samples,
             succ_samples=succ_samples,
             correction=correction,
+            barnard_ok=barnard_ok,
         )
 
         dfs = []
@@ -996,7 +1025,9 @@ def compute_odds_ratios_with_ci(
     return odds_ratios, *cis.T
 
 
-def contingency_test(table: np.ndarray, correction: bool = True) -> pd.DataFrame:
+def contingency_test(
+    table: np.ndarray, correction: bool = True, barnard_ok: bool = True
+) -> pd.DataFrame:
     """Perform a two-tailed test for P(has_pattern | successful) != P(has_pattern)"""
 
     table_df = pd.DataFrame(
@@ -1007,11 +1038,11 @@ def contingency_test(table: np.ndarray, correction: bool = True) -> pd.DataFrame
     table_df.index.name = "pattern_present"
 
     minval = table.min()
-    if minval == 0:
+    if minval == 0 or (minval < 5 and not barnard_ok):
         table_df["test"] = pd.NA
         table_df["statistic"] = np.nan
         table_df["pvalue"] = np.nan
-    elif table.min() < 5:
+    elif minval < 5:
         try:
             res = stats.barnard_exact(table, alternative="two-sided")
             table_df["test"] = "barnard"
