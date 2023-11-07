@@ -1,5 +1,5 @@
 from collections import Counter
-from functools import cached_property, cache
+from functools import cached_property, lru_cache
 from itertools import chain, product, permutations
 import networkx as nx
 import numpy as np
@@ -224,7 +224,6 @@ class SimpleNetworkGrammar(CircuitGrammar):
     def _recolor_string(mapping, string):
         return "".join([mapping.get(c, c) for c in string])
 
-    @cache
     def get_interaction_recolorings(self, genotype: str) -> list[str]:
         if "::" in genotype:
             components, interactions = genotype.split("::")
@@ -240,7 +239,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
         return interaction_recolorings
 
-    @cache
+    @lru_cache
     def get_component_recolorings(self, genotype: str) -> list[str]:
         if "::" in genotype:
             components, interactions = genotype.split("::")
@@ -555,7 +554,6 @@ class DimersGrammar(CircuitGrammar):
         return components + "+" + regulators + "::" + interactions
 
     @staticmethod
-    @cache
     def get_unique_state(genotype: str) -> str:
         components_and_regulators, interactions = genotype.split("::")
         components, regulators = components_and_regulators.split("+")
@@ -685,11 +683,10 @@ class DimersGrammar(CircuitGrammar):
                 )
             )
 
-    @cache
     def get_unique_state(self, genotype: str) -> str:
         return min(self.get_recolorings(genotype))
 
-    @cache
+    @lru_cache
     def _motif_recolorings(self, motif: str) -> list[set[str]]:
         if ("+" in motif) or ("::" in motif) or ("*" in motif):
             raise ValueError(
