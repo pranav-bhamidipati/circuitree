@@ -756,6 +756,8 @@ class CircuiTree(ABC):
         confidence: float | None = 0.95,
         correction: bool = True,
         progress: bool = False,
+        null_samples: Optional[list[Hashable]] = None,
+        succ_samples: Optional[list[Hashable]] = None,
         sampling_method: Literal["rejection", "enumeration"] = "rejection",
         nprocs_sampling: int = 1,
         nprocs_testing: int = 1,
@@ -771,29 +773,31 @@ class CircuiTree(ABC):
         Samples `n_samples` paths from the overall design space and uses rejection
         sampling to sample `n_samples` paths that terminate in a successful circuit as
         determined by the is_successful() method."""
-        null_kwargs = {} if null_kwargs is None else null_kwargs
-        null_samples = self.sample_terminal_states(
-            n_samples, progress=progress, nprocs=nprocs_sampling, **null_kwargs
-        )
+        if null_samples is None:
+            null_kwargs = {} if null_kwargs is None else null_kwargs
+            null_samples = self.sample_terminal_states(
+                n_samples, progress=progress, nprocs=nprocs_sampling, **null_kwargs
+            )
 
-        succ_kwargs = {} if succ_kwargs is None else succ_kwargs
-        if sampling_method == "enumeration":
-            succ_samples = self.sample_successful_circuits_by_enumeration(
-                n_samples, progress=progress, nprocs=nprocs_sampling, **succ_kwargs
-            )
-        elif sampling_method == "rejection":
-            succ_samples = self.sample_successful_circuits_by_rejection(
-                n_samples,
-                max_iter=max_iter,
-                progress=progress,
-                nprocs=nprocs_sampling,
-                **succ_kwargs,
-            )
-        else:
-            raise ValueError(
-                f"Invalid sampling method: {sampling_method}. "
-                "Must be one of ['rejection', 'enumeration']."
-            )
+        if succ_samples is None:
+            succ_kwargs = {} if succ_kwargs is None else succ_kwargs
+            if sampling_method == "enumeration":
+                succ_samples = self.sample_successful_circuits_by_enumeration(
+                    n_samples, progress=progress, nprocs=nprocs_sampling, **succ_kwargs
+                )
+            elif sampling_method == "rejection":
+                succ_samples = self.sample_successful_circuits_by_rejection(
+                    n_samples,
+                    max_iter=max_iter,
+                    progress=progress,
+                    nprocs=nprocs_sampling,
+                    **succ_kwargs,
+                )
+            else:
+                raise ValueError(
+                    f"Invalid sampling method: {sampling_method}. "
+                    "Must be one of ['rejection', 'enumeration']."
+                )
 
         do_one_contingency_test = partial(
             self._contingency_test,
