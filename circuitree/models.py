@@ -236,10 +236,11 @@ class SimpleNetworkGrammar(CircuitGrammar):
         return component_recolorings
 
     def get_recolorings(self, genotype: str) -> Iterable[str]:
+        prefix = "*" if self.is_terminal(genotype) else ""
         components, interactions = genotype.strip("*").split("::")
         rcs = self.get_component_recolorings(components)
         ris = self.get_interaction_recolorings(interactions)
-        recolorings = ["::".join([rc, ri]) for rc, ri in zip(rcs, ris)]
+        recolorings = [f"{prefix}{rc}::{ri}" for rc, ri in zip(rcs, ris)]
 
         return recolorings
 
