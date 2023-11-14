@@ -77,6 +77,7 @@ class ParallelNetworkTree(MultithreadedCircuiTree):
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
         root: Optional[str] = None,
+        cache_maxsize: int = 128,
         **kwargs,
     ):
         grammar = SimpleNetworkGrammar(
@@ -84,6 +85,7 @@ class ParallelNetworkTree(MultithreadedCircuiTree):
             interactions=interactions,
             max_interactions=max_interactions,
             root=root,
+            cache_maxsize=cache_maxsize,
         )
         super().__init__(grammar=grammar, root=root, **kwargs)
 
@@ -136,6 +138,7 @@ class DimerNetworkTree(CircuiTree):
         max_interactions: Optional[int] = None,
         max_interactions_per_promoter: int = 2,
         root: Optional[str] = None,
+        cache_maxsize: int = 128,
         **kwargs,
     ):
         grammar = DimersGrammar(
@@ -145,6 +148,7 @@ class DimerNetworkTree(CircuiTree):
             max_interactions=max_interactions,
             max_interactions_per_promoter=max_interactions_per_promoter,
             root=root,
+            cache_maxsize=cache_maxsize,
         )
         super().__init__(grammar=grammar, root=root, **kwargs)
 
