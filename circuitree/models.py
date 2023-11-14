@@ -3,7 +3,7 @@ from functools import cached_property, lru_cache
 from itertools import chain, product, permutations
 import networkx as nx
 import numpy as np
-from typing import Iterable, Literal, Optional
+from typing import Callable, Iterable, Literal, Optional
 
 from .circuitree import CircuiTree
 from .grammar import CircuitGrammar
@@ -29,6 +29,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
         root: Optional[str] = None,
+        cache_maxsize: int | None = 128,
     ):
         super().__init__()
 
@@ -48,6 +49,14 @@ class SimpleNetworkGrammar(CircuitGrammar):
         else:
             self.max_interactions = max_interactions
 
+        # Allow user to specify a cache size for the get_interaction_recolorings method.
+        # This method is called frequently during search, and evaluation can become a
+        # bottleneck for large spaces. Caching the results of this method can
+        # significantly speed up search, but cache size is limited by system memory.
+        self.get_interaction_recolorings: Callable[[str], list[str]] = lru_cache(
+            maxsize=cache_maxsize
+        )(self._get_interaction_recolorings)
+
         # Attributes that should not be serialized when saving the object to file
         self._non_serializable_attrs.extend(
             [
@@ -56,6 +65,8 @@ class SimpleNetworkGrammar(CircuitGrammar):
                 "edge_options",
                 "component_codes",
                 "_recolor",
+                "_cache_maxsize",
+                "get_interaction_recolorings",
             ]
         )
 
@@ -123,27 +134,6 @@ class SimpleNetworkGrammar(CircuitGrammar):
                     actions.extend(action_group)
 
         return actions
-
-    # def get_actions(self, genotype: str) -> Iterable[str]:
-    #     if self.is_terminal(genotype):
-    #         return list()
-
-    #     # Terminating assembly is always an option
-    #     actions = ["*terminate*"]
-
-    #     components_joined, interactions_joined = genotype.strip("*").split("::")
-    #     components = set(components_joined)
-    #     interactions = set(ixn[:2] for ixn in interactions_joined.split("_") if ixn)
-    #     if len(interactions) >= self.max_interactions:
-    #         return actions
-    #     actions.extend(list(set(c[0] for c in self.components) - components))
-    #     for action_group in self.edge_options:
-    #         if action_group:
-    #             c1_c2 = action_group[0][:2]
-    #             if set(c1_c2) <= components and c1_c2 not in interactions:
-    #                 actions.extend(action_group)
-
-    #     return actions
 
     def do_action(self, genotype: str, action: str) -> str:
         if action == "*terminate*":
@@ -224,12 +214,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
     def _recolor_string(mapping, string):
         return "".join([mapping.get(c, c) for c in string])
 
-    def get_interaction_recolorings(self, genotype: str) -> list[str]:
-        if "::" in genotype:
-            components, interactions = genotype.split("::")
-        else:
-            interactions = genotype
-
+    def _get_interaction_recolorings(self, interactions: str) -> list[str]:
         interaction_recolorings = []
         for mapping in self._recolor:
             recolored_interactions = sorted(
@@ -240,12 +225,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
         return interaction_recolorings
 
     @lru_cache
-    def get_component_recolorings(self, genotype: str) -> list[str]:
-        if "::" in genotype:
-            components, interactions = genotype.split("::")
-        else:
-            components = genotype
-
+    def get_component_recolorings(self, components: str) -> list[str]:
         component_recolorings = []
         for mapping in self._recolor:
             recolored_components = "".join(
@@ -256,8 +236,9 @@ class SimpleNetworkGrammar(CircuitGrammar):
         return component_recolorings
 
     def get_recolorings(self, genotype: str) -> Iterable[str]:
-        ris = self.get_interaction_recolorings(genotype)
-        rcs = self.get_component_recolorings(genotype)
+        components, interactions = genotype.strip("*").split("::")
+        rcs = self.get_component_recolorings(components)
+        ris = self.get_interaction_recolorings(interactions)
         recolorings = ["::".join([rc, ri]) for rc, ri in zip(rcs, ris)]
 
         return recolorings
@@ -375,6 +356,7 @@ class DimersGrammar(CircuitGrammar):
         max_interactions: Optional[int] = None,
         max_interactions_per_promoter: int = 2,
         root: Optional[str] = None,
+        cache_maxsize: int | None = 128,
     ):
         super().__init__()
 
@@ -397,6 +379,14 @@ class DimersGrammar(CircuitGrammar):
 
         self.root = root
 
+        # Allow user to specify a cache size for the get_interaction_recolorings method.
+        # This method is called frequently during search, and evaluation can become a
+        # bottleneck for large spaces. Caching the results of this method can
+        # significantly speed up search, but cache size is limited by system memory.
+        self.get_interaction_recolorings: Callable[[str], list[str]] = lru_cache(
+            maxsize=cache_maxsize
+        )(self._get_interaction_recolorings)
+
         # The following attributes/cached properties should not be serialized when
         # saving the object to file
         self._non_serializable_attrs.extend(
@@ -410,6 +400,7 @@ class DimersGrammar(CircuitGrammar):
                 "edge_options",
                 "_recolor_components",
                 "_recolor_regulators",
+                "get_interaction_recolorings",
             ]
         )
 
@@ -635,8 +626,7 @@ class DimersGrammar(CircuitGrammar):
     def _recolor(mapping, code):
         return "".join([mapping.get(char, char) for char in code])
 
-    def get_interaction_recolorings(self, genotype: str) -> list[str]:
-        *_, interactions = self.get_genotype_parts(genotype)
+    def _get_interaction_recolorings(self, interactions: str) -> list[str]:
         interaction_recolorings = (
             "_".join(
                 sorted([self._recolor(mapping, ixn) for ixn in interactions.split("_")])
@@ -645,16 +635,16 @@ class DimersGrammar(CircuitGrammar):
         )
         return interaction_recolorings
 
-    def get_component_recolorings(self, genotype: str) -> list[str]:
-        components, *_ = self.get_genotype_parts(genotype)
+    @lru_cache
+    def get_component_recolorings(self, components: str) -> list[str]:
         component_recolorings = (
             "".join(sorted(self._recolor(mapping, components)))
             for mapping in self._recolor_components
         )
         return component_recolorings
 
-    def get_regulator_recolorings(self, genotype: str) -> list[str]:
-        _, regulators, *_ = self.get_genotype_parts(genotype)
+    @lru_cache
+    def get_regulator_recolorings(self, regulators: str) -> list[str]:
         regulator_recolorings = (
             "".join(sorted(self._recolor(mapping, regulators)))
             for mapping in self._recolor_components
@@ -664,22 +654,22 @@ class DimersGrammar(CircuitGrammar):
     def get_recolorings(self, genotype: str) -> Iterable[str]:
         prefix = "*" if self.is_terminal(genotype) else ""
 
-        _, regulators, *_ = self.get_genotype_parts(genotype)
+        components, regulators, interactions = self.get_genotype_parts(genotype)
         if regulators:
             return (
                 f"{prefix}{c}+{r}::{i}"
                 for c, r, i in zip(
-                    self.get_component_recolorings(genotype),
-                    self.get_regulator_recolorings(genotype),
-                    self.get_interaction_recolorings(genotype),
+                    self.get_component_recolorings(components),
+                    self.get_regulator_recolorings(regulators),
+                    self.get_interaction_recolorings(interactions),
                 )
             )
         else:
             return (
                 f"{prefix}{c}::{i}"
                 for c, i in zip(
-                    self.get_component_recolorings(genotype),
-                    self.get_interaction_recolorings(genotype),
+                    self.get_component_recolorings(components),
+                    self.get_interaction_recolorings(interactions),
                 )
             )
 
@@ -687,7 +677,7 @@ class DimersGrammar(CircuitGrammar):
         return min(self.get_recolorings(genotype))
 
     @lru_cache
-    def _motif_recolorings(self, motif: str) -> list[set[str]]:
+    def _pattern_recolorings(self, motif: str) -> list[set[str]]:
         if ("+" in motif) or ("::" in motif) or ("*" in motif):
             raise ValueError(
                 "Motif code should only contain interactions, no components or "
@@ -714,7 +704,7 @@ class DimersGrammar(CircuitGrammar):
             return False
 
         state_interactions = set(interaction_code.split("_"))
-        for motif_interactions_set in self._motif_recolorings(motif):
+        for motif_interactions_set in self._pattern_recolorings(motif):
             if motif_interactions_set.issubset(state_interactions):
                 return True
         return False
