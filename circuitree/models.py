@@ -1,4 +1,5 @@
 from collections import Counter
+from copy import copy
 from functools import cached_property, lru_cache
 from itertools import chain, product, permutations
 import networkx as nx
@@ -53,8 +54,9 @@ class SimpleNetworkGrammar(CircuitGrammar):
         # This method is called frequently during search, and evaluation can become a
         # bottleneck for large spaces. Caching the results of this method can
         # significantly speed up search, but cache size is limited by system memory.
+        self._cache_maxsize = cache_maxsize
         self.get_interaction_recolorings: Callable[[str], list[str]] = lru_cache(
-            maxsize=cache_maxsize
+            maxsize=self._cache_maxsize
         )(self._get_interaction_recolorings)
 
         # Attributes that should not be serialized when saving the object to file
@@ -65,9 +67,24 @@ class SimpleNetworkGrammar(CircuitGrammar):
                 "edge_options",
                 "component_codes",
                 "_recolor",
-                "_cache_maxsize",
                 "get_interaction_recolorings",
             ]
+        )
+
+    def __getstate__(self):
+        result = copy(self.__dict__)
+
+        # This is a hack to get around the fact that lru_cache objects are not
+        # serializable. We can't just delete the attribute because it is needed for
+        # the grammar to function properly. Instead, we set it to None here and then
+        # re-initialize it in the __setstate__ method.
+        result["get_interaction_recolorings"] = NotImplemented
+        return result
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.get_interaction_recolorings = lru_cache(maxsize=self._cache_maxsize)(
+            self._get_interaction_recolorings
         )
 
     @cached_property
