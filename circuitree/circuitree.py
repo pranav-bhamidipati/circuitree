@@ -721,9 +721,12 @@ class CircuiTree(ABC):
         succ_samples: list[Hashable],
         correction: bool = True,
         barnard_ok: bool = True,
+        exclude_self: bool = True,
     ):
         """Returns a contingency table with test results for the given pattern."""
-
+        if exclude_self:
+            null_samples = [s for s in null_samples if s != pattern]
+            succ_samples = [s for s in succ_samples if s != pattern]
         pattern_in_null = sum(grammar.has_pattern(s, pattern) for s in null_samples)
         pattern_in_succ = sum(grammar.has_pattern(s, pattern) for s in succ_samples)
         n_null_samples = len(null_samples)
@@ -765,14 +768,20 @@ class CircuiTree(ABC):
         null_kwargs: Optional[dict] = None,
         succ_kwargs: Optional[dict] = None,
         barnard_ok: bool = True,
+        exclude_self: bool = True,
     ) -> pd.DataFrame:
         """Test whether a pattern is successful by sampling random paths from the
-        design space. Returns the contingency table (Pandas DataFrame) and the p-value
-        for significance.
+        design space. Returns the contingency table (a Pandas DataFrame) containing
+        test statistics and p-values.
 
         Samples `n_samples` paths from the overall design space and uses rejection
         sampling to sample `n_samples` paths that terminate in a successful circuit as
-        determined by the is_successful() method."""
+        determined by the is_successful() method.
+
+        if `exclude_self` is True, the pattern being tested is excluded from the null
+        and successful samples. This is to properly evaluate the significance of rare
+        patterns.
+        """
         if null_samples is None:
             null_kwargs = {} if null_kwargs is None else null_kwargs
             null_samples = self.sample_terminal_states(
@@ -806,6 +815,7 @@ class CircuiTree(ABC):
             succ_samples=succ_samples,
             correction=correction,
             barnard_ok=barnard_ok,
+            exclude_self=exclude_self,
         )
 
         dfs = []
