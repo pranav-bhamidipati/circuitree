@@ -8,6 +8,7 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from scipy import stats
+import warnings
 
 from .modularity import tree_modularity, tree_modularity_estimate
 from .grammar import CircuitGrammar
@@ -44,7 +45,8 @@ class CircuiTree(ABC):
         exploration_constant: Optional[float] = None,
         seed: int = 2023,
         graph: Optional[nx.DiGraph] = None,
-        tree_shape: Literal["tree", "dag"] = "dag",
+        tree_shape: Optional[Literal["tree", "dag"]] = None,
+        compute_symmetries: bool = True,
         **kwargs,
     ):
         self.rg = np.random.default_rng(seed)
@@ -62,9 +64,14 @@ class CircuiTree(ABC):
                 )
         self.graph.root = self.root
 
-        if tree_shape not in ("tree", "dag"):
-            raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
-        self.tree_shape = tree_shape
+        self.compute_symmetries = compute_symmetries
+        if tree_shape is not None:
+            if tree_shape not in ("tree", "dag"):
+                raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
+            warnings.warn(
+                "The `tree_shape` argument is deprecated and will be removed in a "
+                "future version. Please use `compute_symmetries` instead."
+            )
 
         self.grammar = grammar
 
@@ -93,7 +100,7 @@ class CircuiTree(ABC):
 
     def _do_action(self, state: Hashable, action: Hashable):
         new_state = self.grammar.do_action(state, action)
-        if self.tree_shape == "dag":
+        if self.compute_symmetries:
             new_state = self.grammar.get_unique_state(new_state)
         return new_state
 
@@ -102,7 +109,7 @@ class CircuiTree(ABC):
         if state == self.root:
             return None
         new_state = self.grammar.undo_action(state, action)
-        if self.tree_shape == "dag":
+        if self.compute_symmetries:
             new_state = self.grammar.get_unique_state(new_state)
         return new_state
 
@@ -237,12 +244,6 @@ class CircuiTree(ABC):
 
         return selection_path, reward, sim_node
 
-    def accumulate_visits_and_rewards(self, graph: Optional[nx.DiGraph] = None):
-        _accumulated = self.graph if graph is None else graph
-        accumulate_visits_and_rewards(_accumulated)
-        if graph is None:
-            return _accumulated
-
     def grow_tree(
         self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
     ):
@@ -320,7 +321,6 @@ class CircuiTree(ABC):
 
             iterator = tqdm(iterator, desc="BFS search")
 
-        cb_results = []
         if callback is not None:
             callback(self, None, None)
 
@@ -576,6 +576,15 @@ class CircuiTree(ABC):
         all possible paths from the root to a successful terminal state. Then, sample
         paths by random traversal from the root."""
 
+        # Check if is_success() is implemented
+        try:
+            _ = self.is_success(self.terminal_states[0])
+        except NotImplementedError:
+            raise NotImplementedError(
+                "The CircuiTree subclass must implement the is_success() method to "
+                "use this function."
+            )
+
         ## Create a graph with all possible paths to success
         successful_terminals = set(
             s for s in self.terminal_states if self.is_success(s)
@@ -627,6 +636,15 @@ class CircuiTree(ABC):
         """Sample a random successful state with rejection sampling. Starts from the
         root state, selects random actions until termination, and accepts the sample if
         it is successful."""
+
+        # Check if is_success() is implemented
+        try:
+            _ = self.is_success(self.terminal_states[0])
+        except NotImplementedError:
+            raise NotImplementedError(
+                "The CircuiTree subclass must implement the is_success() method to "
+                "use this function."
+            )
 
         # Use rejection sampling to sample paths with the given pattern
         successful_terminals = set(
@@ -926,6 +944,16 @@ class CircuiTree(ABC):
         if isinstance(successes, Iterable):
             successful_children = set(successes)
         elif successes is True:
+
+            # Check if is_success() is implemented
+            try:
+                _ = self.is_success(self.terminal_states[0])
+            except NotImplementedError:
+                raise NotImplementedError(
+                    "If successes=True, the CircuiTree subclass must implement "
+                    "the is_success() method."
+                )
+
             # Keep only the successful nodes
             successful_children = set(
                 c for c in self.terminal_states if self.is_success(c)
@@ -951,16 +979,6 @@ class CircuiTree(ABC):
             complexity_graph.nodes[parent]["terminal_state"] = d | {"name": child}
 
         return complexity_graph
-
-    @property
-    def modularity(self) -> float:
-        return tree_modularity(
-            self.graph, self.root, self.grammar.is_terminal, self.is_success
-        )
-
-    @property
-    def modularity_estimate(self) -> float:
-        return tree_modularity_estimate(self.graph, self.root)
 
 
 def compute_odds_ratio_and_ci(
@@ -1073,22 +1091,3 @@ def contingency_test(
         table_df["pvalue"] = res.pvalue
 
     return table_df
-
-
-def accumulate_visits_and_rewards(
-    graph: nx.DiGraph, visits_attr: str = "visits", reward_attr: str = "reward"
-):
-    """Accumulate results on nodes post-hoc"""
-    for n in graph.nodes:
-        total_visits = sum([v for _, _, v in graph.in_edges(n, data=visits_attr)])
-        total_reward = sum([r for _, _, r in graph.in_edges(n, data=reward_attr)])
-        graph.nodes[n]["visits"] = total_visits
-        graph.nodes[n]["reward"] = total_reward
-
-    for n in graph.nodes:
-        graph.nodes[n][visits_attr] = 0
-        graph.nodes[n][reward_attr] = 0
-
-    for parent, child, data in graph.edges(data=True):
-        graph.nodes[parent][visits_attr] += data[visits_attr]
-        graph.nodes[parent][reward_attr] += data[reward_attr]
