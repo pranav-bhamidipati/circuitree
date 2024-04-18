@@ -31,6 +31,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
         max_interactions: Optional[int] = None,
         root: Optional[str] = None,
         cache_maxsize: int | None = 128,
+        fixed_components: Optional[list[str]] = None,
     ):
         super().__init__()
 
@@ -49,6 +50,11 @@ class SimpleNetworkGrammar(CircuitGrammar):
             self.max_interactions = len(self.components) ** 2  # all possible edges
         else:
             self.max_interactions = max_interactions
+
+        self.fixed_components = fixed_components or []
+        self.recolorable_components = [
+            c for c in self.components if c not in self.fixed_components
+        ]
 
         # Allow user to specify a cache size for the get_interaction_recolorings method.
         # This method is called frequently during search, and evaluation can become a
@@ -74,15 +80,15 @@ class SimpleNetworkGrammar(CircuitGrammar):
     def __getstate__(self):
         result = copy(self.__dict__)
 
-        # This is a hack to get around the fact that lru_cache objects are not
-        # serializable. We can't just delete the attribute because it is needed for
-        # the grammar to function properly. Instead, we set it to None here and then
-        # re-initialize it in the __setstate__ method.
+        # We need to remove the lru_cache object because it is not serializable. We
+        # will re-initialize it in the __setstate__ method.
         result["get_interaction_recolorings"] = NotImplemented
         return result
 
     def __setstate__(self, state):
         self.__dict__ = state
+
+        # Re-initialize the lru_cache object
         self.get_interaction_recolorings = lru_cache(maxsize=self._cache_maxsize)(
             self._get_interaction_recolorings
         )
@@ -225,10 +231,13 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
     @cached_property
     def _recolor(self):
-        return [dict(zip(self.components, p)) for p in permutations(self.components)]
+        return [
+            dict(zip(self.recolorable_components, p))
+            for p in permutations(self.recolorable_components)
+        ]
 
     @staticmethod
-    def _recolor_string(mapping, string):
+    def _recolor_string(mapping: dict[str, str], string: str):
         return "".join([mapping.get(c, c) for c in string])
 
     def _get_interaction_recolorings(self, interactions: str) -> list[str]:
@@ -342,7 +351,9 @@ class SimpleNetworkTree(CircuiTree):
         exploration_constant: float | None = None,
         seed: int = 2023,
         graph: nx.DiGraph | None = None,
-        tree_shape: Literal["tree", "dag"] = "dag",
+        tree_shape: Optional[Literal["tree", "dag"]] = None,
+        compute_symmetries: bool = True,
+        fixed_components: Optional[list[str]] = None,
         **kwargs,
     ):
         if grammar is None:
@@ -351,6 +362,7 @@ class SimpleNetworkTree(CircuiTree):
                 interactions=interactions,
                 max_interactions=max_interactions,
                 root=root,
+                fixed_components=fixed_components,
             )
         super().__init__(
             grammar=grammar,
@@ -359,6 +371,7 @@ class SimpleNetworkTree(CircuiTree):
             seed=seed,
             graph=graph,
             tree_shape=tree_shape,
+            compute_symmetries=compute_symmetries,
             **kwargs,
         )
 
@@ -779,7 +792,8 @@ class DimerNetworkTree(CircuiTree):
         exploration_constant: float | None = None,
         seed: int = 2023,
         graph: nx.DiGraph | None = None,
-        tree_shape: Literal["tree", "dag"] = "dag",
+        tree_shape: Optional[Literal["tree", "dag"]] = None,
+        compute_symmetries: bool = True,
         **kwargs,
     ):
         grammar = DimersGrammar(
@@ -797,5 +811,6 @@ class DimerNetworkTree(CircuiTree):
             seed=seed,
             graph=graph,
             tree_shape=tree_shape,
+            compute_symmetries=compute_symmetries,
             **kwargs,
         )
