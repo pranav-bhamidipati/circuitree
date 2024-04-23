@@ -579,7 +579,7 @@ class CircuiTree(ABC):
 
         # Check if is_success() is implemented
         try:
-            _ = self.is_success(next(self.terminal_states))
+            _ = self.grammar.is_success(next(self.terminal_states))
         except NotImplementedError:
             raise NotImplementedError(
                 "The CircuiTree subclass must implement the is_success() method to "
@@ -588,7 +588,7 @@ class CircuiTree(ABC):
 
         ## Create a graph with all possible paths to success
         successful_terminals = set(
-            s for s in self.terminal_states if self.is_success(s)
+            s for s in self.terminal_states if self.grammar.is_success(s)
         )
 
         # Generate the graph with all possible paths to success
@@ -640,7 +640,7 @@ class CircuiTree(ABC):
 
         # Check if is_success() is implemented
         try:
-            _ = self.is_success(next(self.terminal_states))
+            _ = self.grammar.is_success(next(self.terminal_states))
         except NotImplementedError:
             raise NotImplementedError(
                 "The CircuiTree subclass must implement the is_success() method to "
@@ -649,7 +649,7 @@ class CircuiTree(ABC):
 
         # Use rejection sampling to sample paths with the given pattern
         successful_terminals = set(
-            s for s in self.terminal_states if self.is_success(s)
+            s for s in self.terminal_states if self.grammar.is_success(s)
         )
         if progress:
             from tqdm import tqdm
@@ -948,7 +948,7 @@ class CircuiTree(ABC):
 
             # Check if is_success() is implemented
             try:
-                _ = self.is_success(next(self.terminal_states))
+                _ = self.grammar.is_success(next(self.terminal_states))
             except NotImplementedError:
                 raise NotImplementedError(
                     "If successes=True, the CircuiTree subclass must implement "
@@ -957,7 +957,7 @@ class CircuiTree(ABC):
 
             # Keep only the successful nodes
             successful_children = set(
-                c for c in self.terminal_states if self.is_success(c)
+                c for c in self.terminal_states if self.grammar.is_success(c)
             )
         elif successes is False:
             # keep all terminal nodes
