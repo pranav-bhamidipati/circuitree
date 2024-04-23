@@ -119,6 +119,8 @@ def plot_complexity(
     marker_size: float = 10,
     n_to_highlight: Optional[float] = None,
     highlight_clr: str = "tab:orange",
+    fig: Optional[plt.Figure] = None,
+    ax: Optional[plt.Axes] = None,
 ) -> None:
 
     G = tree.to_complexity_graph()
@@ -130,7 +132,7 @@ def plot_complexity(
     xvals, yvals = zip(*pos.values())
     xvals = np.array(xvals)
     yvals = np.array(yvals)
-    
+
     # Get the limits for the number of visits - only show edges with visits in this range
     if vlim[0] is None:
         vmin = min(v for *e, v in G.edges(data="visits"))
@@ -179,7 +181,10 @@ def plot_complexity(
     # edge_colors = np.zeros((len(weights), 4))
     # edge_colors[:, 3] = alpha * weights
 
-    fig, ax = plt.subplots(figsize=figsize)
+    if fig is None:
+        fig = plt.figure(figsize=figsize)
+    if ax is None:
+        ax = fig.add_subplot(1, 1, 1)
 
     # set edge positions
     if plot_layers_as_blocks:
@@ -205,7 +210,7 @@ def plot_complexity(
     )
     edges.set_zorder(0)  # edges go behind nodes
     ax.add_collection(edges)
-    
+
     # edges = nx.draw_networkx_edges(
     #     G,
     #     G_pos,
@@ -235,17 +240,17 @@ def plot_complexity(
             rects.append(rect)
         layer_blocks = mpl_coll.PatchCollection(rects, match_original=True)
         ax.add_collection(layer_blocks)
-    
+
     else:
         # Draw each node as a circle
         for n, (x, y) in pos.items():
             ax.scatter(x, y, color=marker_clr, s=marker_size, zorder=1)
-    
+
     # for xmin_d, xmax_d, yval_d in zip(depth_xmins, depth_xmaxs, depth_yvals):
     #     plt.hlines(yval_d, xmin_d, xmax_d, color="gray", zorder=4, lw=1.0)
 
     if n_to_highlight is not None:
-        
+
         # Get locations of the top "N" oscillators
         highlight_states = sorted(
             tree.terminal_states, key=lambda n: -tree.graph.nodes[n]["visits"]
@@ -267,10 +272,11 @@ def plot_complexity(
                 edgecolors="k",
                 lw=0.3,
             )
-    
+
     ax.set_axis_off()
 
     return fig, ax
+
 
 ## Plot a diagram of an N-component network (see models.SimpleNetworkTree)
 

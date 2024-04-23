@@ -579,7 +579,7 @@ class CircuiTree(ABC):
 
         # Check if is_success() is implemented
         try:
-            _ = self.is_success(self.terminal_states[0])
+            _ = self.is_success(next(self.terminal_states))
         except NotImplementedError:
             raise NotImplementedError(
                 "The CircuiTree subclass must implement the is_success() method to "
@@ -640,7 +640,7 @@ class CircuiTree(ABC):
 
         # Check if is_success() is implemented
         try:
-            _ = self.is_success(self.terminal_states[0])
+            _ = self.is_success(next(self.terminal_states))
         except NotImplementedError:
             raise NotImplementedError(
                 "The CircuiTree subclass must implement the is_success() method to "
@@ -948,7 +948,7 @@ class CircuiTree(ABC):
 
             # Check if is_success() is implemented
             try:
-                _ = self.is_success(self.terminal_states[0])
+                _ = self.is_success(next(self.terminal_states))
             except NotImplementedError:
                 raise NotImplementedError(
                     "If successes=True, the CircuiTree subclass must implement "
