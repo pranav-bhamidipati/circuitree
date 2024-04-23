@@ -16,14 +16,40 @@ scipy = { version = "^1.11.3", python = ">=3.10,<3.13" }
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.12.0"
 black = "^23.3.0"
-line-profiler = { extras = ["python"], version = "^4.0.3" }
 fastapi = "^0.95.0"
 ipykernel = "^6.23.1"
-tuna = "^0.5.11"
 jupyterlab = "^4.0.0"
 ipywidgets = "^8.0.6"
 nodejs = "^0.1.1"
 ipympl = "^0.9.3"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "*"
+sphinx-autobuild = "*"
+sphinxcontrib-applehelp = "*"
+sphinxcontrib-devhelp = "*"
+sphinxcontrib-htmlhelp = "*"
+sphinxcontrib-jsmath = "*"
+sphinxcontrib-qthelp = "*"
+sphinxcontrib-serializinghtml = "*"
+sphinx-copybutton = "*"
+sphinx-external-toc = "*"
+sphinx-jupyterbook-latex = "*"
+sphinx-multitoc-numbering = "*"
+sphinx-rtd-theme = "*"
+sphinx-thebe = "*"
+sphinx-togglebutton = "*"
+nbsphinx = "*"
+pydata-sphinx-theme = "*"
+myst-nb = "*"
+myst-parser = "*"
+commonmark = "*"
+recommonmark = "*"
+watermark = "*"
+
 
 [build-system]
 requires = ["poetry-core"]
