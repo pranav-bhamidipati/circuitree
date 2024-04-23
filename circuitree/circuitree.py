@@ -339,6 +339,7 @@ class CircuiTree(ABC):
         callback: Optional[Callable] = None,
         progress_bar: bool = False,
         run_kwargs: Optional[dict] = None,
+        callback_before_start: bool = True,
     ) -> None:
         if progress_bar:
             from tqdm import trange
@@ -348,7 +349,7 @@ class CircuiTree(ABC):
             iterator = range(n_steps)
 
         run_kwargs = {} if run_kwargs is None else run_kwargs
-        if callback is not None:
+        if callback is not None and callback_before_start:
             callback(self, -1, [None], None, None)
 
         for i in iterator:
