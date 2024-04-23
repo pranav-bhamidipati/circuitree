@@ -1,6 +1,10 @@
+from collections import Counter
 import logging
+import networkx as nx
 import numpy as np
-from typing import Iterable, Optional
+from typing import Iterable, Literal, Optional
+
+from .circuitree import CircuiTree
 
 MPL_BACKEND = "Agg"
 
@@ -11,6 +15,8 @@ try:
 
     from matplotlib.axis import Axis
     import matplotlib.pyplot as plt
+    from matplotlib import collections as mpl_coll
+    from matplotlib.patches import Rectangle
 
 except ImportError:
     logging.warning(
@@ -42,6 +48,229 @@ def rgb2hex(rgb):
 
     return "#{:02x}{:02x}{:02x}".format(*RGB)
 
+
+## Search graph visualization
+
+
+def complexity_layout(
+    tree: CircuiTree,
+    dy: float = 0.5,
+    aspect_ratio: float = 2.0,
+) -> tuple[dict[str, int], dict[str, tuple[float, float]]]:
+    """Returns the depth and xy coordinates of each node in the search graph when
+    visualized based on complexity.
+
+    In a complexity layout, a search graph is represented by a series of layers, where
+    each layer contains nodes that have the same complexity, which is measured as the
+    depth, or distance from the root node. Layers are separated in the y direction, and
+    in the x direction, nodes in the same layer are sorted by the number of visits they
+    have received. Terminal nodes are subsumed into their parent nonterminals.
+    """
+
+    # Convert the the search graph as a "complexity graph" - subsumes terminal nodes
+    # into their parent nonterminals
+    G = tree.to_complexity_graph()
+
+    # Get the depth of each node (distance from the root)
+    depth_of_node = {}
+    for i, layer in enumerate(nx.bfs_layers(G, source=tree.root)):
+        for n in layer:
+            depth_of_node[n] = i
+
+    layer_counter = Counter(depth_of_node)
+    max_layer_size = layer_counter.most_common(1)[0][1]
+
+    # Sort nodes by depth, then by descending number of visits
+    node_visits_inv = -np.array([G.nodes[n]["visits"] for n in G.nodes])
+    node_depth = np.array([depth_of_node[n] for n in G.nodes])
+    node_order = np.lexsort((node_visits_inv, node_depth))
+    node_depth = node_depth[node_order]
+
+    # Get the min and max x values for each layer
+    yvals = dy * (node_depth.max() - node_depth)
+    y_max = yvals.max()
+    x_max = y_max * aspect_ratio
+    dx = x_max / max_layer_size
+
+    # Evenly space nodes in the x direction within each layer
+    xvals = np.zeros_like(yvals)
+    for d, n_d in layer_counter.items():
+        xvals_d = np.arange(n_d) * dx
+        xvals_d = xvals_d - xvals_d.mean()
+        xvals[node_depth == d] = xvals_d
+
+    pos = {n: (x, y) for n, x, y in zip(G.nodes, xvals, yvals)}
+    return depth_of_node, pos
+
+
+def plot_complexity(
+    tree: CircuiTree,
+    depth_of_node: Optional[dict[str, int]] = None,
+    pos: Optional[dict[str, tuple[float, float]]] = None,
+    vlim: tuple[int | float] = (10, None),
+    vscale: Literal["log", "lin", "flat"] = "log",
+    figsize: tuple[float, float] = (6, 3),
+    alpha: float = 0.8,
+    lw: float = 1.0,
+    plot_layers_as_blocks: bool = True,
+    block_height: float = 0.1,
+    block_clr: str = "gray",
+    marker_clr: str = "k",
+    marker_size: float = 10,
+    n_to_highlight: Optional[float] = None,
+    highlight_clr: str = "tab:orange",
+) -> None:
+
+    G = tree.to_complexity_graph()
+
+    if depth_of_node is None or pos is None:
+        print("Computing layout...")
+        depth_of_node, pos = complexity_layout(tree)
+
+    xvals, yvals = zip(*pos.values())
+    xvals = np.array(xvals)
+    yvals = np.array(yvals)
+    
+    # Get the limits for the number of visits - only show edges with visits in this range
+    if vlim[0] is None:
+        vmin = min(v for *e, v in G.edges(data="visits"))
+    else:
+        vmin = vlim[0]
+    if vlim[1] is None:
+        vmax = max(v for *e, v in G.edges(data="visits"))
+    else:
+        vmax = vlim[1]
+
+    total_visits_at_depth = Counter()
+    for n1, n2 in G.edges:
+        depth = depth_of_node[n1[0]]
+        total_visits_at_depth[depth] += G.edges[n1]["visits"]
+
+    # Decide how to normalize the edge weights - on a log/linear scale or flat
+    if vscale == "log":
+        log_vmin = np.log10(vmin)
+        log_vrange = np.log10(vmax) - log_vmin
+
+        def normalize(v):
+            return np.clip((np.log10(v) - log_vmin) / log_vrange, 0, 1)
+
+    elif vscale == "lin":
+        vrange = vmax - vmin
+
+        def normalize(v):
+            return np.clip((v - vmin) / vrange, 0, 1)
+
+    elif vscale == "flat":
+
+        def normalize(v):
+            return 1
+
+    else:
+        raise ValueError(f"Invalid vscale: {vscale}. Must be 'log' or 'lin'.")
+
+    # Compute weights for edges
+    weights = []
+    for n1, n2, v in G.edges(data="visits"):
+        depth = depth_of_node[n1]
+        weights.append(normalize(v))
+    weights = np.array(weights)
+
+    # # Black edges with alpha proportional to the weight
+    # edge_colors = np.zeros((len(weights), 4))
+    # edge_colors[:, 3] = alpha * weights
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # set edge positions
+    if plot_layers_as_blocks:
+        ybias = 0.5 * block_height
+    else:
+        ybias = 0.0
+    edge_pos = []
+    for n1, n2 in G.edges:
+        x1, y1 = pos[n1[0]]
+        x2, y2 = pos[n2[0]]
+        edge_pos.append(((x1, y1 - ybias), (x2, y2 + ybias)))
+    edge_pos = np.array(edge_pos)
+
+    # Draw edges
+    edges = mpl_coll.LineCollection(
+        edge_pos,
+        # colors=edge_colors,
+        colors=weights,
+        linewidths=lw,
+        antialiaseds=(1,),
+        linestyle="-",
+        alpha=alpha,
+    )
+    edges.set_zorder(0)  # edges go behind nodes
+    ax.add_collection(edges)
+    
+    # edges = nx.draw_networkx_edges(
+    #     G,
+    #     G_pos,
+    #     ax=ax,
+    #     edge_color=edge_colors,
+    #     width=0.5,
+    #     arrows=False,
+    #     node_size=0,
+    # )
+    # edges.set_zorder(0)
+
+    if plot_layers_as_blocks:
+        # Plot a gray horizontal rectangle to represent each layer of nodes
+        rects = []
+        for d in np.unique(depth_of_node.values()):
+            d_mask = depth_of_node == d
+            xmin = xvals[d_mask].min()
+            xmax = xvals[d_mask].max()
+            yval = yvals[d_mask][0]
+            rect = Rectangle(
+                (xmin, yval - 0.5 * block_height),
+                width=xmax - xmin,
+                height=block_height,
+                color=block_clr,
+                zorder=1,
+            )
+            rects.append(rect)
+        layer_blocks = mpl_coll.PatchCollection(rects, match_original=True)
+        ax.add_collection(layer_blocks)
+    
+    else:
+        # Draw each node as a circle
+        for n, (x, y) in pos.items():
+            ax.scatter(x, y, color=marker_clr, s=marker_size, zorder=1)
+    
+    # for xmin_d, xmax_d, yval_d in zip(depth_xmins, depth_xmaxs, depth_yvals):
+    #     plt.hlines(yval_d, xmin_d, xmax_d, color="gray", zorder=4, lw=1.0)
+
+    if n_to_highlight is not None:
+        
+        # Get locations of the top "N" oscillators
+        highlight_states = sorted(
+            tree.terminal_states, key=lambda n: -tree.graph.nodes[n]["visits"]
+        )[:n_to_highlight]
+        top_states_pos = []
+        for state in highlight_states:
+            nonterm = state.lstrip("*")
+            if nonterm in pos:
+                top_states_pos.append(pos[nonterm])
+        top_states_pos = np.array(top_states_pos)
+
+        # Highlight the top N oscillators
+        if top_states_pos.size > 0:
+            plt.scatter(
+                *top_states_pos.T,
+                color=highlight_clr,
+                s=15,
+                zorder=5,
+                edgecolors="k",
+                lw=0.3,
+            )
+    
+    ax.set_axis_off()
+
+    return fig, ax
 
 ## Plot a diagram of an N-component network (see models.SimpleNetworkTree)
 
