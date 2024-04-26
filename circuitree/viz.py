@@ -55,7 +55,7 @@ def rgb2hex(rgb):
 def complexity_layout(
     tree: CircuiTree,
     dy: float = 0.5,
-    aspect_ratio: float = 2.0,
+    aspect: float = 2.0,
 ) -> tuple[dict[str, int], dict[str, tuple[float, float]]]:
     """Returns the depth and xy coordinates of each node in the search graph when
     visualized based on complexity.
@@ -67,124 +67,138 @@ def complexity_layout(
     have received. Terminal nodes are subsumed into their parent nonterminals.
     """
 
-    # Convert the the search graph as a "complexity graph" - subsumes terminal nodes
-    # into their parent nonterminals
-    G = tree.to_complexity_graph()
+    # Convert the search graph to a complexity graph, where terminal nodes are subsumed
+    # into their parent nonterminals.
+    G = tree.to_complexity_graph(successes=False)
 
     # Get the depth of each node (distance from the root)
     depth_of_node = {}
-    for i, layer in enumerate(nx.bfs_layers(G, source=tree.root)):
+    for i, layer in enumerate(nx.bfs_layers(tree.graph, sources=tree.root)):
         for n in layer:
-            depth_of_node[n] = i
+            if n in G.nodes:
+                depth_of_node[n] = i
 
-    layer_counter = Counter(depth_of_node)
-    max_layer_size = layer_counter.most_common(1)[0][1]
+    layer_counter = Counter(depth_of_node.values())
+    max_layer_size = max(layer_counter.values(), default=0)
 
-    # Sort nodes by depth, then by descending number of visits
-    node_visits_inv = -np.array([G.nodes[n]["visits"] for n in G.nodes])
-    node_depth = np.array([depth_of_node[n] for n in G.nodes])
-    node_order = np.lexsort((node_visits_inv, node_depth))
-    node_depth = node_depth[node_order]
+    if max_layer_size == 0:
+        return np.array([], dtype=np.float64), {}
 
-    # Get the min and max x values for each layer
-    yvals = dy * (node_depth.max() - node_depth)
-    y_max = yvals.max()
-    x_max = y_max * aspect_ratio
-    dx = x_max / max_layer_size
+    # Get the complexity as the distance from the root to each node
+    nodes = np.array(list(G.nodes))
+    complexity = np.array([depth_of_node[n] for n in nodes])
+    visits = np.array([G.nodes[n]["visits"] for n in nodes])
+    order = np.lexsort((-visits, complexity))
+    nodes = nodes[order]
+    complexity = complexity[order]
 
-    # Evenly space nodes in the x direction within each layer
+    # Get y coordinates for each node based on complexity
+    yvals = -dy * complexity
+    height = dy * complexity.max(initial=0) + dy / 2
+
+    # Evenly space nodes in the x direction within each layer. Sort nodes in the
+    # x-direction by the number of visits they have received.
+    width = height * aspect
+    dx = width / max_layer_size
     xvals = np.zeros_like(yvals)
-    for d, n_d in layer_counter.items():
-        xvals_d = np.arange(n_d) * dx
-        xvals_d = xvals_d - xvals_d.mean()
-        xvals[node_depth == d] = xvals_d
+    for c, n_c in layer_counter.items():
+        xvals_c = np.arange(n_c) * dx
+        xvals_c = xvals_c - xvals_c.mean()
+        xvals[complexity == c] = xvals_c
 
-    pos = {n: (x, y) for n, x, y in zip(G.nodes, xvals, yvals)}
-    return depth_of_node, pos
+    pos = {n: (x, y) for n, x, y in zip(nodes, xvals, yvals)}
+    return complexity, pos
 
 
 def plot_complexity(
     tree: CircuiTree,
-    depth_of_node: Optional[dict[str, int]] = None,
+    complexity: Optional[dict[str, int]] = None,
     pos: Optional[dict[str, tuple[float, float]]] = None,
-    vlim: tuple[int | float] = (10, None),
-    vscale: Literal["log", "lin", "flat"] = "log",
+    vlim: tuple[int | float] = (None, None),
+    vscale: Literal["log", "lin", "flat"] = "flat",
     figsize: tuple[float, float] = (6, 3),
-    alpha: float = 0.8,
+    alpha: float = 0.25,
     lw: float = 1.0,
+    complexity_labels: bool = True,
     plot_layers_as_blocks: bool = True,
-    block_height: float = 0.1,
-    block_clr: str = "gray",
+    block_height: float = 0.075,
+    block_clr: str = "lightsteelblue",
     marker_clr: str = "k",
     marker_size: float = 10,
     n_to_highlight: Optional[float] = None,
+    highlight_min_visits: int = 1,
     highlight_clr: str = "tab:orange",
     fig: Optional[plt.Figure] = None,
     ax: Optional[plt.Axes] = None,
+    **kwargs,
 ) -> None:
 
-    G = tree.to_complexity_graph()
+    # Convert the search graph to a complexity graph, where terminal nodes are subsumed
+    # into their parent nonterminals.
+    G = tree.to_complexity_graph(successes=False)
 
-    if depth_of_node is None or pos is None:
-        print("Computing layout...")
-        depth_of_node, pos = complexity_layout(tree)
+    if complexity is None or pos is None:
+        complexity, pos = complexity_layout(tree, **kwargs)
 
-    xvals, yvals = zip(*pos.values())
+    if len(pos) == 0:
+        xvals = []
+        yvals = []
+    else:
+        xvals, yvals = zip(*pos.values())
     xvals = np.array(xvals)
     yvals = np.array(yvals)
 
     # Get the limits for the number of visits - only show edges with visits in this range
+    visits = np.array([v for *e, v in G.edges(data="visits")])
     if vlim[0] is None:
-        vmin = min(v for *e, v in G.edges(data="visits"))
+        vmin = max(visits.min(initial=1), 1)  # ignore zero visits
     else:
         vmin = vlim[0]
     if vlim[1] is None:
-        vmax = max(v for *e, v in G.edges(data="visits"))
+        vmax = visits.max(initial=1)
     else:
         vmax = vlim[1]
-
-    total_visits_at_depth = Counter()
-    for n1, n2 in G.edges:
-        depth = depth_of_node[n1[0]]
-        total_visits_at_depth[depth] += G.edges[n1]["visits"]
 
     # Decide how to normalize the edge weights - on a log/linear scale or flat
     if vscale == "log":
         log_vmin = np.log10(vmin)
         log_vrange = np.log10(vmax) - log_vmin
-
-        def normalize(v):
-            return np.clip((np.log10(v) - log_vmin) / log_vrange, 0, 1)
-
+        weights = np.clip((np.log10(visits) - log_vmin) / log_vrange, 0, 1)
     elif vscale == "lin":
         vrange = vmax - vmin
-
-        def normalize(v):
-            return np.clip((v - vmin) / vrange, 0, 1)
-
+        weights = np.clip((visits - vmin) / vrange, 0, 1)
     elif vscale == "flat":
-
-        def normalize(v):
-            return 1
+        weights = (visits >= vmin).astype(float)
 
     else:
-        raise ValueError(f"Invalid vscale: {vscale}. Must be 'log' or 'lin'.")
+        raise ValueError(f"Invalid vscale: {vscale}. Must be 'flat', 'log', or 'lin'.")
 
-    # Compute weights for edges
-    weights = []
-    for n1, n2, v in G.edges(data="visits"):
-        depth = depth_of_node[n1]
-        weights.append(normalize(v))
-    weights = np.array(weights)
-
-    # # Black edges with alpha proportional to the weight
-    # edge_colors = np.zeros((len(weights), 4))
-    # edge_colors[:, 3] = alpha * weights
+    # Black edges with transparency (alpha) proportional to the weight
+    edge_colors = np.zeros((len(weights), 4))
+    edge_colors[:, 3] = alpha * weights
 
     if fig is None:
         fig = plt.figure(figsize=figsize)
     if ax is None:
         ax = fig.add_subplot(1, 1, 1)
+
+    # Turn of all axis spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+
+    # Turn off x axis ticks
+    ax.set_xticks([])
+
+    if complexity_labels:
+        # Turn off y axis ticks but keep labels
+        ax.set_yticks(np.unique(yvals)[::-1])
+        ax.set_yticklabels([f"{d}" for d in np.unique(complexity)])
+        ax.yaxis.set_ticks_position("none")
+        ax.set_ylabel("Complexity")
+    else:
+        ax.set_yticks([])
 
     # set edge positions
     if plot_layers_as_blocks:
@@ -193,20 +207,18 @@ def plot_complexity(
         ybias = 0.0
     edge_pos = []
     for n1, n2 in G.edges:
-        x1, y1 = pos[n1[0]]
-        x2, y2 = pos[n2[0]]
+        x1, y1 = pos[n1]
+        x2, y2 = pos[n2]
         edge_pos.append(((x1, y1 - ybias), (x2, y2 + ybias)))
     edge_pos = np.array(edge_pos)
 
     # Draw edges
     edges = mpl_coll.LineCollection(
         edge_pos,
-        # colors=edge_colors,
-        colors=weights,
+        colors=edge_colors,
         linewidths=lw,
         antialiaseds=(1,),
         linestyle="-",
-        alpha=alpha,
     )
     edges.set_zorder(0)  # edges go behind nodes
     ax.add_collection(edges)
@@ -225,11 +237,11 @@ def plot_complexity(
     if plot_layers_as_blocks:
         # Plot a gray horizontal rectangle to represent each layer of nodes
         rects = []
-        for d in np.unique(depth_of_node.values()):
-            d_mask = depth_of_node == d
-            xmin = xvals[d_mask].min()
-            xmax = xvals[d_mask].max()
-            yval = yvals[d_mask][0]
+        for c in np.unique(complexity):
+            c_mask = complexity == c
+            xmin = xvals[c_mask].min()
+            xmax = xvals[c_mask].max()
+            yval = yvals[c_mask][0]
             rect = Rectangle(
                 (xmin, yval - 0.5 * block_height),
                 width=xmax - xmin,
@@ -251,10 +263,23 @@ def plot_complexity(
 
     if n_to_highlight is not None:
 
-        # Get locations of the top "N" oscillators
+        # Get the states with the highest mean reward among states that were
+        # visited at least "higlight_min_visits" times
+        states_to_consider = (
+            n
+            for n in tree.terminal_states
+            if tree.graph.nodes[n]["visits"] >= highlight_min_visits
+        )
         highlight_states = sorted(
-            tree.terminal_states, key=lambda n: -tree.graph.nodes[n]["visits"]
+            states_to_consider,
+            key=lambda n: (
+                tree.graph.nodes[n].get("reward", 0)
+                / tree.graph.nodes[n].get("visits", 1)
+            ),
+            reverse=True,
         )[:n_to_highlight]
+
+        # Get the coordinates for the top states
         top_states_pos = []
         for state in highlight_states:
             nonterm = state.lstrip("*")
@@ -262,7 +287,7 @@ def plot_complexity(
                 top_states_pos.append(pos[nonterm])
         top_states_pos = np.array(top_states_pos)
 
-        # Highlight the top N oscillators
+        # Plot a marker to highlight the top states
         if top_states_pos.size > 0:
             plt.scatter(
                 *top_states_pos.T,
@@ -273,7 +298,9 @@ def plot_complexity(
                 lw=0.3,
             )
 
-    ax.set_axis_off()
+    # axes_lims = xvals.min(), xvals.max(), yvals.min(), yvals.max()
+    # ax.axis(axes_lims)
+    ax.axis("equal")
 
     return fig, ax
 
