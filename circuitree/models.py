@@ -32,8 +32,10 @@ class SimpleNetworkGrammar(CircuitGrammar):
         root: Optional[str] = None,
         cache_maxsize: int | None = 128,
         fixed_components: Optional[list[str]] = None,
+        *args,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         if len(set(c[0] for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
@@ -52,17 +54,14 @@ class SimpleNetworkGrammar(CircuitGrammar):
             self.max_interactions = max_interactions
 
         self.fixed_components = fixed_components or []
-        self.recolorable_components = [
-            c for c in self.components if c not in self.fixed_components
-        ]
 
         # Allow user to specify a cache size for the get_interaction_recolorings method.
         # This method is called frequently during search, and evaluation can become a
         # bottleneck for large spaces. Caching the results of this method can
         # significantly speed up search, but cache size is limited by system memory.
-        self._cache_maxsize = cache_maxsize
+        self.cache_maxsize = cache_maxsize
         self.get_interaction_recolorings: Callable[[str], list[str]] = lru_cache(
-            maxsize=self._cache_maxsize
+            maxsize=self.cache_maxsize
         )(self._get_interaction_recolorings)
 
         # Attributes that should not be serialized when saving the object to file
@@ -77,6 +76,10 @@ class SimpleNetworkGrammar(CircuitGrammar):
             ]
         )
 
+    @property
+    def recolorable_components(self) -> list[str]:
+        return [c for c in self.components if c not in self.fixed_components]
+
     def __getstate__(self):
         result = copy(self.__dict__)
 
@@ -89,7 +92,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
         self.__dict__ = state
 
         # Re-initialize the lru_cache object
-        self.get_interaction_recolorings = lru_cache(maxsize=self._cache_maxsize)(
+        self.get_interaction_recolorings = lru_cache(maxsize=self.cache_maxsize)(
             self._get_interaction_recolorings
         )
 
@@ -371,7 +374,7 @@ class SimpleNetworkTree(CircuiTree):
             seed=seed,
             graph=graph,
             tree_shape=tree_shape,
-            compute_symmetries=compute_symmetries,
+            compute_unique=compute_symmetries,
             **kwargs,
         )
 
@@ -388,8 +391,10 @@ class DimersGrammar(CircuitGrammar):
         max_interactions_per_promoter: int = 2,
         root: Optional[str] = None,
         cache_maxsize: int | None = 128,
+        *args,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         if len(set(c[0] for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
@@ -811,6 +816,6 @@ class DimerNetworkTree(CircuiTree):
             seed=seed,
             graph=graph,
             tree_shape=tree_shape,
-            compute_symmetries=compute_symmetries,
+            compute_unique=compute_symmetries,
             **kwargs,
         )
