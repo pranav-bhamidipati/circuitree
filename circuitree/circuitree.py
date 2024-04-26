@@ -46,7 +46,7 @@ class CircuiTree(ABC):
         seed: int = 2023,
         graph: Optional[nx.DiGraph] = None,
         tree_shape: Optional[Literal["tree", "dag"]] = None,
-        compute_symmetries: bool = True,
+        compute_unique: bool = True,
         **kwargs,
     ):
         self.rg = np.random.default_rng(seed)
@@ -64,7 +64,7 @@ class CircuiTree(ABC):
                 )
         self.graph.root = self.root
 
-        self.compute_symmetries = compute_symmetries
+        self.compute_symmetries = compute_unique
         if tree_shape is not None:
             if tree_shape not in ("tree", "dag"):
                 raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
@@ -355,12 +355,52 @@ class CircuiTree(ABC):
         for i in iterator:
             selection_path, reward, sim_node = self.traverse(**run_kwargs)
             if callback is not None and i % callback_every == 0:
-                _ = callback(self, i, selection_path, sim_node, reward)
+                callback(self, i, selection_path, sim_node, reward)
+
+        return
 
     def is_success(self, state: Hashable) -> bool:
         """Returns whether or not a state is successful. Used to infer which patterns
         lead to more successes (i.e. motif candidates)."""
         raise NotImplementedError
+
+    def copy_graph(self) -> nx.DiGraph:
+        """Return a shallow copy of the graph. Use copy.deepcopy() for a deep copy."""
+        return self.graph.copy()
+
+    def get_attributes(self, attrs_copy: Optional[Iterable[str]]) -> dict:
+        """Return a dictionary of the object's attributes. If `attrs_copy` is not
+        provided, all attributes are returned except those in the
+        `_non_serializable_attrs` list. If `attrs_copy` is provided, only the specified
+        attributes are returned. If any of the specified attributes are in
+        `_non_serializable_attrs`, a ValueError is raised.
+
+        If an attribute has a `to_dict()` method, it is called to get the attribute's
+        value. Otherwise, the attribute is copied as-is.
+        """
+
+        # Get the attributes to copy
+        if attrs_copy is None:
+            keys = set(self.__dict__.keys()) - set(self._non_serializable_attrs)
+        else:
+            keys = set(attrs_copy)
+            if non_serializable := (keys & set(self._non_serializable_attrs)):
+                repr_non_ser = ", ".join(non_serializable)
+                raise ValueError(
+                    f"Attempting to save non-serializable attributes: {repr_non_ser}."
+                )
+
+        # Copy the attributes
+        attrs_copy = {}
+        for k, v in self.__dict__.items():
+            if k not in keys:
+                continue
+            if hasattr(v, "to_dict"):
+                attrs_copy[k] = v.to_dict()
+            else:
+                attrs_copy[k] = v
+
+        return attrs_copy
 
     def to_file(
         self,
@@ -370,38 +410,32 @@ class CircuiTree(ABC):
         compress: bool = False,
         **kwargs,
     ):
+        """Save the CircuiTree object to a gml file and optionally a json file
+        containing the object's attributes. The `save_attrs` argument can be used to
+        specify which attributes to save. If `compress` is True, the gml file is
+        compressed with gzip.
+
+        A saved CircuiTree object can be loaded with the `from_file` class method.
+
+        The grammar is saved by calling its `to_dict()` method, which returns a
+        dictionary of the grammar's attributes and its class name string
+        `__grammar_cls__`. These attributes are saved in the JSON file and used to
+        create the grammar object upon loading."""
+
+        # Save the graph
         if compress:
             gml_target = Path(gml_file).with_suffix(".gml.gz")
         else:
             gml_target = Path(gml_file).with_suffix(".gml")
         nx.write_gml(self.graph, gml_target, **kwargs)
 
+        # Save the other attributes
         if json_file is not None:
-            if save_attrs is None:
-                keys = set(self.__dict__.keys()) - set(self._non_serializable_attrs)
-            else:
-                keys = set(save_attrs)
-                if non_serializable := (keys & set(self._non_serializable_attrs)):
-                    repr_non_ser = ", ".join(non_serializable)
-                    raise ValueError(
-                        f"Attempting to save non-serializable attributes: {repr_non_ser}."
-                    )
-
-            attrs = {}
-            for k, v in self.__dict__.items():
-                if k not in keys:
-                    continue
-                if hasattr(v, "to_dict"):
-                    attrs[k] = v.to_dict()
-                else:
-                    attrs[k] = v
-
+            attrs = self.get_attributes(save_attrs)
             json_target = Path(json_file).with_suffix(".json")
             with json_target.open("w") as f:
                 json.dump(attrs, f, indent=4)
-
             return gml_target, json_target
-
         else:
             return gml_target
 
@@ -415,7 +449,7 @@ class CircuiTree(ABC):
         **kwargs,
     ):
         """Load a CircuiTree from a gml file and a JSON file containing the object's
-        attributes.
+        attributes, typically saved with the `to_file` method.
 
         The grammar attribute is loaded by looking for a key "grammar" in the JSON file,
         whose value should be a dict `grammar_kwargs` used to create a grammar object.
@@ -423,10 +457,6 @@ class CircuiTree(ABC):
         grammar object. Alternatively, if `grammar_kwargs` contains a key
         "__grammar_cls__" that specifies a class name string, that class will be found
         in globals() and used to construct the grammar object.
-
-        When dumping a CircuiTree to a JSON file, the grammar object is dumped using
-        the method `to_dict()`, which automatically creates the "__grammar_cls__"
-        key-value entry.
         """
         # Load the attributes from the json file
         with open(attrs_json, "r") as f:
@@ -579,7 +609,7 @@ class CircuiTree(ABC):
 
         # Check if is_success() is implemented
         try:
-            _ = self.grammar.is_success(next(self.terminal_states))
+            _ = self.is_success(self.root)
         except NotImplementedError:
             raise NotImplementedError(
                 "The CircuiTree subclass must implement the is_success() method to "
@@ -588,7 +618,7 @@ class CircuiTree(ABC):
 
         ## Create a graph with all possible paths to success
         successful_terminals = set(
-            s for s in self.terminal_states if self.grammar.is_success(s)
+            s for s in self.terminal_states if self.is_success(s)
         )
 
         # Generate the graph with all possible paths to success
@@ -640,7 +670,7 @@ class CircuiTree(ABC):
 
         # Check if is_success() is implemented
         try:
-            _ = self.grammar.is_success(next(self.terminal_states))
+            _ = self.is_success(self.root)
         except NotImplementedError:
             raise NotImplementedError(
                 "The CircuiTree subclass must implement the is_success() method to "
@@ -649,7 +679,7 @@ class CircuiTree(ABC):
 
         # Use rejection sampling to sample paths with the given pattern
         successful_terminals = set(
-            s for s in self.terminal_states if self.grammar.is_success(s)
+            s for s in self.terminal_states if self.is_success(s)
         )
         if progress:
             from tqdm import tqdm
@@ -948,7 +978,7 @@ class CircuiTree(ABC):
 
             # Check if is_success() is implemented
             try:
-                _ = self.grammar.is_success(next(self.terminal_states))
+                _ = self.is_success(self.root)
             except NotImplementedError:
                 raise NotImplementedError(
                     "If successes=True, the CircuiTree subclass must implement "
@@ -957,13 +987,13 @@ class CircuiTree(ABC):
 
             # Keep only the successful nodes
             successful_children = set(
-                c for c in self.terminal_states if self.grammar.is_success(c)
+                c for c in self.terminal_states if self.is_success(c)
             )
         elif successes is False:
             # keep all terminal nodes
             successful_children = set(self.terminal_states)
         else:
-            raise ValueError(f"Invalid value for successes: {successes}")
+            raise ValueError(f"Invalid value for `successes`: {successes}")
 
         # Store the attributes of the terminal states
         child_attrs: dict[Hashable, dict[str, Any]] = {}
