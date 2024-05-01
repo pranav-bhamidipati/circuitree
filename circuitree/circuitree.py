@@ -49,9 +49,11 @@ class CircuiTree(ABC):
         compute_unique: bool = True,
         **kwargs,
     ):
+        # Initialize RNG
         self.rg = np.random.default_rng(seed)
         self.seed = self.rg.bit_generator._seed_seq.entropy
 
+        # Initialize search graph
         self.root = root
         if graph is None:
             self.graph = nx.DiGraph()
@@ -64,7 +66,8 @@ class CircuiTree(ABC):
                 )
         self.graph.root = self.root
 
-        self.compute_symmetries = compute_unique
+        # Decide whether to compute the uniqueness of each visited state
+        self.compute_unique = compute_unique
         if tree_shape is not None:
             if tree_shape not in ("tree", "dag"):
                 raise ValueError("Argument `tree_shape` must be `tree` or `dag`.")
@@ -73,8 +76,10 @@ class CircuiTree(ABC):
                 "future version. Please use `compute_symmetries` instead."
             )
 
+        # Grammar defining the search space
         self.grammar = grammar
 
+        # Exploration constant for UCB
         if exploration_constant is None:
             self.exploration_constant = np.sqrt(2)
         else:
@@ -100,7 +105,7 @@ class CircuiTree(ABC):
 
     def _do_action(self, state: Hashable, action: Hashable):
         new_state = self.grammar.do_action(state, action)
-        if self.compute_symmetries:
+        if self.compute_unique:
             new_state = self.grammar.get_unique_state(new_state)
         return new_state
 
@@ -109,7 +114,7 @@ class CircuiTree(ABC):
         if state == self.root:
             return None
         new_state = self.grammar.undo_action(state, action)
-        if self.compute_symmetries:
+        if self.compute_unique:
             new_state = self.grammar.get_unique_state(new_state)
         return new_state
 
@@ -341,6 +346,8 @@ class CircuiTree(ABC):
         run_kwargs: Optional[dict] = None,
         callback_before_start: bool = True,
     ) -> None:
+
+        # Optionally set up a progress bar
         if progress_bar:
             from tqdm import trange
 
@@ -348,14 +355,118 @@ class CircuiTree(ABC):
         else:
             iterator = range(n_steps)
 
-        run_kwargs = {} if run_kwargs is None else run_kwargs
+        # Optionally run the callback before starting the search
         if callback is not None and callback_before_start:
             callback(self, -1, [None], None, None)
 
+        # Run the search
+        run_kwargs = {} if run_kwargs is None else run_kwargs
+        print(f"Starting MCTS search with {n_steps} iterations.")
+        if callback is None:
+            self._run_mcts(self, iterator, **run_kwargs)
+        else:
+            self._run_mcts_with_callback(
+                self, iterator, callback, callback_every, **run_kwargs
+            )
+        return
+
+    @staticmethod
+    def _run_mcts(tree: "CircuiTree", iterator: Iterable[int], **kwargs) -> None:
+        """Run the MCTS search algorithm on the given CircuiTree object. Can be used to
+        run the search in parallel threads or processes."""
+        for _ in iterator:
+            tree.traverse(**kwargs)
+
+    @staticmethod
+    def _run_mcts_with_callback(
+        tree: "CircuiTree",
+        iterator: Iterable[int],
+        callback: Optional[Callable],
+        callback_every: int,
+        **kwargs,
+    ) -> None:
+        """Run the MCTS search algorithm on the given CircuiTree object, calling a
+        callback function every `callback_every` iterations. Can be used to run the
+        search in parallel threads or processes."""
         for i in iterator:
-            selection_path, reward, sim_node = self.traverse(**run_kwargs)
+            selection_path, reward, sim_node = tree.traverse(**kwargs)
             if callback is not None and i % callback_every == 0:
-                callback(self, i, selection_path, sim_node, reward)
+                callback(tree, i, selection_path, sim_node, reward)
+
+    def search_mcts_parallel(
+        self,
+        n_steps: int,
+        n_threads: int,
+        callback: Optional[Callable] = None,
+        callback_every: int = 1,
+        callback_before_start: bool = True,
+        run_kwargs: Optional[dict] = None,
+        logger: Optional[Any] = None,
+    ) -> None:
+
+        # Check if the `gevent` package is installed
+        try:
+            import gevent
+        except ImportError:
+            raise ImportError(
+                "The gevent package is required to run parallel MCTS. You can install "
+                "it with `pip install gevent` or as a dependency of circuitree with "
+                "`pip install circuitree[distributed]`."
+            )
+
+        if n_threads < 1:
+            raise ValueError("Number of threads must be at least 1.")
+        if n_threads == 1:
+            self.search_mcts(
+                n_steps=n_steps,
+                callback_every=callback_every,
+                callback=callback,
+                run_kwargs=run_kwargs,
+            )
+            return
+
+        # Optionally run the callback before starting the search
+        if callback is not None and callback_before_start:
+            callback(self, -1, [None], None, None)
+
+        # Distribute the steps evenly among the threads
+        quotient, remainder = divmod(n_steps, n_threads)
+        n_per_thread = [quotient + 1] * remainder + [quotient] * (n_threads - remainder)
+        if remainder:
+            n_repr = f"{quotient}-{quotient + 1}"
+        else:
+            n_repr = f"{quotient}"
+        start_msg = (
+            f"Starting MCTS search with {n_steps} iters on {n_threads} threads "
+            f"({n_repr} iters per thread)."
+        )
+
+        # Pass logger to the get_reward() function if supplied and log the start message
+        run_kwargs = {} if run_kwargs is None else run_kwargs
+        if logger is not None:
+            run_kwargs["logger"] = logger
+            logger.info()
+        print(start_msg)
+
+        if callback is None:
+            gthreads = [
+                gevent.spawn(self._run_mcts, self, range(n), **run_kwargs)
+                for n in n_per_thread
+            ]
+            gevent.joinall(gthreads)
+        else:
+            gthreads = [
+                gevent.spawn(
+                    self._run_mcts_with_callback,
+                    self,
+                    range(n),
+                    callback,
+                    callback_every,
+                    **run_kwargs,
+                )
+                for n in n_per_thread
+            ]
+            gevent.joinall(gthreads)
 
         return
 

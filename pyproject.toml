@@ -50,6 +50,12 @@ commonmark = "*"
 recommonmark = "*"
 watermark = "*"
 
+[toolpoetry.group.distributed]
+optional = true
+
+[tool.poetry.group.distributed.dependencies]
+celery = { extras = ["redis"], version = "^5.3.1" }
+gevent = "^23.9.1"
 
 [build-system]
 requires = ["poetry-core"]
