@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "circuitree"
-version = "0.10.1"
+version = "0.10.2"
 description = "Genetic circuit design using Monte Carlo tree search"
 authors = ["pranav-bhamidipati <pbhamidi@usc.edu>"]
 license = "GPLv3"
@@ -14,8 +14,8 @@ pandas = "^2.0.0"
 scipy = { version = "^1.11.3", python = ">=3.10,<3.13" }
 
 # Optional dependencies (used in extras)
-celery = { extras = ["redis"], version = "^5.3.1", optional = "true" }
-gevent = { version = "^23.9.1", optional = "true" }
+celery = { extras = ["redis"], version = "^5.3.1", optional = true }
+gevent = { version = "^23.9.1", optional = true }
 
 [tool.poetry.extras]
 distributed = ["celery", "gevent"]
