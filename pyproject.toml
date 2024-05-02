@@ -13,6 +13,13 @@ networkx = "^3.1"
 pandas = "^2.0.0"
 scipy = { version = "^1.11.3", python = ">=3.10,<3.13" }
 
+# Optional dependencies (used in extras)
+celery = { extras = ["redis"], version = "^5.3.1", optional = "true" }
+gevent = { version = "^23.9.1", optional = "true" }
+
+[tool.poetry.extras]
+distributed = ["celery", "gevent"]
+
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.12.0"
 black = "^23.3.0"
@@ -49,14 +56,6 @@ myst-parser = "*"
 commonmark = "*"
 recommonmark = "*"
 watermark = "*"
-
-[toolpoetry.group.distributed]
-optional = true
-
-
-[tool.poetry.group.distributed.dependencies]
-celery = { extras = ["redis"], version = "^5.3.1" }
-gevent = "^23.9.1"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,11 +1,17 @@
 from celery import Celery
 from circuitree.models import SimpleNetworkGrammar
 import numpy as np
+import os
 from time import sleep
 from tutorial_1_basic_example import get_bistability_reward
 
-# Specify the address of the Redis server and create a Celery app
-database_url = "redis://localhost:6379"
+# Use a Redis server hosted on the cloud
+database_url = os.environ["CIRCUITREE_CLOUD_REDIS_URL"]
+if not database_url:
+    raise ValueError(
+        "Please set the CIRCUITREE_CLOUD_REDIS_URL environment variable "
+        "to the URL of a Redis server."
+    )
 app = Celery("bistability", broker=database_url, backend=database_url)
 
 # Define the grammar here also so it can be accessed by workers
