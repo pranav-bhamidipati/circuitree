@@ -15,7 +15,7 @@ if not database_url:
 app = Celery("bistability", broker=database_url, backend=database_url)
 
 # Define the grammar here also so it can be accessed by workers
-grammar = SimpleNetworkGrammar(["A", "B"], ["activates", "inhibits"])
+grammar = SimpleNetworkGrammar(["A", "B", "C"], ["activates", "inhibits"])
 
 
 @app.task
