@@ -513,6 +513,17 @@ class CircuiTree(ABC):
 
         return attrs_copy
 
+    def generate_gml(self) -> str:
+        """Return a string representation of the graph in GML format."""
+        return nx.generate_gml(self.graph)
+
+    def to_string(self) -> tuple[str, str]:
+        """Return a a GML-formatted string of the `graph` attribute and a JSON-formatted
+        string of the other serializable attributes."""
+        graph_src = self.generate_gml()
+        attrs_src = json.dumps(self.get_attributes(None), indent=4)
+        return graph_src, attrs_src
+
     def to_file(
         self,
         gml_file: str | Path,
@@ -550,32 +561,17 @@ class CircuiTree(ABC):
         else:
             return gml_target
 
-    @classmethod
-    def from_file(
-        cls,
-        graph_gml: str | Path | None,
-        attrs_json: str | Path,
-        grammar_cls: Optional[CircuitGrammar] = None,
-        grammar_kwargs: Optional[dict] = None,
-        **kwargs,
-    ):
-        """Load a CircuiTree from a gml file and a JSON file containing the object's
-        attributes, typically saved with the `to_file` method.
+    @staticmethod
+    def generate_grammar(grammar_cls: CircuitGrammar, grammar_kwargs: dict):
+        """Generate a grammar object from the class and keyword arguments.
 
-        The grammar attribute is loaded by looking for a key "grammar" in the JSON file,
-        whose value should be a dict `grammar_kwargs` used to create a grammar object.
-        The grammar_cls keyword can be passed to specify the class constructor for the
-        grammar object. Alternatively, if `grammar_kwargs` contains a key
-        "__grammar_cls__" that specifies a class name string, that class will be found
-        in globals() and used to construct the grammar object.
-        """
-        # Load the attributes from the json file
-        with open(attrs_json, "r") as f:
-            kwargs.update(json.load(f))
+        The `CircuitGrammar` class used to construct the object can be passed using the
+        grammar_cls keyword grammar object. Alternatively, if `grammar_kwargs` contains
+        a key "__grammar_cls__" that specifies a class name string, that class will be
+        searched for in `globals()`."""
 
         # Make the grammar object
         # Get kwargs from the grammar_kwargs in this function and/or from the json
-        grammar_kwargs = kwargs.pop("grammar", {}) | (grammar_kwargs or {})
         _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
 
         if grammar_cls is None:
@@ -597,8 +593,47 @@ class CircuiTree(ABC):
         # Patch an external bug where _non_serializable_attrs is saved to the json file
         grammar_kwargs.pop("_non_serializable_attrs", None)
 
-        grammar = _grammar_cls(**grammar_kwargs)
-        graph = None if graph_gml is None else nx.read_gml(graph_gml)
+        return _grammar_cls(**grammar_kwargs)
+
+    @classmethod
+    def from_file(
+        cls,
+        graph_gml: str | Path | None,
+        attrs_json: str | Path,
+        grammar_cls: Optional[CircuitGrammar] = None,
+        grammar_kwargs: Optional[dict] = None,
+        **kwargs,
+    ):
+        """Load a CircuiTree object from a JSON file containing the object's attributes
+        and an optional GML file of the search graph, typically saved with the `.to_file()`
+        method. Both can be supplied as serialized strings as well.
+
+        The grammar attribute is loaded by looking for a key "grammar" in the JSON file,
+        whose value should be a dict `grammar_kwargs` used to create a grammar object.
+        The grammar_cls keyword can be passed to specify the class constructor for the
+        grammar object. Alternatively, if `grammar_kwargs` contains a key
+        "__grammar_cls__" that specifies a class name string, that class will be found
+        in globals() and used to construct the grammar object.
+        """
+        # Load the attributes from the json file
+        if Path(attrs_json).is_file():
+            with open(attrs_json, "r") as f:
+                kwargs.update(json.load(f))
+        else:
+            kwargs.update(json.loads(attrs_json))
+
+        # Read the gml to a `nx.DiGraph` object if provided. Can be supplied as a file
+        # path or a string.
+        if graph_gml is None:
+            graph = None
+        elif Path(graph_gml).is_file():
+            graph = nx.read_gml(graph_gml)
+        else:
+            graph = nx.parse_gml(graph_gml)
+
+        # Make the grammar attribute
+        grammar_kwargs = kwargs.pop("grammar", {}) | (grammar_kwargs or {})
+        grammar = cls.generate_grammar(grammar_cls, grammar_kwargs)
 
         return cls(grammar=grammar, graph=graph, **kwargs)
 
