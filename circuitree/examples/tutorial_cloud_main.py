@@ -20,7 +20,7 @@ def run_mcts_parallel(
     as a string in GML format. Together they can be used to reconstruct the search tree
     using `CircuiTree.from_file()`."""
 
-    from .distributed import DistributedBistabilityTree
+    from circuitree.examples.distributed import DistributedBistabilityTree
 
     # Run the search in parallel
     tree = DistributedBistabilityTree(root=root, **kwargs)
