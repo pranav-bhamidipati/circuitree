@@ -1,6 +1,5 @@
 from celery import Celery
 import os
-from tutorial_2_cloud_example import DistributedBistabilityTree
 
 # Use a Redis server hosted on the cloud
 database_url = os.environ["CIRCUITREE_CLOUD_REDIS_URL"]
@@ -20,6 +19,8 @@ def run_mcts_parallel(
     a dictionary of attributes (from `CircuiTree.to_dict()`) and the search graph object
     as a string in GML format. Together they can be used to reconstruct the search tree
     using `CircuiTree.from_file()`."""
+
+    from tutorial_2_cloud_example import DistributedBistabilityTree
 
     # Run the search in parallel
     tree = DistributedBistabilityTree(root=root, **kwargs)
