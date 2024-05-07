@@ -1,5 +1,5 @@
 from celery import Celery
-from models import SimpleNetworkGrammar
+from circuitree.models import SimpleNetworkGrammar
 import numpy as np
 import os
 from time import sleep

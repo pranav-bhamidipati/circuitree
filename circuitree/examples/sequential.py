@@ -1,5 +1,6 @@
 import numpy as np
-from circuitree import CircuiTree, SimpleNetworkGrammar
+from circuitree import CircuiTree
+from circuitree.models import SimpleNetworkGrammar
 from time import sleep
 
 grammar = SimpleNetworkGrammar(
