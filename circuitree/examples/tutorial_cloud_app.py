@@ -4,7 +4,7 @@ import numpy as np
 import os
 from time import sleep
 
-from sequential import get_bistability_reward
+from circuitree.examples.sequential import get_bistability_reward
 
 # Use a Redis server hosted on the cloud
 database_url = os.environ["CIRCUITREE_CLOUD_REDIS_URL"]
