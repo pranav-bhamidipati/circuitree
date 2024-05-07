@@ -1,3 +1,4 @@
+from typing import Optional
 from celery import Celery
 import os
 
@@ -13,7 +14,12 @@ app = Celery("bistability_main", broker=database_url, backend=database_url)
 
 @app.task
 def run_mcts_parallel(
-    n_steps: int, n_threads: int, expensive: bool = True, root="ABC::", **kwargs
+    n_steps: int,
+    n_threads: int,
+    expensive: bool = True,
+    root="ABC::",
+    run_kwargs: Optional[dict] = None,
+    **kwargs
 ) -> tuple[dict, str]:
     """Runs a parallel MCTS search with the given number of steps and threads. Returns
     a dictionary of attributes (from `CircuiTree.to_dict()`) and the search graph object
@@ -23,11 +29,9 @@ def run_mcts_parallel(
     from circuitree.examples.distributed import DistributedBistabilityTree
 
     # Run the search in parallel
+    run_kwargs = dict(expensive=expensive) | (run_kwargs or {})
     tree = DistributedBistabilityTree(root=root, **kwargs)
     tree.search_mcts_parallel(
-        n_steps=n_steps,
-        n_threads=n_threads,
-        run_kwargs=dict(expensive=expensive),
-        **kwargs
+        n_steps=n_steps, n_threads=n_threads, run_kwargs=run_kwargs
     )
     return tree.to_string()
