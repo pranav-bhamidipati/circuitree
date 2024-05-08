@@ -4,7 +4,7 @@ from circuitree.examples.distributed import DistributedBistabilityTree
 
 
 @app.task(queue="main_node")
-def run_mcts_parallel(
+def run_bistability_search_parallel(
     n_steps: int,
     n_threads: int,
     expensive: bool = True,
