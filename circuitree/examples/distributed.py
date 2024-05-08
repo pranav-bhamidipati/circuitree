@@ -6,7 +6,7 @@ from gevent import monkey
 monkey.patch_all()
 
 from circuitree.examples.sequential import BistabilityTree
-import examples.app as worker_node
+from circuitree.examples.app import get_reward_celery
 
 
 class DistributedBistabilityTree(BistabilityTree):
@@ -21,6 +21,6 @@ class DistributedBistabilityTree(BistabilityTree):
     def get_reward(self, state, expensive=False):
         # Generate a unique random seed and run the task in a worker
         seed = int(self.rg.integers(0, 2**32))
-        result = worker_node.get_reward_celery.delay(state, seed, expensive=expensive)
+        result = get_reward_celery.delay(state, seed, expensive=expensive)
         reward = result.get()
         return reward

@@ -1,10 +1,10 @@
 from typing import Optional
-from examples.app import app
+from circuitree.examples.app import app
 from circuitree.examples.distributed import DistributedBistabilityTree
 
 
 @app.task(queue="main_node")
-def run_bistability_search_parallel(
+def run_mcts_parallel(
     n_steps: int,
     n_threads: int,
     expensive: bool = True,
@@ -24,3 +24,24 @@ def run_bistability_search_parallel(
         n_steps=n_steps, n_threads=n_threads, run_kwargs=run_kwargs
     )
     return tree.to_string()
+
+
+def run_bistability_search_on_cloud(
+    n_steps: int,
+    n_threads: int,
+    expensive: bool = True,
+    root="ABC::",
+    run_kwargs: Optional[dict] = None,
+    **kwargs
+) -> tuple[dict, str]:
+    result = run_mcts_parallel.delay(
+        n_steps=n_steps,
+        n_threads=n_threads,
+        expensive=expensive,
+        root=root,
+        run_kwargs=run_kwargs,
+        **kwargs
+    )
+    serialized = result.get()
+    tree = DistributedBistabilityTree.from_file(*serialized)
+    return tree
