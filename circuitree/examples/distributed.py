@@ -6,7 +6,7 @@ from gevent import monkey
 monkey.patch_all()
 
 from circuitree.examples.sequential import BistabilityTree
-import circuitree.examples.worker_app as worker_node
+import examples.app as worker_node
 
 
 class DistributedBistabilityTree(BistabilityTree):

@@ -19,7 +19,7 @@ app = Celery("bistability", broker=database_url, backend=database_url)
 grammar = SimpleNetworkGrammar(["A", "B", "C"], ["activates", "inhibits"])
 
 
-@app.task
+@app.task(queue="worker_node")
 def get_reward_celery(state: str, seed: int, expensive: bool = False) -> float:
     """Returns a reward value for the given state based on how many types of positive
     feedback loops (PFLs) it contains. Same as `BistabilityTree.get_reward()`."""
