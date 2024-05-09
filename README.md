@@ -10,7 +10,9 @@ Biochemical circuit design using Monte Carlo tree search
 
 ## Getting Started
 
-See the [getting started tutorial](tutorials/tutorial-1-getting-started.ipynb). See the [`circuitree-tutorial`](https://github.com/pranav-bhamidipati/circuitree-tutorial) repo for additional tutorials and example scripts.
+[Getting started tutorial](https://githubtocolab.com/pranav-bhamidipati/circuitree-tutorial/blob/main/src/tutorial-1-getting-started.ipynb). 
+
+See the [`circuitree-tutorial`](https://github.com/pranav-bhamidipati/circuitree-tutorial) repo for additional tutorials and example scripts.
 
 ## Documentation
 
