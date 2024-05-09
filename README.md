@@ -15,3 +15,7 @@ See the [tutorial](tutorials/tutorial-1-getting-started.ipynb) [notebooks](tutor
 ## Documentation
 
 API docs coming soon
+
+
+© 2024 Pranav Bhamidipati
+Logo © 2024 Inna-Marie Strazhnik 
