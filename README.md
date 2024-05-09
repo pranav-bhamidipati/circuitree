@@ -10,7 +10,7 @@ Biochemical circuit design using Monte Carlo tree search
 
 ## Usage
 
-See the [tutorial](tutorials/tutorial-1-getting-started.ipynb) [notebooks](tutorials/tutorial-2-mcts-in-parallel.ipynb) for guidance on usage. 
+See the [tutorial](tutorials/tutorial-1-getting-started.ipynb) [notebooks](tutorials/tutorial-2-mcts-in-parallel.ipynb) for guidance on usage. See the [`circuitree-tutorial`](https://github.com/pranav-bhamidipati/circuitree-tutorial) package for tutorial source code.
 
 ## Documentation
 
