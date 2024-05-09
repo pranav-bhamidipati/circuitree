@@ -10,7 +10,8 @@ Biochemical circuit design using Monte Carlo tree search
 
 ## Getting Started
 
-[Getting started tutorial](https://githubtocolab.com/pranav-bhamidipati/circuitree-tutorial/blob/main/src/tutorial-1-getting-started.ipynb). 
+[Tutorial 1](https://githubtocolab.com/pranav-bhamidipati/circuitree-tutorial/blob/main/src/tutorial-1-getting-started.ipynb)
+[Tutorial 2](https://githubtocolab.com/pranav-bhamidipati/circuitree-tutorial/blob/main/src/tutorial-2-mcts-in-parallel.ipynb). 
 
 See the [`circuitree-tutorial`](https://github.com/pranav-bhamidipati/circuitree-tutorial) repo for additional tutorials and example scripts.
 
