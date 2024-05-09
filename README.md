@@ -8,9 +8,9 @@ Biochemical circuit design using Monte Carlo tree search
 
 ```pip install circuitree```
 
-## Usage
+## Getting Started
 
-See the [tutorial](tutorials/tutorial-1-getting-started.ipynb) [notebooks](tutorials/tutorial-2-mcts-in-parallel.ipynb) for guidance on usage. See the [`circuitree-tutorial`](https://github.com/pranav-bhamidipati/circuitree-tutorial) package for tutorial source code.
+See the [getting started tutorial](tutorials/tutorial-1-getting-started.ipynb). See the [`circuitree-tutorial`](https://github.com/pranav-bhamidipati/circuitree-tutorial) repo for additional tutorials and example scripts.
 
 ## Documentation
 
