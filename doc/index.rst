@@ -1,5 +1,5 @@
 CircuiTree: Biochemical circuit design using reinfocement learning
-=========================================================================
+==================================================================
 
 CircuiTree is a Python package for optimizing the architecture, or topology, of a biochemical network with respect to a given reward function. The package is designed to be extensible, allowing users to define their own reward functions and custom search spaces for circuits. The package uses the 
 
@@ -8,8 +8,8 @@ CircuiTree is a Python package for optimizing the architecture, or topology, of 
    :caption: Getting started
 
    getting_started/installation
-   getting_started/tutorial-1-getting-started.ipynb
-   getting_started/tutorial-2-mcts-in-parallel.ipynb
+   getting_started/tutorial_1_getting_started
+   getting_started/tutorial_2_mcts_in_parallel
 
 .. toctree::
    :maxdepth: 2
