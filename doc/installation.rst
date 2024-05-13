@@ -5,11 +5,13 @@ Installation
 
 For parallel and/or distributed computing
 
-	$ pip install --upgrade circuitree[distributed]
+.. code-block:: bash
+	pip install --upgrade circuitree[distributed]
 
 For basic usage
 
-	$ pip install --upgrade circuitree
+.. code-block:: bash
+	pip install --upgrade circuitree
 
 Dependencies
 ------------
@@ -22,9 +24,9 @@ Dependencies
 - Pandas_
 - SciPy_
 
-For progress bars, `circuitree` uses the tqdm_ package, which is optional.
+For progress bars, ``circuitree`` uses the tqdm_ package, which is optional.
 
-`circuitree[distributed]` additionally uses the following dependencies to manage a distributed computing environment.
+``circuitree[distributed]`` additionally uses the following dependencies to manage a distributed computing environment.
 
 - Celery_
 - gevent_
