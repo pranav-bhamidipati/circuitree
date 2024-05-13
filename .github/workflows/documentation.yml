@@ -1,13 +1,18 @@
 name: documentation
 
-on: [push, pull_request, workflow_dispatch]
-
-permissions:
-  contents: write
+on:
+  push:
+    branches:
+      - docs
+  pull_request:
 
 jobs:
-  docs:
-    runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,12 +22,12 @@ jobs:
           poetry install --with docs
       - name: Sphinx build
         run: |
-          poetry run sphinx-build doc _build
+          poetry run sphinx-build doc gh-pages
+          touch gh-pages/.nojekyll
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/docs' }}
+        if: github.ref == 'refs/heads/docs'
         with:
-          publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: _build/
+          publish_dir: gh-pages
           force_orphan: true
