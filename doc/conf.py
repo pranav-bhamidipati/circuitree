@@ -43,7 +43,6 @@ extensions = [
     'sphinx.ext.githubpages',
     'sphinx.ext.autosectionlabel',
     'nbsphinx',
-    'bokeh.sphinxext.bokeh_plot',
     'sphinx.ext.napoleon'
 ]
 
