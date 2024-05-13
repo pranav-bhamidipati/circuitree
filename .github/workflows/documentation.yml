@@ -23,7 +23,7 @@ jobs:
           pip install poetry
           poetry install --with docs      
       - name: Install Pandoc
-        uses: pandoc/actions/setup@{main}
+        uses: pandoc/actions/setup
       - name: Sphinx build
         run: |
           poetry run sphinx-build ./doc ./site
