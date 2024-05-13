@@ -1,4 +1,4 @@
-.. _built-in_grammars:
+.. _built_in_grammars:
 
 Built-in Grammars
 -----------------

@@ -1,5 +1,5 @@
 .. _custom_grammars:
 
-Custom Grammars
------------------
+Defining custom Grammars using `CircuitGrammar`
+----------------------------------------------
 
