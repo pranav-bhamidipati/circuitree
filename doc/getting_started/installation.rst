@@ -32,7 +32,7 @@ For progress bars, `circuitree` uses the tqdm_ package, which is optional.
 .. _NumPy: http://www.numpy.org/
 .. _NetworkX: https://networkx.org/
 .. _Pandas: http://pandas.pydata.org
-.. _Pandas: http://pandas.pydata.org
+.. _SciPy: https://www.scipy.org/
 .. _tqdm: https://github.com/tqdm/tqdm
 .. _Celery: https://docs.celeryq.dev/en/stable/
 .. _gevent: https://www.gevent.org/
