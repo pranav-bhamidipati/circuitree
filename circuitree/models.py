@@ -324,8 +324,6 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
 class SimpleNetworkTree(CircuiTree):
     """
-    SimpleNetworkTree
-    =================
     Models a circuit as a set of components and strictly pairwise interactions between them.
     The circuit topology (also referred to as the "state" during search) is encoded using a
     string representation with the following rules:
@@ -748,8 +746,6 @@ class DimersGrammar(CircuitGrammar):
 
 class DimerNetworkTree(CircuiTree):
     """
-    DimerNetworkTree
-    =================
     A CircuiTree for the design space of dimerizing TF networks. Intended to recapitulate
     the dimerization of zinc-finger proteins.
 
