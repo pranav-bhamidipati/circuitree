@@ -25,6 +25,8 @@ except ImportError:
 
 __all__ = [
     "rgb2hex",
+    "complexity_layout",
+    "plot_complexity",
     "plot_network",
 ]
 

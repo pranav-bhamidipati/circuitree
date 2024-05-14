@@ -3,26 +3,46 @@ from functools import partial
 from itertools import cycle, chain, islice, repeat
 import json
 from pathlib import Path
-from typing import Callable, Hashable, Literal, Optional, Iterable, Any
+from typing import Callable, Hashable, Iterator, Literal, Optional, Iterable, Any
 import numpy as np
 import networkx as nx
 import pandas as pd
 from scipy import stats
 import warnings
 
-from .modularity import tree_modularity, tree_modularity_estimate
 from .grammar import CircuitGrammar
 
-__all__ = ["CircuiTree"]
+__all__ = [
+    "ucb_score",
+    "CircuiTree",
+]
 
 
 def ucb_score(
     graph: nx.DiGraph,
-    parent,
-    node,
-    exploration_constant: Optional[float] = np.sqrt(2),
+    parent: Hashable,
+    node: Hashable,
+    exploration_constant: Optional[float] = np.sqrt(2.0),
     **kw,
 ):
+    """
+    Compute the UCB score for a node in the search graph.
+
+    The UCB score balances exploitation and exploration during tree search.
+    It combines the mean reward of a child node with an exploration term
+    based on the visit counts of the parent and child nodes.
+
+    Parameters:
+        graph (nx.DiGraph): The directed search graph.
+        parent (str): The ID of the parent node of the target node.
+        node (str): The ID of the target node for which to compute the UCB score.
+        exploration_constant (float, optional): The exploration constant that
+            controls the balance between exploitation and exploration. Defaults to
+            np.sqrt(2.0).
+
+    Returns:
+        float: The UCB score of the target node.
+    """
     attrs = graph.edges[parent, node]
 
     visits = attrs["visits"]
@@ -38,6 +58,22 @@ def ucb_score(
 
 
 class CircuiTree(ABC):
+    """A base class for implementing the Monte Carlo Tree Search (MCTS) algorithm for
+    circuit topologies. The class defines the basic structure of the search tree and
+    provides methods for tree traversal, expansion, and backpropagation.
+
+    The class is designed to be subclassed with a specific implementation of the
+    `get_reward()` method, which calculates the reward for a given state. The class
+    also requires a `CircuitGrammar` object to define the search space.
+
+    There are also methods for extracting meaningful patterns (motifs) from the search
+    graph, by comparing successful and unsuccessful paths in the graph. These methods
+    are more experimental and may be removed in future versions.
+
+    Args:
+        ABC (_type_): _description_
+    """
+
     def __init__(
         self,
         grammar: CircuitGrammar,
@@ -85,6 +121,7 @@ class CircuiTree(ABC):
         else:
             self.exploration_constant = exploration_constant
 
+        # Attributes that should not be serialized to JSON
         self._non_serializable_attrs = [
             "_non_serializable_attrs",
             "rg",
@@ -92,25 +129,87 @@ class CircuiTree(ABC):
         ]
 
     @abstractmethod
-    def get_reward(self, state) -> float | int:
-        raise NotImplementedError
+    def get_reward(self, state: Hashable, **kwargs) -> float | int:
+        """
+        Abstract method that calculates the reward for a given state.
+
+        This method must be implemented by a subclass of `CircuiTree`. It defines
+        the interface for reward calculation within the framework.
+
+        Args:
+            state (Hashable): The state for which to calculate the reward.
+
+        Returns:
+            float | int: The reward for the given state. Reward values can be
+                deterministic or stochastic. The range of possible outputs should be
+                finite and ideally normalized to the range [0, 1].
+        """
+
+        pass
 
     @property
     def default_attrs(self):
+        """Default attributes for nodes and edges in the search graph."""
         return dict(visits=0, reward=0)
 
     @property
-    def terminal_states(self):
+    def terminal_states(self) -> Iterator[Hashable]:
+        """
+        Generator that yields terminal states in the search graph.
+
+        This property provides an iterator that traverses the terminal states
+        present in the search graph associated with the `CircuiTree` instance.
+
+        Yields:
+            Hashable: Each element returned by the iterator represents a terminal
+                state within the search graph (see :func:`CircuitGrammar.is_terminal`).
+        Example:
+
+        ```python
+        # Find terminal states with mean reward > 0.5
+        for state in tree.terminal_states:
+            if tree.graph.nodes[state]["reward"] / tree.graph.nodes[state]["visits"] > 0.5:
+                print(state)
+        ```
+        """
+
         return (node for node in self.graph.nodes if self.grammar.is_terminal(node))
 
-    def _do_action(self, state: Hashable, action: Hashable):
+    def _do_action(self, state: Hashable, action: Hashable) -> Hashable:
+        """
+        Apply an action to a state and compute a unique representation (internal method).
+
+        This is an internal function that applies an action to the given state using the
+        supplied grammar. It then optionally computes a unique representation of the
+        resulting state, depending on the `compute_unique` attribute.
+
+        Args:
+            state (Hashable): The current state.
+            action (Hashable): The action to apply to the state.
+
+        Returns:
+            Hashable: The resulting state after applying the action. If
+                `self.compute_unique` is True, `self.grammar.get_unique_state()` is
+                called on the resulting state before returning.
+
+        """
+
         new_state = self.grammar.do_action(state, action)
         if self.compute_unique:
             new_state = self.grammar.get_unique_state(new_state)
         return new_state
 
     def _undo_action(self, state: Hashable, action: Hashable) -> Hashable:
-        """Undo one action from the given state."""
+        """Undo one action from the given state. Experimental.
+
+        Args:
+            state (Hashable): _description_
+            action (Hashable): _description_
+
+        Returns:
+            Hashable: _description_
+        """
+
         if state == self.root:
             return None
         new_state = self.grammar.undo_action(state, action)
@@ -122,7 +221,24 @@ class CircuiTree(ABC):
     def _get_random_terminal_descendant(
         grammar: CircuitGrammar, start: Hashable, rg: np.random.Generator
     ) -> Hashable:
-        """Starting from the state `start`, select random actions until termination."""
+        """
+        Sample a random terminal state by following random actions from a given start
+        state.
+
+        Performs a random walk on the search space starting from the specified `start`
+        state by recursively selecting random actions until a terminal state is reached,
+        as determined by the `grammar` (see :func:`CircuitGrammar.is_terminal`).
+
+        Args:
+            grammar (CircuitGrammar): The grammar associated with the search space.
+            start (Hashable): The starting state for the random walk.
+            rg (np.random.Generator): A NumPy random number generator.
+
+        Returns:
+            Hashable: A randomly sampled terminal state.
+
+        """
+
         state = start
         while not grammar.is_terminal(state):
             actions = grammar.get_actions(state)
@@ -133,12 +249,36 @@ class CircuiTree(ABC):
 
     @staticmethod
     def _sample_from_terminals_with_rejection(
-        terminals: set[Any],
+        terminals: set[Hashable],
         grammar: CircuitGrammar,
         start: Hashable,
         seed: int,
         max_iter: Optional[int] = None,
-    ):
+    ) -> Hashable:
+        """
+        Sample from a set of terminal states using rejection sampling.
+
+        A state is sampled by performing a random walk on the search space from the
+        `start` state until a terminal state is reached that belongs to the `terminals`
+        set.
+
+        Args:
+            terminals (set[Hashable]): The set of valid terminal states for acceptance.
+            grammar (CircuitGrammar): The grammar associated with the search space.
+            start (Hashable): The starting state for the random walk.
+            seed (int): Seed for a NumPy random number generator.
+            max_iter (Optional[int], optional): The maximum number of iterations allowed
+                for sampling. Defaults to 1e8.
+
+        Raises:
+            RuntimeError: If the maximum number of iterations is reached without finding
+                a suitable terminal state.
+
+        Returns:
+            Hashable: A randomly sampled terminal state in `terminals`.
+
+        """
+
         max_iter = max_iter or 100_000_000
         rg = np.random.default_rng(seed)
         terminals = set(terminals)
@@ -157,22 +297,49 @@ class CircuiTree(ABC):
     def get_random_terminal_descendant(
         self, start: Hashable, rg: Optional[np.random.Generator] = None
     ) -> Hashable:
-        """Starting from the state `start`, select random actions until termination."""
+        """
+        Sample a random terminal state by following random actions from a given start
+        state. Wrapper for the `_get_random_terminal_descendant` method.
+
+        Args:
+            start (Hashable): The starting state from which to begin the random walk.
+            rg (Optional[np.random.Generator], optional): Defaults to None, in which
+            case the `rg` attribute of the `CircuiTree` instance is used.
+
+        Returns:
+            Hashable: The randomly sampled terminal state.
+
+        """
+
         rg = self.rg if rg is None else rg
         return self._get_random_terminal_descendant(self.grammar, start, rg)
 
     def select_and_expand(
         self, rg: Optional[np.random.Generator] = None
     ) -> list[Hashable]:
+        """Selects a path through the search graph using the UCB score. Adds the last
+        node to the graph if it is not already present.
+
+        This method implements the core selection and expansion step of the UCB algorithm.
+        It iteratively selects the child node with the highest UCB score until a terminal
+        state or an unexpanded edge is encountered.
+
+        Args:
+            rg (Optional[np.random.Generator], optional): Random number generator.
+                Defaults to None, in which case the `rg` attribute of the `CircuiTree`
+                instance is used.
+
+        Returns:
+            list[Hashable]: A list of states representing the selected path through the
+                search graph.
+        """
+
         rg = self.rg if rg is None else rg
 
         # Start at root
         node = self.root
         selection_path = [node]
         actions = self.grammar.get_actions(node)
-
-        # Select the child with the highest UCB score until you reach a terminal
-        # state or an unexpanded edge
         while actions:
             max_ucb = -np.inf
             best_child = None
@@ -188,7 +355,7 @@ class CircuiTree(ABC):
                     selection_path.append(child)
                     return selection_path
 
-                # Otherwise, track the child with the highest UCB score
+                # Otherwise, recursively pick the child with the highest UCB score.
                 if ucb > max_ucb:
                     max_ucb = ucb
                     best_child = child
@@ -197,22 +364,46 @@ class CircuiTree(ABC):
             selection_path.append(node)
             actions = self.grammar.get_actions(node)
 
-        # If the loop breaks, we have reached a terminal state.
+        # If no actions can be taken, we have reached a terminal state.
         return selection_path
 
     def expand_edge(self, parent: Hashable, child: Hashable):
+        """Expands the search graph by adding the child node and/or the parent-child
+        edge to the search graph if they do not already exist.
+
+        Args:
+            parent (Hashable): The parent node of the edge.
+            child (Hashable): The child node.
+        """
+
         if not self.graph.has_node(child):
             self.graph.add_node(child, **self.default_attrs)
         self.graph.add_edge(parent, child, **self.default_attrs)
 
-    def get_ucb_score(self, parent, child):
+    def get_ucb_score(self, parent: Hashable, child: Hashable):
+        """Calculates the UCB score for a child node given its parent.
+
+        Args:
+            parent (Hashable): The parent node.
+            child (Hashable): The child node.
+
+        Returns:
+            float: The UCB score of the child node.
+        """
+
         if self.graph.has_edge(parent, child):
             return ucb_score(self.graph, parent, child, self.exploration_constant)
         else:
             return np.inf
 
     def _backpropagate(self, path: list, attr: str, value: float | int):
-        """Update the value of an attribute for each node and edge in the path."""
+        """Update the value of an attribute for each node and edge in the path.
+
+        Args:
+            path (list): The list of nodes in the path.
+            attr (str): The attribute to update.
+            value (float | int): The value to add to the attribute.
+        """
         _path = path.copy()
         child = _path.pop()
         self.graph.nodes[child][attr] += value
@@ -223,20 +414,61 @@ class CircuiTree(ABC):
             self.graph.nodes[child][attr] += value
 
     def backpropagate_visit(self, selection_path: list) -> None:
-        """Update the visit count for each node and edge in the selection path.
-        Visit update happens before simulation and reward calculation, so until the
-        reward is computed and backpropagated, there is 'virtual loss' on each node in
-        the selection path."""
+        """Increment the visit count for each node and edge in `selection_path`.
+
+        Notes:
+        * The reward function (`get_reward`) is called after `backpropagate_visit` and
+        before `backpropagate_reward`.
+        * In parallel mode, each node and edge in the selection path incurs "virtual loss"
+        until the reward is computed and backpropagated. This is because the visit
+        count is incremented before the actual reward is known.
+
+        Args:
+            selection_path (list): The list of nodes in the selection path.
+        """
         self._backpropagate(selection_path, "visits", 1)
 
     def backpropagate_reward(self, selection_path: list, reward: float | int):
-        """Update the reward for each node and edge in the selection path.
-        Visit update happens before simulation and reward calculation, so until the
-        reward is computed and backpropagated, there is 'virtual loss' on each node in
-        the selection path."""
+        """Update the reward for each node and edge in `selection_path`.
+
+        Notes:
+        * The reward function (`get_reward`) is called after `backpropagate_visit` and
+        before `backpropagate_reward`.
+        * In parallel mode, each node and edge in the selection path incurs "virtual loss"
+        until the reward is computed and backpropagated. This is because the visit
+        count is incremented before the actual reward is known.
+
+        Args:
+            selection_path (list): The list of nodes in the selection path.
+            reward (float | int): The reward value to add to each node and edge.
+        """
         self._backpropagate(selection_path, "reward", reward)
 
-    def traverse(self, **kwargs):
+    def traverse(self, **kwargs) -> tuple[list[Hashable], float | int, Hashable]:
+        """Performs a single iteration of the MCTS algorithm.
+
+        This method implements the core traversal step of the UCB algorithm. It selects
+        a path through the search tree using UCB scores, expands the tree if necessary,
+        obtains a reward estimate by simulating a random downstream terminal state, and
+        updates the search graph based on the reward value.
+
+        Notes:
+        * The reward function (`get_reward`) is called after `backpropagate_visit` and
+        before `backpropagate_reward`.
+        * In parallel mode, each node and edge in the selection path incurs "virtual loss"
+        until the reward is computed and backpropagated. This is because the visit
+        count is incremented before the actual reward is known.
+
+        Args:
+            **kwargs: Additional keyword arguments passed to the :func:`get_reward` method.
+
+        Returns:
+            tuple[list[Hashable], float | int, Hashable]:
+                - selection_path (list): The selected path through the search graph.
+                - reward (float | int): The reward obtained from the simulation.
+                - sim_node (Hashable): The simulated terminal state.
+        """
+
         # Select the next state to sample and the terminal state to be simulated.
         # Expands a child if possible.
         selection_path = self.select_and_expand()
@@ -250,8 +482,30 @@ class CircuiTree(ABC):
         return selection_path, reward, sim_node
 
     def grow_tree(
-        self, root=None, n_visits: int = 0, print_updates=False, print_every=1000
+        self,
+        root: Hashable = None,
+        n_visits: int = 0,
+        print_updates: bool = False,
+        print_every: int = 1000,
     ):
+        """Exhaustively expand the search tree from a root node (not recommended for large spaces).
+
+        This method performs a depth-first search expansion of the search graph,
+        adding all possible nodes and edges based on the grammar until no new states
+        can be reached.
+
+        **Warning:** This method can be computationally expensive and memory-intensive
+        for large search spaces.
+
+        Args:
+            root (Hashable, optional): The starting node for the expansion. Defaults to None.
+            n_visits (int, optional): The initial visit count for all added nodes. Defaults to 0.
+            print_updates (bool, optional): Whether to print information about the number of
+                added nodes during growth. Defaults to False.
+            print_every (int, optional): The frequency at which to print updates
+                (if print_updates is True). Defaults to 1000.
+        """
+
         if root is None:
             root = self.root
             if print_updates:
@@ -276,7 +530,9 @@ class CircuiTree(ABC):
                 if not self.graph.has_edge(node, next_node):
                     self.graph.add_edge(node, next_node, visits=n_visits, reward=0)
 
-    def bfs_iterator(self, root=None, shuffle=False):
+    def bfs_iterator(self, root=None, shuffle=False) -> Iterator[Hashable]:
+        """Iterate over all terminal nodes in breadth-first (BFS) order starting from
+        a root node."""
         root = self.root if root is None else root
         layers = (l for l in nx.bfs_layers(self.graph, root))
 
@@ -285,7 +541,6 @@ class CircuiTree(ABC):
             for l in layers:
                 self.rg.shuffle(l)
 
-        # Iterate over all terminal nodes in BFS order
         return filter(self.grammar.is_terminal, chain.from_iterable(layers))
 
     def search_bfs(
@@ -299,6 +554,47 @@ class CircuiTree(ABC):
         progress: bool = False,
         run_kwargs: Optional[dict] = None,
     ) -> None:
+        """Performs a breadth-first search (BFS) traversal of the search graph.
+
+        This method iterates over the search graph in a breadth-first manner, visiting
+        nodes layer by layer. The number of iterations can be controlled using various
+        parameters:
+
+        * `n_steps`: Stop the search after a fixed number of total iterations over all
+        explored nodes (considering repeats and cycles).
+        * `n_repeats`: For each node encountered during BFS traversal, repeat the visit
+        `n_repeats` times before moving on to the next node in the layer.
+        * `n_cycles`: Repeat the entire BFS traversal `n_cycles` times.
+
+        Args:
+            n_steps (Optional[int], optional): Number of total iterations (repeats and
+                cycles considered). Defaults to None.
+            n_repeats (Optional[int], optional): Number of repeats per node. Defaults to
+                None.
+            n_cycles (Optional[int], optional): Number of BFS traversal cycles. Defaults
+                to None.
+            callback (Optional[Callable], optional): A callback function to be executed
+                at specific points during the search. Defaults to None.
+                - The callback is called with three arguments:
+                    - `self`: The `CircuiTree` instance.
+                    - `node`: The current node being visited (value is None during
+                        initialization).
+                    - `reward`: The reward obtained from the node (value is None during
+                        initialization).
+            callback_every (int, optional): How often to call the callback (in terms of
+                iterations). Defaults to 1.
+            shuffle (bool, optional): If True, shuffles the order of nodes within each
+                BFS layer. Defaults to False.
+            progress (bool, optional): If True, displays a progress bar during the
+                search. Defaults to False.
+            run_kwargs (Optional[dict], optional): A dictionary of additional keyword
+                arguments passed to the `get_reward` method during node evaluation.
+                Defaults to None.
+
+        Raises:
+            ValueError: If both `n_steps` and `n_cycles` are specified (exactly one should be provided).
+        """
+
         if self.graph.number_of_nodes() < 2:
             self.graph.add_node(self.root, **self.default_attrs)
             self.grow_tree(root=self.root, n_visits=0)
@@ -337,7 +633,7 @@ class CircuiTree(ABC):
             if callback is not None and i % callback_every == 0:
                 _ = callback(self.graph, node, reward)
 
-    def search_mcts(
+    def search_mCTS(
         self,
         n_steps: int,
         callback_every: int = 1,
@@ -346,8 +642,57 @@ class CircuiTree(ABC):
         run_kwargs: Optional[dict] = None,
         callback_before_start: bool = True,
     ) -> None:
+        """Performs a Monte Carlo Tree Search (MCTS) traversal of circuit topology space.
 
-        # Optionally set up a progress bar
+        This method implements the core MCTS algorithm for exploring and exploiting the
+        search tree. It performs a sequence of `n_steps` iterations, each consisting of
+        selection, expansion, simulation, and backpropagation steps.
+
+        If provided, a callback function is called at specific points during the search.
+        This can be used for various purposes:
+        - Logging search progress
+        - Backing up intermediate results
+        - Recording search statistics
+        - Checking for convergence or early stopping conditions
+
+        The callback function is called with five arguments:
+        - `self`: The `CircuiTree` instance.
+        - `step`: The current MCTS iteration (0-based index).
+        - `path`: A list of nodes representing the selected path in the tree.
+        - `action`: The action taken at the last node expansion (None if no expansion
+            occurred).
+        - `reward`: The reward obtained from the simulated terminal node (None if no
+            simulation occurred).
+
+
+
+        Args:
+            n_steps (int): The total number of MCTS iterations to perform.
+            callback_every (int, optional): How often to call the callback function
+                (in terms of iterations). Defaults to 1 (every iteration).
+            callback (Optional[Callable], optional): A callback function to be executed
+                at specific points during the search. Defaults to None.
+                - The callback is called with five arguments:
+                    - `self`: The `CircuiTree` instance.
+                    - `step`: The current MCTS iteration (0-based index).
+                    - `path`: A list of nodes representing the selected path in the tree.
+                    - `sim_node`: The state used for the simulation step. Chosen by
+                        following random actions from the last node in the path until
+                        a terminal state is reached.
+                    - `reward`: The reward obtained from the simulation step.
+            progress_bar (bool, optional): If True, displays a progress bar during the
+                search. Defaults to False. Requires the `tqdm` package.
+            run_kwargs (Optional[dict], optional): A dictionary of additional keyword
+                arguments passed to the `get_reward` method during node evaluation.
+                Defaults to None.
+            callback_before_start (bool, optional): Whether to call the callback before
+                starting the search. If so, the callback is called with `step=-1`.
+                Defaults to True.
+
+        Returns:
+            None
+        """
+
         if progress_bar:
             from tqdm import trange
 
@@ -359,7 +704,6 @@ class CircuiTree(ABC):
         if callback is not None and callback_before_start:
             callback(self, -1, [None], None, None)
 
-        # Run the search
         run_kwargs = {} if run_kwargs is None else run_kwargs
         print(f"Starting MCTS search with {n_steps} iterations.")
         if callback is None:
@@ -372,8 +716,8 @@ class CircuiTree(ABC):
 
     @staticmethod
     def _run_mcts(tree: "CircuiTree", iterator: Iterable[int], **kwargs) -> None:
-        """Run the MCTS search algorithm on the given CircuiTree object. Can be used to
-        run the search in parallel threads or processes."""
+        """(Internal) Runs an MCTS searcht."""
+        # Performs MCTS iterations on the tree using the provided iterator
         for _ in iterator:
             tree.traverse(**kwargs)
 
@@ -385,9 +729,7 @@ class CircuiTree(ABC):
         callback_every: int,
         **kwargs,
     ) -> None:
-        """Run the MCTS search algorithm on the given CircuiTree object, calling a
-        callback function every `callback_every` iterations. Can be used to run the
-        search in parallel threads or processes."""
+        """(Internal) Runs an MCTS search with a callback."""
         for i in iterator:
             selection_path, reward, sim_node = tree.traverse(**kwargs)
             if callback is not None and i % callback_every == 0:
@@ -403,6 +745,38 @@ class CircuiTree(ABC):
         run_kwargs: Optional[dict] = None,
         logger: Optional[Any] = None,
     ) -> None:
+        """Performs a Monte Carlo Tree Search (MCTS) in parallel using multiple threads.
+
+        This method leverages the `gevent` library (included with
+        `circuitree[distributed]`) to execute the MCTS search algorithm across multiple
+        execution threads on the same search graph.
+
+        **Key Differences from `search_mcts`:**
+
+        * This function utilizes multiple threads for parallel execution, whereas
+        `search_mcts` runs sequentially on a single thread
+        * For intended performance, reward computations should be performed by a separate
+        pool of worker processes (see [Parallelization](user_guide/parallelization))
+        * Requires the `gevent` library
+
+        Args:
+            n_steps (int): The total number of MCTS iterations to perform (divided among threads).
+            n_threads (int): The number of threads to use for parallel MCTS. Must be at least 1.
+            callback (Optional[Callable], optional): A callback function to be executed
+                at specific points during the search. Defaults to None. (See `search_mcts` docstring for details).
+            callback_every (int, optional): How often to call the callback function
+                (in terms of iterations). Defaults to 1 (every iteration).
+            callback_before_start (bool, optional): Whether to call the callback before
+                starting the search (step=-1). Defaults to True.
+            run_kwargs (Optional[dict], optional): A dictionary of additional keyword arguments
+                passed to the `get_reward` method during node evaluation. Defaults to None.
+            logger (Optional[Any], optional): A logger object to be used for logging messages
+                during the search. Can be useful for monitoring progress. Defaults to None.
+
+        Raises:
+            ImportError: If `gevent` is not installed.
+            ValueError: If the number of threads is less than 1.
+        """
 
         # Check if the `gevent` package is installed
         try:
@@ -470,24 +844,53 @@ class CircuiTree(ABC):
 
         return
 
-    def is_success(self, state: Hashable) -> bool:
-        """Returns whether or not a state is successful. Used to infer which patterns
-        lead to more successes (i.e. motif candidates)."""
+    def is_success(self, terminal_state: Hashable) -> bool:
+        """
+        Determines whether a state represents a successful outcome in the search.
+
+        Designed to be implemented in a subclass, since the definition of success
+        depends on the specific search problem. It takes a terminal state as input, which
+        represents a potential solution for the design problem.
+
+        Args:
+            terminal_state (Hashable): The state to evaluate for success.
+
+        Raises:
+            NotImplementedError: This base class implementation raises a `NotImplementedError`
+                as it's intended to be overridden in subclasses.
+
+        Returns:
+            bool: Whether the provided state represents a successful outcome (True) or not (False).
+        """
+
         raise NotImplementedError
 
     def copy_graph(self) -> nx.DiGraph:
-        """Return a shallow copy of the graph. Use copy.deepcopy() for a deep copy."""
+        """Return a shallow copy of the search graph (the `graph` attribute). Use
+        `copy.deepcopy()` for a deep copy."""
         return self.graph.copy()
 
     def get_attributes(self, attrs_copy: Optional[Iterable[str]]) -> dict:
-        """Return a dictionary of the object's attributes. If `attrs_copy` is not
-        provided, all attributes are returned except those in the
-        `_non_serializable_attrs` list. If `attrs_copy` is provided, only the specified
-        attributes are returned. If any of the specified attributes are in
-        `_non_serializable_attrs`, a ValueError is raised.
+        """Returns a dictionary of the object's attributes.
 
-        If an attribute has a `to_dict()` method, it is called to get the attribute's
-        value. Otherwise, the attribute is copied as-is.
+        This method allows controlled access to the object's attributes, potentially
+        excluding ones that should not be serialized when writing to a JSON file.
+
+        For any attribute with a `to_dict()` method, the output of that method is used.
+        Otherwise, the attribute is copied directly.
+
+        Args:
+            attrs_copy (Optional[Iterable[str]]): An optional list of attribute names
+                to include. If None, all attributes except those in
+                `_non_serializable_attrs` are returned.
+
+        Raises:
+            ValueError: If `attrs_copy` contains attributes from `_non_serializable_attrs`.
+
+        Returns:
+            dict: A dictionary containing the requested attributes. Attributes with a
+                `to_dict()` method are converted using that method, otherwise they are
+                copied directly.
         """
 
         # Get the attributes to copy
@@ -495,10 +898,11 @@ class CircuiTree(ABC):
             keys = set(self.__dict__.keys()) - set(self._non_serializable_attrs)
         else:
             keys = set(attrs_copy)
-            if non_serializable := (keys & set(self._non_serializable_attrs)):
-                repr_non_ser = ", ".join(non_serializable)
+            non_serializable_keys = keys & set(self._non_serializable_attrs)
+            if non_serializable_keys:
+                repr_attrs = ", ".join(non_serializable_keys)
                 raise ValueError(
-                    f"Attempting to save non-serializable attributes: {repr_non_ser}."
+                    f"Attempting to save non-serializable attributes: {repr_attrs}."
                 )
 
         # Copy the attributes
@@ -514,7 +918,11 @@ class CircuiTree(ABC):
         return attrs_copy
 
     def generate_gml(self) -> str:
-        """Return a string representation of the graph in GML format."""
+        """Convert the `graph` attribute to a GML formatted string.
+
+        Returns:
+            str: The GML representation of the graph.
+        """
         return nx.generate_gml(self.graph)
 
     def to_string(self) -> tuple[str, str]:
@@ -532,17 +940,29 @@ class CircuiTree(ABC):
         compress: bool = False,
         **kwargs,
     ):
-        """Save the CircuiTree object to a gml file and optionally a json file
-        containing the object's attributes. The `save_attrs` argument can be used to
-        specify which attributes to save. If `compress` is True, the gml file is
-        compressed with gzip.
+        """Save the `CircuiTree` object to a gml file and optionally a JSON file
+        containing the object's attributes.
 
-        A saved CircuiTree object can be loaded with the `from_file` class method.
+        This method allows saving the CircuiTree object to disk in a GML format for the
+        graph and optionally a JSON format for the serializable attributes. The saved
+        object can be loaded later using the `from_file` class method (see
+        `CircuiTree.from_file`).
 
-        The grammar is saved by calling its `to_dict()` method, which returns a
-        dictionary of the grammar's attributes and its class name string
-        `__grammar_cls__`. These attributes are saved in the JSON file and used to
-        create the grammar object upon loading."""
+        Args:
+            gml_file (str | Path): The path to the GML file as a `str` or `Path` object.
+            json_file (Optional[str | Path], optional): The path to the optional JSON file
+                for saving other attributes. Defaults to None.
+            save_attrs (Optional[Iterable[str]], optional): An optional list of attribute
+                names to include in the JSON file. If None, all attributes except those in
+                `_non_serializable_attrs` are saved. Defaults to None.
+            compress (bool, optional): If True, the GML file will be compressed with gzip.
+                Defaults to False.
+            **kwargs: Additional keyword arguments passed to `networkx.write_gml`.
+
+        Returns:
+            Path | Tuple[Path, Path]: Returns the path to the saved GML file and,
+            optionally, the JSON file.
+        """
 
         # Save the graph
         if compress:
@@ -561,19 +981,18 @@ class CircuiTree(ABC):
         else:
             return gml_target
 
-    @staticmethod
-    def generate_grammar(grammar_cls: CircuitGrammar, grammar_kwargs: dict):
-        """Generate a grammar object from the class and keyword arguments.
+    def generate_grammar(
+        grammar_cls: CircuitGrammar | None, grammar_kwargs: dict
+    ) -> CircuitGrammar:
+        """
+        (Internal) Generate a grammar object from class and kwargs.
 
-        The `CircuitGrammar` class used to construct the object can be passed using the
-        grammar_cls keyword grammar object. Alternatively, if `grammar_kwargs` contains
-        a key "__grammar_cls__" that specifies a class name string, that class will be
-        searched for in `globals()`."""
+        # This function can also handle grammar class specification by looking for a
+        # '__grammar_cls__' key in grammar_kwargs and looking for the class in globals().
+        """
 
-        # Make the grammar object
-        # Get kwargs from the grammar_kwargs in this function and/or from the json
+        # Find the grammar class if not provided
         _grammar_cls_name = grammar_kwargs.pop("__grammar_cls__", None)
-
         if grammar_cls is None:
             if _grammar_cls_name is None:
                 raise ValueError(
@@ -590,7 +1009,8 @@ class CircuiTree(ABC):
         else:
             _grammar_cls = grammar_cls
 
-        # Patch an external bug where _non_serializable_attrs is saved to the json file
+        # For backwards compatibility. Older versions had a bug where
+        # _non_serializable_attrs was saved to the json file
         grammar_kwargs.pop("_non_serializable_attrs", None)
 
         return _grammar_cls(**grammar_kwargs)
@@ -610,11 +1030,25 @@ class CircuiTree(ABC):
 
         The grammar attribute is loaded by looking for a key "grammar" in the JSON file,
         whose value should be a dict `grammar_kwargs` used to create a grammar object.
-        The grammar_cls keyword can be passed to specify the class constructor for the
-        grammar object. Alternatively, if `grammar_kwargs` contains a key
-        "__grammar_cls__" that specifies a class name string, that class will be found
-        in globals() and used to construct the grammar object.
+        The `grammar_cls` keyword argument can be used to directly specify the grammar class
+        constructor. Alternatively, the JSON file can include a key "__grammar_cls__" that
+        specifies the class name string (which will be looked up in `globals()`).
+
+        Args:
+            graph_gml (str | Path | None, optional): The path to the GML file or the
+                serialized GML string (optional).
+            attrs_json (str | Path): The path to the JSON file containing the object's
+                attributes or the serialized JSON string.
+            grammar_cls (Optional[CircuitGrammar], optional): The grammar class constructor
+                to use. If None, the class is loaded from the JSON file. Defaults to None.
+            grammar_kwargs (Optional[dict], optional): Keyword arguments used to create the
+                grammar object.
+            **kwargs: Keyword arguments to pass to the CircuiTree constructor.
+
+        Returns:
+            CircuiTree: A CircuiTree object loaded from the provided files or strings.
         """
+
         # Load the attributes from the json file
         if Path(attrs_json).is_file():
             with open(attrs_json, "r") as f:
@@ -636,6 +1070,81 @@ class CircuiTree(ABC):
         grammar = cls.generate_grammar(grammar_cls, grammar_kwargs)
 
         return cls(grammar=grammar, graph=graph, **kwargs)
+
+    def to_complexity_graph(
+        self, successes: bool | Iterable[Hashable] = True
+    ) -> nx.DiGraph:
+        """Generates a directed acyclic graph (DAG) representing the search graph as a
+        'complexity atlas' [1]_.
+
+        Returns a subgraph of the original search tree that includes only certain
+        terminal states (determined by the `successes` argument) and their parent nodes.
+        The returned graph can be used to visualize the search space and identify
+        clusters of topologically similar solutions that occur, for example, due to
+        motifs.
+
+        Args:
+            successes (bool | Iterable[Hashable], optional): A flag or an iterable of
+                states representing successful terminal states.
+                * If `True` (default), the `is_success()` method is used to identify the
+                    successful states, and only these are included.
+                * If `False`, all terminal states are included.
+                * If an iterable, the states in the iterable are included.
+
+        Raises:
+            ValueError: If an invalid value is provided for `successes`.
+            NotImplementedError: If `successes` is `True` and `is_success()` is not
+                implemented. The intended usage is to subclass `CircuiTree` and implement
+                the `is_success()` method.
+
+        Returns:
+            nx.DiGraph: A directed acyclic graph representing the complexity atlas.
+
+        References:
+            .. [1] Cotterell J, Sharpe J. *An atlas of gene regulatory networks reveals
+            multiple three-gene mechanisms for interpreting morphogen gradients*. Mol
+            Syst Biol. 2010 Nov 2;6:425. doi: 10.1038/msb.2010.74. PMID: 21045819;
+            PMCID: PMC3010108.
+        """
+
+        if isinstance(successes, Iterable):
+            successful_children = set(successes)
+        elif successes is True:
+
+            # Check if is_success() is implemented
+            try:
+                _ = self.is_success(self.root)
+            except NotImplementedError:
+                raise NotImplementedError(
+                    "If successes=True, the CircuiTree subclass must implement "
+                    "the is_success() method."
+                )
+
+            # Keep only the successful nodes
+            successful_children = set(
+                c for c in self.terminal_states if self.is_success(c)
+            )
+        elif successes is False:
+            # keep all terminal nodes
+            successful_children = set(self.terminal_states)
+        else:
+            raise ValueError(f"Invalid value for `successes`: {successes}")
+
+        # Store the attributes of the terminal states
+        child_attrs: dict[Hashable, dict[str, Any]] = {}
+        for child in successful_children:
+            parents = [p for p, _ in self.graph.in_edges(child)]
+            for p in parents:
+                child_attrs[(p, child)] = self.graph.edges[(p, child)]
+
+        complexity_graph: nx.DiGraph = self.graph.subgraph(
+            (p for p, c in child_attrs.keys())
+        ).copy()
+
+        for (parent, child), d in child_attrs.items():
+            complexity_graph.nodes[parent]["terminal_state"] = d | {"name": child}
+
+        return complexity_graph
 
     def sample_terminal_states(
         self,
@@ -971,7 +1480,7 @@ class CircuiTree(ABC):
 
         Samples `n_samples` paths from the overall design space and uses rejection
         sampling to sample `n_samples` paths that terminate in a successful circuit as
-        determined by the is_successful() method.
+        determined by the `is_success` method.
 
         if `exclude_self` is True, the pattern being tested is excluded from the null
         and successful samples. This is to properly evaluate the significance of rare
@@ -1114,48 +1623,6 @@ class CircuiTree(ABC):
                 graph.add_edge(parent, state, **self.default_attrs)
 
         return graph
-
-    def to_complexity_graph(
-        self, successes: bool | Iterable[Hashable] = True
-    ) -> nx.DiGraph:
-        if isinstance(successes, Iterable):
-            successful_children = set(successes)
-        elif successes is True:
-
-            # Check if is_success() is implemented
-            try:
-                _ = self.is_success(self.root)
-            except NotImplementedError:
-                raise NotImplementedError(
-                    "If successes=True, the CircuiTree subclass must implement "
-                    "the is_success() method."
-                )
-
-            # Keep only the successful nodes
-            successful_children = set(
-                c for c in self.terminal_states if self.is_success(c)
-            )
-        elif successes is False:
-            # keep all terminal nodes
-            successful_children = set(self.terminal_states)
-        else:
-            raise ValueError(f"Invalid value for `successes`: {successes}")
-
-        # Store the attributes of the terminal states
-        child_attrs: dict[Hashable, dict[str, Any]] = {}
-        for child in successful_children:
-            parents = [p for p, _ in self.graph.in_edges(child)]
-            for p in parents:
-                child_attrs[(p, child)] = self.graph.edges[(p, child)]
-
-        complexity_graph: nx.DiGraph = self.graph.subgraph(
-            (p for p, c in child_attrs.keys())
-        ).copy()
-
-        for (parent, child), d in child_attrs.items():
-            complexity_graph.nodes[parent]["terminal_state"] = d | {"name": child}
-
-        return complexity_graph
 
 
 def compute_odds_ratio_and_ci(

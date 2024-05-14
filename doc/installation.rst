@@ -1,16 +1,19 @@
 .. _installation:
+.. highlight:: console
 
 Installation
 ============
 
 For parallel and/or distributed computing
 
-.. code-block:: bash
+.. code-block:: console
+	
 	pip install --upgrade circuitree[distributed]
 
 For basic usage
 
-.. code-block:: bash
+.. code-block:: console
+
 	pip install --upgrade circuitree
 
 Dependencies
