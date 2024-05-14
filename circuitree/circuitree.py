@@ -163,14 +163,16 @@ class CircuiTree(ABC):
         Yields:
             Hashable: Each element returned by the iterator represents a terminal
                 state within the search graph (see :func:`CircuitGrammar.is_terminal`).
+
         Example:
 
-        ```python
-        # Find terminal states with mean reward > 0.5
-        for state in tree.terminal_states:
-            if tree.graph.nodes[state]["reward"] / tree.graph.nodes[state]["visits"] > 0.5:
-                print(state)
-        ```
+        .. code-block:: python
+
+            # Find terminal states with mean reward > 0.5
+            for state in tree.terminal_states:
+                if tree.graph.nodes[state]["reward"] / tree.graph.nodes[state]["visits"] > 0.5:
+                    print(state)
+
         """
 
         return (node for node in self.graph.nodes if self.grammar.is_terminal(node))
@@ -566,6 +568,7 @@ class CircuiTree(ABC):
         `n_repeats` times before moving on to the next node in the layer.
         * `n_cycles`: Repeat the entire BFS traversal `n_cycles` times.
 
+
         Args:
             n_steps (Optional[int], optional): Number of total iterations (repeats and
                 cycles considered). Defaults to None.
@@ -574,13 +577,14 @@ class CircuiTree(ABC):
             n_cycles (Optional[int], optional): Number of BFS traversal cycles. Defaults
                 to None.
             callback (Optional[Callable], optional): A callback function to be executed
-                at specific points during the search. Defaults to None.
-                - The callback is called with three arguments:
-                    - `self`: The `CircuiTree` instance.
-                    - `node`: The current node being visited (value is None during
-                        initialization).
-                    - `reward`: The reward obtained from the node (value is None during
-                        initialization).
+                at specific points during the search. Defaults to None. The callback is
+                called with three arguments:
+                - `self`: The `CircuiTree` instance.
+                - `node`: The current node being visited (value is None during
+                    initialization).
+                - `reward`: The reward obtained from the node (value is None during
+                    initialization).
+
             callback_every (int, optional): How often to call the callback (in terms of
                 iterations). Defaults to 1.
             shuffle (bool, optional): If True, shuffles the order of nodes within each
@@ -633,7 +637,7 @@ class CircuiTree(ABC):
             if callback is not None and i % callback_every == 0:
                 _ = callback(self.graph, node, reward)
 
-    def search_mCTS(
+    def search_mcts(
         self,
         n_steps: int,
         callback_every: int = 1,
@@ -665,21 +669,21 @@ class CircuiTree(ABC):
             simulation occurred).
 
 
-
         Args:
             n_steps (int): The total number of MCTS iterations to perform.
             callback_every (int, optional): How often to call the callback function
                 (in terms of iterations). Defaults to 1 (every iteration).
             callback (Optional[Callable], optional): A callback function to be executed
-                at specific points during the search. Defaults to None.
-                - The callback is called with five arguments:
-                    - `self`: The `CircuiTree` instance.
-                    - `step`: The current MCTS iteration (0-based index).
-                    - `path`: A list of nodes representing the selected path in the tree.
-                    - `sim_node`: The state used for the simulation step. Chosen by
-                        following random actions from the last node in the path until
-                        a terminal state is reached.
-                    - `reward`: The reward obtained from the simulation step.
+                at specific points during the search. Defaults to None. The callback is
+                called with five arguments:
+                - `self`: The `CircuiTree` instance.
+                - `step`: The current MCTS iteration (0-based index).
+                - `path`: A list of nodes representing the selected path in the tree.
+                - `sim_node`: The state used for the simulation step. Chosen by
+                    following random actions from the last node in the path until
+                    a terminal state is reached.
+                - `reward`: The reward obtained from the simulation step.
+
             progress_bar (bool, optional): If True, displays a progress bar during the
                 search. Defaults to False. Requires the `tqdm` package.
             run_kwargs (Optional[dict], optional): A dictionary of additional keyword
@@ -1086,25 +1090,25 @@ class CircuiTree(ABC):
         Args:
             successes (bool | Iterable[Hashable], optional): A flag or an iterable of
                 states representing successful terminal states.
-                * If `True` (default), the `is_success()` method is used to identify the
-                    successful states, and only these are included.
-                * If `False`, all terminal states are included.
-                * If an iterable, the states in the iterable are included.
+            * If `True` (default), the `is_success` method is used to identify the
+                successful states, and only these are included.
+            * If `False`, all terminal states are included.
+            * If an iterable, the states in the iterable are included.
 
         Raises:
             ValueError: If an invalid value is provided for `successes`.
-            NotImplementedError: If `successes` is `True` and `is_success()` is not
+            NotImplementedError: If `successes` is `True` and `is_success` is not
                 implemented. The intended usage is to subclass `CircuiTree` and implement
-                the `is_success()` method.
+                the `is_success` method.
 
         Returns:
             nx.DiGraph: A directed acyclic graph representing the complexity atlas.
 
         References:
             .. [1] Cotterell J, Sharpe J. *An atlas of gene regulatory networks reveals
-            multiple three-gene mechanisms for interpreting morphogen gradients*. Mol
-            Syst Biol. 2010 Nov 2;6:425. doi: 10.1038/msb.2010.74. PMID: 21045819;
-            PMCID: PMC3010108.
+                multiple three-gene mechanisms for interpreting morphogen gradients*. Mol
+                Syst Biol. 2010 Nov 2;6:425. doi: 10.1038/msb.2010.74. PMID: 21045819;
+                PMCID: PMC3010108.
         """
 
         if isinstance(successes, Iterable):
