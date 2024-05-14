@@ -38,7 +38,7 @@ def ucb_score(
         node (str): The ID of the target node for which to compute the UCB score.
         exploration_constant (float, optional): The exploration constant that
             controls the balance between exploitation and exploration. Defaults to
-            np.sqrt(2.0).
+            ``np.sqrt(2.0)``.
 
     Returns:
         float: The UCB score of the target node.
@@ -63,12 +63,11 @@ class CircuiTree(ABC):
     provides methods for tree traversal, expansion, and backpropagation.
 
     The class is designed to be subclassed with a specific implementation of the
-    `get_reward()` method, which calculates the reward for a given state. The class
-    also requires a `CircuitGrammar` object to define the search space.
-
-    There are also methods for extracting meaningful patterns (motifs) from the search
-    graph, by comparing successful and unsuccessful paths in the graph. These methods
-    are more experimental and may be removed in future versions.
+    ``get_reward()`` method, which calculates the reward for a given state. The class
+    also requires a ``CircuitGrammar`` object to define the search space. There are also
+    methods for extracting meaningful patterns (motifs) from the search graph, by
+    comparing successful and unsuccessful paths in the graph. These methods are
+    experimental and may be removed in future versions.
     """
 
     def __init__(
@@ -130,7 +129,7 @@ class CircuiTree(ABC):
         """
         Abstract method that calculates the reward for a given state.
 
-        This method must be implemented by a subclass of `CircuiTree`. It defines
+        This method must be implemented by a subclass of ``CircuiTree``. It defines
         the interface for reward calculation within the framework.
 
         Args:
@@ -155,11 +154,11 @@ class CircuiTree(ABC):
         Generator that yields terminal states in the search graph.
 
         This property provides an iterator that traverses the terminal states
-        present in the search graph associated with the `CircuiTree` instance.
+        present in the search graph associated with the ``CircuiTree`` instance.
 
         Yields:
             Hashable: Each element returned by the iterator represents a terminal
-                state within the search graph (see :func:`CircuitGrammar.is_terminal`).
+            state within the search graph (see ``CircuitGrammar.is_terminal``).
 
         Example:
 
@@ -188,7 +187,7 @@ class CircuiTree(ABC):
 
         Returns:
             Hashable: The resulting state after applying the action. If
-                `self.compute_unique` is True, `self.grammar.get_unique_state()` is
+                ``self.compute_unique`` is True, ``self.grammar.get_unique_state()`` is
                 called on the resulting state before returning.
 
         """
@@ -224,9 +223,9 @@ class CircuiTree(ABC):
         Sample a random terminal state by following random actions from a given start
         state.
 
-        Performs a random walk on the search space starting from the specified `start`
+        Performs a random walk on the search space starting from the specified ``start``
         state by recursively selecting random actions until a terminal state is reached,
-        as determined by the `grammar` (see :func:`CircuitGrammar.is_terminal`).
+        as determined by the ``grammar`` (see :func:`CircuitGrammar.is_terminal`).
 
         Args:
             grammar (CircuitGrammar): The grammar associated with the search space.
@@ -258,7 +257,7 @@ class CircuiTree(ABC):
         Sample from a set of terminal states using rejection sampling.
 
         A state is sampled by performing a random walk on the search space from the
-        `start` state until a terminal state is reached that belongs to the `terminals`
+        ``start`` state until a terminal state is reached that belongs to the ``terminals``
         set.
 
         Args:
@@ -274,7 +273,7 @@ class CircuiTree(ABC):
                 a suitable terminal state.
 
         Returns:
-            Hashable: A randomly sampled terminal state in `terminals`.
+            Hashable: A randomly sampled terminal state in ``terminals``.
 
         """
 
@@ -298,12 +297,12 @@ class CircuiTree(ABC):
     ) -> Hashable:
         """
         Sample a random terminal state by following random actions from a given start
-        state. Wrapper for the `_get_random_terminal_descendant` method.
+        state.
 
         Args:
             start (Hashable): The starting state from which to begin the random walk.
             rg (Optional[np.random.Generator], optional): Defaults to None, in which
-            case the `rg` attribute of the `CircuiTree` instance is used.
+            case the ``rg`` attribute of the ``CircuiTree`` instance is used.
 
         Returns:
             Hashable: The randomly sampled terminal state.
@@ -325,12 +324,12 @@ class CircuiTree(ABC):
 
         Args:
             rg (Optional[np.random.Generator], optional): Random number generator.
-                Defaults to None, in which case the `rg` attribute of the `CircuiTree`
+                Defaults to None, in which case the ``rg`` attribute of the ``CircuiTree``
                 instance is used.
 
         Returns:
             list[Hashable]: A list of states representing the selected path through the
-                search graph.
+            search graph.
         """
 
         rg = self.rg if rg is None else rg
@@ -413,14 +412,15 @@ class CircuiTree(ABC):
             self.graph.nodes[child][attr] += value
 
     def backpropagate_visit(self, selection_path: list) -> None:
-        """Increment the visit count for each node and edge in `selection_path`.
+        """Increment the visit count for each node and edge in ``selection_path``.
 
         Notes:
-        * The reward function (`get_reward`) is called after `backpropagate_visit` and
-        before `backpropagate_reward`.
+
+        * The reward function (``get_reward``) is called after ``backpropagate_visit`` and
+           before ``backpropagate_reward``.
         * In parallel mode, each node and edge in the selection path incurs "virtual loss"
-        until the reward is computed and backpropagated. This is because the visit
-        count is incremented before the actual reward is known.
+          until the reward is computed and backpropagated. This is because the visit
+          count is incremented before the actual reward is known.
 
         Args:
             selection_path (list): The list of nodes in the selection path.
@@ -428,14 +428,15 @@ class CircuiTree(ABC):
         self._backpropagate(selection_path, "visits", 1)
 
     def backpropagate_reward(self, selection_path: list, reward: float | int):
-        """Update the reward for each node and edge in `selection_path`.
+        """Update the reward for each node and edge in ``selection_path``.
 
         Notes:
-        * The reward function (`get_reward`) is called after `backpropagate_visit` and
-        before `backpropagate_reward`.
+
+        * The reward function (``get_reward``) is called after ``backpropagate_visit`` and
+          before ``backpropagate_reward``.
         * In parallel mode, each node and edge in the selection path incurs "virtual loss"
-        until the reward is computed and backpropagated. This is because the visit
-        count is incremented before the actual reward is known.
+          until the reward is computed and backpropagated. This is because the visit
+          count is incremented before the actual reward is known.
 
         Args:
             selection_path (list): The list of nodes in the selection path.
@@ -452,14 +453,14 @@ class CircuiTree(ABC):
         updates the search graph based on the reward value.
 
         Notes:
-        * The reward function (`get_reward`) is called after `backpropagate_visit` and
-        before `backpropagate_reward`.
+        * The reward function (``get_reward``) is called after ``backpropagate_visit`` and
+          before ``backpropagate_reward``.
         * In parallel mode, each node and edge in the selection path incurs "virtual loss"
-        until the reward is computed and backpropagated. This is because the visit
-        count is incremented before the actual reward is known.
+          until the reward is computed and backpropagated. This is because the visit
+          count is incremented before the actual reward is known.
 
         Args:
-            **kwargs: Additional keyword arguments passed to the :func:`get_reward` method.
+            **kwargs: Additional keyword arguments passed to the :func:``get_reward`` method.
 
         Returns:
             tuple[list[Hashable], float | int, Hashable]:
@@ -559,12 +560,11 @@ class CircuiTree(ABC):
         nodes layer by layer. The number of iterations can be controlled using various
         parameters:
 
-        * `n_steps`: Stop the search after a fixed number of total iterations over all
-            explored nodes (considering repeats and cycles).
-        * `n_repeats`: For each node encountered during BFS traversal, repeat the visit
-            `n_repeats` times before moving on to the next node in the layer.
-        * `n_cycles`: Repeat the entire BFS traversal `n_cycles` times.
-
+        * ``n_steps``: Stop the search after a fixed number of total iterations over all
+          explored nodes (considering repeats and cycles).
+        * ``n_repeats``: For each node encountered during BFS traversal, repeat the visit
+          ``n_repeats`` times before moving on to the next node in the layer.
+        * ``n_cycles``: Repeat the entire BFS traversal `n_cycles` times.
 
         Args:
             n_steps (Optional[int], optional): Number of total iterations (repeats and
@@ -577,11 +577,11 @@ class CircuiTree(ABC):
                 at specific points during the search. Defaults to None. The callback is
                 called with three arguments:
 
-                - `self`: The `CircuiTree` instance.
-                - `node`: The current node being visited (value is None during
-                    initialization).
-                - `reward`: The reward obtained from the node (value is None during
-                    initialization).
+                - ``tree``: The ``CircuiTree`` instance calling the callback.
+                - ``node``: The current node being visited (value is None during
+                  initialization).
+                - ``reward``: The reward obtained from the node (value is None during
+                  initialization).
 
             callback_every (int, optional): How often to call the callback (in terms of
                 iterations). Defaults to 1.
@@ -590,11 +590,11 @@ class CircuiTree(ABC):
             progress (bool, optional): If True, displays a progress bar during the
                 search. Defaults to False.
             run_kwargs (Optional[dict], optional): A dictionary of additional keyword
-                arguments passed to the `get_reward` method during node evaluation.
+                arguments passed to the ``get_reward`` method during node evaluation.
                 Defaults to None.
 
         Raises:
-            ValueError: If both `n_steps` and `n_cycles` are specified (exactly one should be provided).
+            ValueError: If both ``n_steps`` and ``n_cycles`` are specified (exactly one should be provided).
         """
 
         if self.graph.number_of_nodes() < 2:
@@ -647,7 +647,7 @@ class CircuiTree(ABC):
         """Performs a Monte Carlo Tree Search (MCTS) traversal of circuit topology space.
 
         This method implements the core MCTS algorithm for exploring and exploiting the
-        search tree. It performs a sequence of `n_steps` iterations, each consisting of
+        search tree. It performs a sequence of ``n_steps`` iterations, each consisting of
         selection, expansion, simulation, and backpropagation steps. If provided, a
         callback function is called at specific points during the search. This can be
         used for various purposes:
@@ -659,13 +659,13 @@ class CircuiTree(ABC):
 
         The callback function is called with five arguments:
 
-        - `self`: The `CircuiTree` instance.
-        - `step`: The current MCTS iteration (0-based index).
-        - `path`: A list of nodes representing the selected path in the tree.
-        - `action`: The action taken at the last node expansion (None if no expansion
-            occurred).
-        - `reward`: The reward obtained from the simulated terminal node (None if no
-            simulation occurred).
+        - ``tree``: The ``CircuiTree`` instance.
+        - ``step``: The current MCTS iteration (0-based index).
+        - ``path``: A list of nodes representing the selected path in the tree.
+        - ``action``: The action taken at the last node expansion (None if no expansion
+          occurred).
+        - ``reward``: The reward obtained from the simulated terminal node (None if no
+          simulation occurred).
 
         Args:
             n_steps (int): The total number of MCTS iterations to perform.
@@ -675,21 +675,21 @@ class CircuiTree(ABC):
                 at specific points during the search. Defaults to None. The callback is
                 called with five arguments:
 
-                - `self`: The `CircuiTree` instance.
-                - `step`: The current MCTS iteration (0-based index).
-                - `path`: A list of nodes representing the selected path in the tree.
-                - `sim_node`: The state used for the simulation step. Chosen by
-                    following random actions from the last node in the path until
-                    a terminal state is reached.
-                - `reward`: The reward obtained from the simulation step.
+                - ``tree``: The ``CircuiTree`` instance calling the callback.
+                - ``step``: The current MCTS iteration (0-based index).
+                - ``path``: A list of nodes representing the selected path in the tree.
+                - ``sim_node``: The state used for the simulation step. Chosen by
+                  following random actions from the last node in the path until
+                  a terminal state is reached.
+                - ``reward``: The reward obtained from the simulation step.
 
             progress_bar (bool, optional): If True, displays a progress bar during the
-                search. Defaults to False. Requires the `tqdm` package.
+                search. Defaults to False. Requires the ``tqdm`` package.
             run_kwargs (Optional[dict], optional): A dictionary of additional keyword
-                arguments passed to the `get_reward` method during node evaluation.
+                arguments passed to the ``get_reward`` method during node evaluation.
                 Defaults to None.
             callback_before_start (bool, optional): Whether to call the callback before
-                starting the search. If so, the callback is called with `step=-1`.
+                starting the search. If so, the callback is called with ``step = -1``.
                 Defaults to True.
 
         Returns:
@@ -749,34 +749,34 @@ class CircuiTree(ABC):
         logger: Optional[Any] = None,
     ) -> None:
         """Performs a Monte Carlo Tree Search (MCTS) in parallel using multiple threads.
-        This method leverages the `gevent` library (included with
-        `circuitree[distributed]`) to execute the MCTS search algorithm across multiple
+        This method leverages the ``gevent`` library (included with
+        ``circuitree[distributed]``) to execute the MCTS search algorithm across multiple
         execution threads on the same search graph.
 
-        Key Differences from `search_mcts`:
+        Key differences from ``search_mcts``:
 
         * This function utilizes multiple threads for parallel execution, whereas
-            `search_mcts` runs sequentially on a single thread
+          ``search_mcts`` runs sequentially on a single thread
         * For intended performance, reward computations should be performed by a separate
-            pool of worker processes (see User Guide > Parallelization)
-        * Requires the `gevent` library
+          pool of worker processes (see User Guide > Parallelization)
+        * Requires the ``gevent`` library
 
         Args:
             n_steps (int): The total number of MCTS iterations to perform (divided among threads).
             n_threads (int): The number of threads to use for parallel MCTS. Must be at least 1.
             callback (Optional[Callable], optional): A callback function to be executed
-                at specific points during the search. Defaults to None. (See `search_mcts` docstring for details).
+                at specific points during the search. Defaults to None. (See ``search_mcts`` docstring for details).
             callback_every (int, optional): How often to call the callback function
                 (in terms of iterations). Defaults to 1 (every iteration).
             callback_before_start (bool, optional): Whether to call the callback before
                 starting the search (step=-1). Defaults to True.
             run_kwargs (Optional[dict], optional): A dictionary of additional keyword arguments
-                passed to the `get_reward` method during node evaluation. Defaults to None.
+                passed to the ``get_reward`` method during node evaluation. Defaults to None.
             logger (Optional[Any], optional): A logger object to be used for logging messages
                 during the search. Can be useful for monitoring progress. Defaults to None.
 
         Raises:
-            ImportError: If `gevent` is not installed.
+            ImportError: If ``gevent`` is not installed.
             ValueError: If the number of threads is less than 1.
         """
 
@@ -858,18 +858,19 @@ class CircuiTree(ABC):
             terminal_state (Hashable): The state to evaluate for success.
 
         Raises:
-            NotImplementedError: This base class implementation raises a `NotImplementedError`
-                as it's intended to be overridden in subclasses.
+            NotImplementedError: This base class implementation is intended to be 
+            overridden in subclasses.
 
         Returns:
-            bool: Whether the provided state represents a successful outcome (True) or not (False).
+            bool: Whether the provided state represents a successful outcome (True) or 
+            not (False).
         """
 
         raise NotImplementedError
 
     def copy_graph(self) -> nx.DiGraph:
-        """Return a shallow copy of the search graph (the `graph` attribute). Use
-        `copy.deepcopy()` for a deep copy."""
+        """Return a shallow copy of the search graph (the ``graph`` attribute). Use
+        ``copy.deepcopy()`` for a deep copy."""
         return self.graph.copy()
 
     def get_attributes(self, attrs_copy: Optional[Iterable[str]]) -> dict:
@@ -878,20 +879,20 @@ class CircuiTree(ABC):
         This method allows controlled access to the object's attributes, potentially
         excluding ones that should not be serialized when writing to a JSON file.
 
-        For any attribute with a `to_dict()` method, the output of that method is used.
+        For any attribute with a ``to_dict()`` method, the output of that method is used.
         Otherwise, the attribute is copied directly.
 
         Args:
             attrs_copy (Optional[Iterable[str]]): An optional list of attribute names
                 to include. If None, all attributes except those in
-                `_non_serializable_attrs` are returned.
+                ``_non_serializable_attrs`` are returned.
 
         Raises:
-            ValueError: If `attrs_copy` contains attributes from `_non_serializable_attrs`.
+            ValueError: If ``attrs_copy`` contains attributes from ``_non_serializable_attrs``.
 
         Returns:
             dict: A dictionary containing the requested attributes. Attributes with a
-                `to_dict()` method are converted using that method, otherwise they are
+                ``to_dict()`` method are converted using that method, otherwise they are
                 copied directly.
         """
 
@@ -920,15 +921,15 @@ class CircuiTree(ABC):
         return attrs_copy
 
     def generate_gml(self) -> str:
-        """Convert the `graph` attribute to a GML formatted string.
+        """Convert the ``graph`` attribute to a GML formatted string.
 
         Returns:
-            str: The GML representation of the graph.
+            str: The GML representation of ``self.graph``.
         """
         return nx.generate_gml(self.graph)
 
     def to_string(self) -> tuple[str, str]:
-        """Return a a GML-formatted string of the `graph` attribute and a JSON-formatted
+        """Return a a GML-formatted string of the ``graph`` attribute and a JSON-formatted
         string of the other serializable attributes."""
         graph_src = self.generate_gml()
         attrs_src = json.dumps(self.get_attributes(None), indent=4)
@@ -942,24 +943,24 @@ class CircuiTree(ABC):
         compress: bool = False,
         **kwargs,
     ):
-        """Save the `CircuiTree` object to a gml file and optionally a JSON file
+        """Save the ``CircuiTree`` object to a gml file and optionally a JSON file
         containing the object's attributes.
 
         This method allows saving the CircuiTree object to disk in a GML format for the
         graph and optionally a JSON format for the serializable attributes. The saved
-        object can be loaded later using the `from_file` class method (see
-        `CircuiTree.from_file`).
+        object can be loaded later using the ``from_file`` class method (see
+        ``CircuiTree.from_file``).
 
         Args:
-            gml_file (str | Path): The path to the GML file as a `str` or `Path` object.
+            gml_file (str | Path): The path to the GML file as a ``str`` or ``Path`` object.
             json_file (Optional[str | Path], optional): The path to the optional JSON file
                 for saving other attributes. Defaults to None.
             save_attrs (Optional[Iterable[str]], optional): An optional list of attribute
                 names to include in the JSON file. If None, all attributes except those in
-                `_non_serializable_attrs` are saved. Defaults to None.
+                ``_non_serializable_attrs`` are saved. Defaults to None.
             compress (bool, optional): If True, the GML file will be compressed with gzip.
                 Defaults to False.
-            **kwargs: Additional keyword arguments passed to `networkx.write_gml`.
+            **kwargs: Additional keyword arguments passed to ``networkx.write_gml``.
 
         Returns:
             Path | Tuple[Path, Path]: Returns the path to the saved GML file and,
@@ -983,14 +984,15 @@ class CircuiTree(ABC):
         else:
             return gml_target
 
-    def generate_grammar(
+    def _generate_grammar(
         grammar_cls: CircuitGrammar | None, grammar_kwargs: dict
     ) -> CircuitGrammar:
         """
         (Internal) Generate a grammar object from class and kwargs.
 
-        # This function can also handle grammar class specification by looking for a
-        # '__grammar_cls__' key in grammar_kwargs and looking for the class in globals().
+        This function can also handle grammar class specification by looking for a
+        ``__grammar_cls__`` key in ``grammar_kwargs`` and looking for the class in 
+        ``globals()``.
         """
 
         # Find the grammar class if not provided
@@ -1026,15 +1028,16 @@ class CircuiTree(ABC):
         grammar_kwargs: Optional[dict] = None,
         **kwargs,
     ):
-        """Load a CircuiTree object from a JSON file containing the object's attributes
-        and an optional GML file of the search graph, typically saved with the `.to_file()`
-        method. Both can be supplied as serialized strings as well.
+        """Load a CircuiTree object from a JSON file/string containing the object's
+        attributes and an optional GML file/string of the search graph.
+
+        These files are typically saved with the ``to_file()`` method.
 
         The grammar attribute is loaded by looking for a key "grammar" in the JSON file,
-        whose value should be a dict `grammar_kwargs` used to create a grammar object.
-        The `grammar_cls` keyword argument can be used to directly specify the grammar class
-        constructor. Alternatively, the JSON file can include a key "__grammar_cls__" that
-        specifies the class name string (which will be looked up in `globals()`).
+        whose value should be a dict ``grammar_kwargs`` used to create a grammar object.
+        The ``grammar_cls`` keyword argument can be used to directly specify the grammar class
+        constructor. Alternatively, the JSON file can include a key "``__grammar_cls__``" that
+        specifies the class name string (which will be looked up in ``globals()``).
 
         Args:
             graph_gml (str | Path | None, optional): The path to the GML file or the
@@ -1069,7 +1072,7 @@ class CircuiTree(ABC):
 
         # Make the grammar attribute
         grammar_kwargs = kwargs.pop("grammar", {}) | (grammar_kwargs or {})
-        grammar = cls.generate_grammar(grammar_cls, grammar_kwargs)
+        grammar = cls._generate_grammar(grammar_cls, grammar_kwargs)
 
         return cls(grammar=grammar, graph=graph, **kwargs)
 
@@ -1077,10 +1080,10 @@ class CircuiTree(ABC):
         self, successes: bool | Iterable[Hashable] = True
     ) -> nx.DiGraph:
         """Generates a directed acyclic graph (DAG) representing the search graph as a
-        'complexity atlas' [1]_.
+        'complexity atlas'.
 
-        Returns a subgraph of the original search tree that includes only certain
-        terminal states (determined by the `successes` argument) and their parent nodes.
+        A complexity atlas[1]_ is a subgraph of the search graph that includes only certain
+        terminal states (determined by the ``successes`` argument) and their parent nodes.
         The returned graph can be used to visualize the search space and identify
         clusters of topologically similar solutions that occur, for example, due to
         motifs.
@@ -1088,16 +1091,16 @@ class CircuiTree(ABC):
         Args:
             successes (bool | Iterable[Hashable], optional): A flag or an iterable of
                 states representing successful terminal states.
-            * If `True` (default), the `is_success` method is used to identify the
+            * If ``True`` (default), the ``is_success`` method is used to identify the
                 successful states, and only these are included.
-            * If `False`, all terminal states are included.
+            * If ``False``, all terminal states are included.
             * If an iterable, the states in the iterable are included.
 
         Raises:
-            ValueError: If an invalid value is provided for `successes`.
-            NotImplementedError: If `successes` is `True` and `is_success` is not
-                implemented. The intended usage is to subclass `CircuiTree` and implement
-                the `is_success` method.
+            ValueError: If an invalid value is provided for ``successes``.
+            NotImplementedError: If ``successes`` is ``True`` and ``is_success`` is not
+                implemented. The intended usage is to subclass ``CircuiTree`` and implement
+                the ``is_success`` method.
 
         Returns:
             nx.DiGraph: A directed acyclic graph representing the complexity atlas.
@@ -1480,11 +1483,11 @@ class CircuiTree(ABC):
         design space. Returns the contingency table (a Pandas DataFrame) containing
         test statistics and p-values.
 
-        Samples `n_samples` paths from the overall design space and uses rejection
-        sampling to sample `n_samples` paths that terminate in a successful circuit as
-        determined by the `is_success` method.
+        Samples ``n_samples`` paths from the overall design space and uses rejection
+        sampling to sample ``n_samples`` paths that terminate in a successful circuit as
+        determined by the ``is_success`` method.
 
-        if `exclude_self` is True, the pattern being tested is excluded from the null
+        if ``exclude_self`` is True, the pattern being tested is excluded from the null
         and successful samples. This is to properly evaluate the significance of rare
         patterns.
         """
