@@ -417,7 +417,7 @@ class CircuiTree(ABC):
         Notes:
 
         * The reward function (``get_reward``) is called after ``backpropagate_visit`` and
-           before ``backpropagate_reward``.
+          before ``backpropagate_reward``.
         * In parallel mode, each node and edge in the selection path incurs "virtual loss"
           until the reward is computed and backpropagated. This is because the visit
           count is incremented before the actual reward is known.
@@ -453,6 +453,7 @@ class CircuiTree(ABC):
         updates the search graph based on the reward value.
 
         Notes:
+
         * The reward function (``get_reward``) is called after ``backpropagate_visit`` and
           before ``backpropagate_reward``.
         * In parallel mode, each node and edge in the selection path incurs "virtual loss"
@@ -657,16 +658,6 @@ class CircuiTree(ABC):
         - Recording search statistics
         - Checking for convergence or early stopping conditions
 
-        The callback function is called with five arguments:
-
-        - ``tree``: The ``CircuiTree`` instance.
-        - ``step``: The current MCTS iteration (0-based index).
-        - ``path``: A list of nodes representing the selected path in the tree.
-        - ``action``: The action taken at the last node expansion (None if no expansion
-          occurred).
-        - ``reward``: The reward obtained from the simulated terminal node (None if no
-          simulation occurred).
-
         Args:
             n_steps (int): The total number of MCTS iterations to perform.
             callback_every (int, optional): How often to call the callback function
@@ -858,11 +849,11 @@ class CircuiTree(ABC):
             terminal_state (Hashable): The state to evaluate for success.
 
         Raises:
-            NotImplementedError: This base class implementation is intended to be 
+            NotImplementedError: This base class implementation is intended to be
             overridden in subclasses.
 
         Returns:
-            bool: Whether the provided state represents a successful outcome (True) or 
+            bool: Whether the provided state represents a successful outcome (True) or
             not (False).
         """
 
@@ -877,9 +868,8 @@ class CircuiTree(ABC):
         """Returns a dictionary of the object's attributes.
 
         This method allows controlled access to the object's attributes, potentially
-        excluding ones that should not be serialized when writing to a JSON file.
-
-        For any attribute with a ``to_dict()`` method, the output of that method is used.
+        excluding ones that should not be serialized when writing to a JSON file. For
+        any attribute with a ``to_dict()`` method, the output of that method is used.
         Otherwise, the attribute is copied directly.
 
         Args:
@@ -892,8 +882,8 @@ class CircuiTree(ABC):
 
         Returns:
             dict: A dictionary containing the requested attributes. Attributes with a
-                ``to_dict()`` method are converted using that method, otherwise they are
-                copied directly.
+            ``to_dict()`` method are converted using that method, otherwise they are
+            copied directly.
         """
 
         # Get the attributes to copy
@@ -991,7 +981,7 @@ class CircuiTree(ABC):
         (Internal) Generate a grammar object from class and kwargs.
 
         This function can also handle grammar class specification by looking for a
-        ``__grammar_cls__`` key in ``grammar_kwargs`` and looking for the class in 
+        ``__grammar_cls__`` key in ``grammar_kwargs`` and looking for the class in
         ``globals()``.
         """
 
@@ -1080,9 +1070,9 @@ class CircuiTree(ABC):
         self, successes: bool | Iterable[Hashable] = True
     ) -> nx.DiGraph:
         """Generates a directed acyclic graph (DAG) representing the search graph as a
-        'complexity atlas'.
+        "complexity atlas".
 
-        A complexity atlas[1]_ is a subgraph of the search graph that includes only certain
+        A complexity atlas [1]_ is a subgraph of the search graph that includes only certain
         terminal states (determined by the ``successes`` argument) and their parent nodes.
         The returned graph can be used to visualize the search space and identify
         clusters of topologically similar solutions that occur, for example, due to
@@ -1091,10 +1081,11 @@ class CircuiTree(ABC):
         Args:
             successes (bool | Iterable[Hashable], optional): A flag or an iterable of
                 states representing successful terminal states.
-            * If ``True`` (default), the ``is_success`` method is used to identify the
-                successful states, and only these are included.
-            * If ``False``, all terminal states are included.
-            * If an iterable, the states in the iterable are included.
+
+                - If ``True`` (default), the ``is_success`` method is used to identify the
+                  successful states, and only these are included.
+                - If ``False``, all terminal states are included.
+                - If an iterable, the states in the iterable are included.
 
         Raises:
             ValueError: If an invalid value is provided for ``successes``.
