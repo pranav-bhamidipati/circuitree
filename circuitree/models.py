@@ -8,6 +8,7 @@ from typing import Callable, Iterable, Literal, Optional
 
 from .circuitree import CircuiTree
 from .grammar import CircuitGrammar
+from .utils import merge_overlapping_sets
 
 __all__ = [
     "SimpleNetworkGrammar",
@@ -191,7 +192,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
             components_in_ixn = [set(ixn[:2]) for ixn in interactions_joined.split("_")]
             for i, ixn in enumerate(interactions):
                 # If we remove this interaction, will the circuit remain connected?
-                distinct_sets_without_ixn = self.merge_overlapping_sets(
+                distinct_sets_without_ixn = merge_overlapping_sets(
                     components_in_ixn[:i] + components_in_ixn[i + 1 :]
                 )
 
