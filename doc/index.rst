@@ -1,7 +1,10 @@
-CircuiTree: Biochemical circuit design using reinfocement learning
-==================================================================
+CircuiTree: Biochemical circuit design using RL
+===============================================
 
-CircuiTree is a Python package for optimizing the architecture, or topology, of a biochemical network with respect to a given reward function. The package is designed to be extensible, allowing users to define their own reward functions and custom search spaces for circuits. The package uses the 
+``circuitree`` is a Python package for optimizing the architecture, or topology, of a biochemical network 
+for a particular behavior using reinforcement learning (RL), specifically Monte carlo Tree Search 
+(MCTS). Once the user defines a space of topologies they want to search and supplies a reward function, 
+``circuitree`` will search for the best topologies. 
 
 .. toctree::
    :maxdepth: 1
