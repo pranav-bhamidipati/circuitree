@@ -16,7 +16,9 @@ CircuiTree
    ucb_score
 
 
-Built-in Grammar classes and CircuiTree subclasses
+.. _Models:
+
+Built-in Grammars
 --------------------------------------------------
 .. currentmodule:: circuitree.models
 
@@ -30,6 +32,8 @@ Built-in Grammar classes and CircuiTree subclasses
    DimerNetworkTree
 
 
+.. _Grammar:
+
 Low-level CircuitGrammar API
 ----------------------------
 .. currentmodule:: circuitree.grammar
@@ -40,6 +44,8 @@ Low-level CircuitGrammar API
 
    CircuitGrammar
 
+
+.. _Viz:
 
 Visualisation
 -------------
@@ -54,6 +60,8 @@ Visualisation
    plot_complexity
    plot_network
 
+
+.. _Utils:
 
 Utility functions and classes
 -----------------------------

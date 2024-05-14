@@ -1,9 +1,10 @@
-Defining search spaces using CircuitGrammar
-===========================================
+Defining search spaces
+======================
 
-`circuitree` provides a way to specify search spaces implicitly using :ref:`Grammars`. This is useful when the search space is too large to be enumerated explicitly.
-
-The package comes with a couple of built-in Grammars for common use cases. Custom grammars can also be defined by subclassing `CircuitGrammar`.
+In many cases, we may want to search a space of circuit architectures that is too large to be enumerated 
+explicitly. In ``circuitree``, search spaces are specified implicitly as Grammars. The package comes with a few 
+built-in Grammars for common use cases, and in other cases a custom Grammar can also be defined using the 
+``CircuitGrammar`` low-level API.
 
 .. toctree::
    :maxdepth: 1
