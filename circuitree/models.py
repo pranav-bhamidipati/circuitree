@@ -354,7 +354,7 @@ class SimpleNetworkTree(CircuiTree):
         seed: int = 2023,
         graph: nx.DiGraph | None = None,
         tree_shape: Optional[Literal["tree", "dag"]] = None,
-        compute_symmetries: bool = True,
+        compute_unique: bool = True,
         fixed_components: Optional[list[str]] = None,
         **kwargs,
     ):
@@ -373,7 +373,7 @@ class SimpleNetworkTree(CircuiTree):
             seed=seed,
             graph=graph,
             tree_shape=tree_shape,
-            compute_unique=compute_symmetries,
+            compute_unique=compute_unique,
             **kwargs,
         )
 
@@ -795,7 +795,7 @@ class DimerNetworkTree(CircuiTree):
         seed: int = 2023,
         graph: nx.DiGraph | None = None,
         tree_shape: Optional[Literal["tree", "dag"]] = None,
-        compute_symmetries: bool = True,
+        compute_unique: bool = True,
         **kwargs,
     ):
         grammar = DimersGrammar(
@@ -813,6 +813,6 @@ class DimerNetworkTree(CircuiTree):
             seed=seed,
             graph=graph,
             tree_shape=tree_shape,
-            compute_unique=compute_symmetries,
+            compute_unique=compute_unique,
             **kwargs,
         )
