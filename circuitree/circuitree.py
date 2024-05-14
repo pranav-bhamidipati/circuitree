@@ -69,9 +69,6 @@ class CircuiTree(ABC):
     There are also methods for extracting meaningful patterns (motifs) from the search
     graph, by comparing successful and unsuccessful paths in the graph. These methods
     are more experimental and may be removed in future versions.
-
-    Args:
-        ABC (_type_): _description_
     """
 
     def __init__(
@@ -563,9 +560,9 @@ class CircuiTree(ABC):
         parameters:
 
         * `n_steps`: Stop the search after a fixed number of total iterations over all
-        explored nodes (considering repeats and cycles).
+            explored nodes (considering repeats and cycles).
         * `n_repeats`: For each node encountered during BFS traversal, repeat the visit
-        `n_repeats` times before moving on to the next node in the layer.
+            `n_repeats` times before moving on to the next node in the layer.
         * `n_cycles`: Repeat the entire BFS traversal `n_cycles` times.
 
 
@@ -579,6 +576,7 @@ class CircuiTree(ABC):
             callback (Optional[Callable], optional): A callback function to be executed
                 at specific points during the search. Defaults to None. The callback is
                 called with three arguments:
+
                 - `self`: The `CircuiTree` instance.
                 - `node`: The current node being visited (value is None during
                     initialization).
@@ -650,16 +648,17 @@ class CircuiTree(ABC):
 
         This method implements the core MCTS algorithm for exploring and exploiting the
         search tree. It performs a sequence of `n_steps` iterations, each consisting of
-        selection, expansion, simulation, and backpropagation steps.
+        selection, expansion, simulation, and backpropagation steps. If provided, a
+        callback function is called at specific points during the search. This can be
+        used for various purposes:
 
-        If provided, a callback function is called at specific points during the search.
-        This can be used for various purposes:
         - Logging search progress
         - Backing up intermediate results
         - Recording search statistics
         - Checking for convergence or early stopping conditions
 
         The callback function is called with five arguments:
+
         - `self`: The `CircuiTree` instance.
         - `step`: The current MCTS iteration (0-based index).
         - `path`: A list of nodes representing the selected path in the tree.
@@ -668,7 +667,6 @@ class CircuiTree(ABC):
         - `reward`: The reward obtained from the simulated terminal node (None if no
             simulation occurred).
 
-
         Args:
             n_steps (int): The total number of MCTS iterations to perform.
             callback_every (int, optional): How often to call the callback function
@@ -676,6 +674,7 @@ class CircuiTree(ABC):
             callback (Optional[Callable], optional): A callback function to be executed
                 at specific points during the search. Defaults to None. The callback is
                 called with five arguments:
+
                 - `self`: The `CircuiTree` instance.
                 - `step`: The current MCTS iteration (0-based index).
                 - `path`: A list of nodes representing the selected path in the tree.
@@ -750,17 +749,16 @@ class CircuiTree(ABC):
         logger: Optional[Any] = None,
     ) -> None:
         """Performs a Monte Carlo Tree Search (MCTS) in parallel using multiple threads.
-
         This method leverages the `gevent` library (included with
         `circuitree[distributed]`) to execute the MCTS search algorithm across multiple
         execution threads on the same search graph.
 
-        **Key Differences from `search_mcts`:**
+        Key Differences from `search_mcts`:
 
         * This function utilizes multiple threads for parallel execution, whereas
-        `search_mcts` runs sequentially on a single thread
+            `search_mcts` runs sequentially on a single thread
         * For intended performance, reward computations should be performed by a separate
-        pool of worker processes (see [Parallelization](user_guide/parallelization))
+            pool of worker processes (see User Guide > Parallelization)
         * Requires the `gevent` library
 
         Args:
