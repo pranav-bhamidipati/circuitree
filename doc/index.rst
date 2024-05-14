@@ -5,16 +5,10 @@ CircuiTree is a Python package for optimizing the architecture, or topology, of 
 
 .. toctree::
    :maxdepth: 1
-   :caption: Installation
-
-   installation
-
-.. toctree::
-   :maxdepth: 1
    :caption: Getting started
 
+   getting_started/installation
    getting_started/tutorial_1_getting_started
-   getting_started/tutorial_2_mcts_in_parallel
 
 .. toctree::
    :maxdepth: 2
@@ -22,7 +16,7 @@ CircuiTree is a Python package for optimizing the architecture, or topology, of 
 
    user_guide/core_concepts
    user_guide/conventions
-   user_guide/parallelization
+   user_guide/tutorial_2_mcts_in_parallel
    user_guide/defining_search_spaces/index
    user_guide/api
 

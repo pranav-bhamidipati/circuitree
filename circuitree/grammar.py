@@ -5,8 +5,10 @@ __all__ = ["CircuitGrammar"]
 
 
 class CircuitGrammar(ABC):
-    """Abstract class for Grammars, which define the rules for the circuit assembly
-    "game". Each stage of circuit topology assembly is represented by a ``state``, which
+    """Abstract class for Grammars. Used to define custom rules for the circuit assembly
+    "game".
+
+    Each stage of circuit topology assembly is represented by a ``state``, which
     is a hashable ID (typically a string) for the current state. The state can be
     modified by applying an ``action``, and the game ends when a terminal state is
     reached.
@@ -77,11 +79,11 @@ class CircuitGrammar(ABC):
 
     @abstractmethod
     def get_unique_state(self, state: Hashable) -> Hashable:
-        """Given a state, return a unique representation of that state. 
-        
-        This is used to determine whether two ``state`` IDs represent the same topology. 
-        For example, two assembly paths may lead to state IDs that are isomorphic 
-        "mirror images" of each other. In this case, ``get_unique_state`` should return 
+        """Given a state, return a unique representation of that state.
+
+        This is used to determine whether two ``state`` IDs represent the same topology.
+        For example, two assembly paths may lead to state IDs that are isomorphic
+        "mirror images" of each other. In this case, ``get_unique_state`` should return
         the same ID for both.
 
         Args:
@@ -93,7 +95,7 @@ class CircuitGrammar(ABC):
         pass
 
     def has_pattern(self, state: Hashable, pattern: Hashable) -> bool:
-        """Optional method to check if a given state contains a particular sub-pattern. 
+        """Optional method to check if a given state contains a particular sub-pattern.
         This is useful for finding specific beneficial patterns, or motifs.
 
         Args:
@@ -132,7 +134,7 @@ class CircuitGrammar(ABC):
     def to_dict(self) -> dict:
         """Convert the grammar to a dictionary that can be serialized to JSON. Useful for
         saving the grammar to a file or for transferring it over a network.
-        
+
         The ``__grammar_cls__`` key is added to the dictionary to indicate the name of the
         class that should be used to re-instantiate the grammar.
 
