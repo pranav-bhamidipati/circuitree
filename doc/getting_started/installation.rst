@@ -19,7 +19,7 @@ For basic usage
 Dependencies
 ------------
 
-`circuitree` has the following dependencies.
+``circuitree`` has the following dependencies.
 
 - Python 3.10 or newer
 - Numpy_
