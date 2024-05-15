@@ -179,7 +179,7 @@ class CircuiTree(ABC):
 
         This is an internal function that applies an action to the given state using the
         supplied grammar. It then optionally computes a unique representation of the
-        resulting state, depending on the `compute_unique` attribute.
+        resulting state, depending on the ``compute_unique`` attribute.
 
         Args:
             state (Hashable): The current state.
@@ -198,15 +198,7 @@ class CircuiTree(ABC):
         return new_state
 
     def _undo_action(self, state: Hashable, action: Hashable) -> Hashable:
-        """Undo one action from the given state. Experimental.
-
-        Args:
-            state (Hashable): _description_
-            action (Hashable): _description_
-
-        Returns:
-            Hashable: _description_
-        """
+        """(Experimental) Undo one action from the given state."""
 
         if state == self.root:
             return None

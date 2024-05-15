@@ -1,10 +1,10 @@
 from collections import Counter
 from copy import copy
 from functools import cached_property, lru_cache
-from itertools import chain, product, permutations
+from itertools import chain, combinations, product, permutations
 import networkx as nx
 import numpy as np
-from typing import Callable, Iterable, Literal, Optional
+from typing import Callable, Generator, Iterable, Literal, Optional
 
 from .circuitree import CircuiTree
 from .grammar import CircuitGrammar
@@ -21,40 +21,81 @@ __all__ = [
 
 
 class SimpleNetworkGrammar(CircuitGrammar):
-    """A class implementing the grammar for simple network circuits. It provides
-    all required methods for the CircuiTree and MultithreadedCircuiTree classes
-    except the get_reward() method."""
+    """A Grammar class for pairwise interaction networks.
+
+    This class models a circuit as a set of ``components`` and pairwise
+    ``interactions``. This grammar is well-suited for simple biological networks such as
+    basic transcriptional networks or signaling pathways where regulation between
+    components is pairwise.
+
+    Each ``state`` of circuit assembly is encoded as a string that contains the components
+    and interactions in the circuit, and each ``action`` can either add a new interaction
+    or terminate the assembly.
+
+    * A component is abbreviated by an uppercase letter. For instance, Mdm2 and p53 would
+      be ``M`` and ``P``, respectively). Multiple components are concatenated (``MP``).
+    * Each type of interaction is abbreviated as a lowercase letter. For instance,
+      activation and inhibition would be abbreviated as ``a`` and ``i``.
+    * Each pairwise interaction is represented by three characters, the two components
+      involved and the type of interaction. For instance, ``MPi`` means "MdM2 inhibits
+      p53". Multiple interactions are separated by ``_``.
+    * The ``state`` is a two-part string ``<components>::<interactions>``.
+    * A terminal ``state`` starts with ``*``.
+
+    For example, the ``state`` string ``*MP::MPi_PMa`` represents the MdM2-p53 negative
+    feedback circuit, where MdM2 inhibits p53 and p53 activates MdM2. The ``*`` indicates
+    that the circuit has been fully assembled.
+
+    Args:
+        components (str | Iterable[str]): _description_
+        interactions (str | Iterable[str]): _description_
+        max_interactions (int, optional): The maximum number of interactions
+            allowed in a ``state``. Defaults to ``len(components) ** 2``.
+        root (str, optional): The initial ``state``.
+        fixed_components (Optional[str | Iterable[str]], optional): A list of components
+            to ignore when computing uniqueness. In other words, these components are
+            considered fixed and will not be permuted when computing unique states.
+        cache_maxsize (int | None, optional): The maximum size of the LRU cache used to
+            speed up the computation of unique states. Defaults to 128.
+
+    Raises:
+        ValueError: If the first character of any component or interaction type
+            is not unique.
+
+    Models a circuit as a set of ``components`` and with pairwise interactions. Each
+    ``state`` of circuit assembly is encoded as a string with the following format:
+    """
 
     def __init__(
         self,
-        components: Iterable[Iterable[str]],
-        interactions: Iterable[str],
+        components: str | Iterable[str],
+        interactions: str | Iterable[str],
         max_interactions: Optional[int] = None,
         root: Optional[str] = None,
-        cache_maxsize: int | None = 128,
         fixed_components: Optional[list[str]] = None,
+        cache_maxsize: int | None = 128,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
-        if len(set(c[0] for c in components)) < len(components):
+        if len(set(c[0].upper() for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
-        if len(set(c[0] for c in interactions)) < len(interactions):
+        if len(set(c[0].lower() for c in interactions)) < len(interactions):
             raise ValueError("First character of each interaction must be unique")
 
         self.root = root
-        self.components = components
-        self.component_map = {c[0]: c for c in self.components}
-        self.interactions = interactions
-        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
+        self.components = list(components)
+        self.component_map = {c[0].upper(): c for c in self.components}
+        self.interactions = list(interactions)
+        self.interaction_map = {ixn[0].lower(): ixn for ixn in self.interactions}
 
         if max_interactions is None:
             self.max_interactions = len(self.components) ** 2  # all possible edges
         else:
             self.max_interactions = max_interactions
 
-        self.fixed_components = fixed_components or []
+        self.fixed_components = list(fixed_components or [])
 
         # Allow user to specify a cache size for the get_interaction_recolorings method.
         # This method is called frequently during search, and evaluation can become a
@@ -78,8 +119,15 @@ class SimpleNetworkGrammar(CircuitGrammar):
         )
 
     @property
-    def recolorable_components(self) -> list[str]:
-        return [c for c in self.components if c not in self.fixed_components]
+    def _recolorable_components(self) -> list[str]:
+        """List of single-character component codes to permute when checking for
+        uniqueness."""
+        return [
+            c[0].upper()
+            for c in self.components
+            if c not in self.fixed_components
+            and c[0].upper() not in self.fixed_components
+        ]
 
     def __getstate__(self):
         result = copy(self.__dict__)
@@ -98,17 +146,35 @@ class SimpleNetworkGrammar(CircuitGrammar):
         )
 
     @cached_property
-    def edge_options(self):
+    def _edge_options(self):
+        """List of possible interactions for each ordered pair of components."""
         return [
-            [c1[0] + c2[0] + ixn[0] for ixn in self.interactions]
+            [
+                c1[0].upper() + c2[0].upper() + ixn[0].lower()
+                for ixn in self.interactions
+            ]
             for c1, c2 in product(self.components, self.components)
         ]
 
     @cached_property
     def component_codes(self) -> set[str]:
-        return set(c[0] for c in self.components)
+        """Set of single-character uppercase component codes."""
+        return set(c[0].upper() for c in self.components)
 
     def get_actions(self, genotype: str) -> Iterable[str]:
+        """Returns the actions that can be taken from a given ``state``, or ``genotype``.
+
+        Possible actions are adding a new component, adding a new interaction, or
+        terminating the assembly process. Checks to make sure the necessary components
+        are present and the circuit would remain fully connected.
+
+        Args:
+            genotype (str): The current state of the circuit assembly.
+
+        Returns:
+            Iterable[str]: A list of valid actions that can be taken.
+        """
+
         # If terminal already, no actions can be taken
         if self.is_terminal(genotype):
             return list()
@@ -122,37 +188,34 @@ class SimpleNetworkGrammar(CircuitGrammar):
         interactions = set(ixn[:2] for ixn in interactions_joined.split("_") if ixn)
         n_interactions = len(interactions)
 
-        # If we have reached the limit on interactions, only termination is an option
         if n_interactions >= self.max_interactions:
             return actions
 
-        # We can add at most one more component not already in the genotype
-        if len(components) < len(self.components):
-            actions.append(next(c for c in self.component_codes if c not in components))
+        # Add components if possible
+        actions.extend([c for c in self.component_codes if c not in components])
 
-        # If we have no interactions yet, don't need to check for connectedness
-        elif n_interactions == 0:
+        # No interactions yet, any pair of components can be connected
+        if n_interactions == 0:
             possible_edge_options = [
                 grp
-                for grp in self.edge_options
+                for grp in self._edge_options
                 if grp and set(grp[0][:2]).issubset(components)
             ]
             return list(chain.from_iterable(possible_edge_options))
 
-        # Otherwise, add all valid interactions
-        for action_group in self.edge_options:
+        # Otherwise, add valid interactions
+        for action_group in self._edge_options:
             if action_group:
-                c1_c2 = action_group[0][:2]
-                c1, c2 = c1_c2
+                c_ij = action_group[0][:2]
+                c_i, c_j = c_ij
 
-                # Add the interaction the necessary components are present, that edge
-                # isn't already taken, and the added edge would be contiguous with the
-                # existing edges (i.e. the circuit should be fully connected)
-                has_necessary_components = c1 in components and c2 in components
+                # Make sure that the circuit would still be fully connected after adding
+                # an interaction between c_i and c_j
+                has_necessary_components = c_i in components and c_j in components
                 connected_to_current_edges = (
-                    c1_c2[0] in interactions_joined or c1_c2[1] in interactions_joined
+                    c_i in interactions_joined or c_j in interactions_joined
                 )
-                no_existing_edge = c1_c2 not in interactions
+                no_existing_edge = c_ij not in interactions
                 if (
                     has_necessary_components
                     and connected_to_current_edges
@@ -163,6 +226,35 @@ class SimpleNetworkGrammar(CircuitGrammar):
         return actions
 
     def do_action(self, genotype: str, action: str) -> str:
+        """Applies the given action to the current circuit assembly state, or
+        ``genotype``.
+
+        The action can be:
+
+        - A single character: Add a new component to the circuit.
+        - Three characters: Add a new interaction between two components.
+        - ``*terminate*``: Terminate the assembly process.
+
+        Args:
+            genotype (str): The current assembly state.
+            action (str): The action to be applied.
+
+        Returns:
+            str: The new state (``genotype``) after applying the action to given state.
+
+        Examples:
+            >>> grammar = SimpleNetworkGrammar(...)
+            >>> gen1 = "MP::"  # Initial state with two components
+            >>> gen2 = grammar.do_action(gen1, "MPi")  # Add inhibition interaction
+            >>> print(gen2)
+            "MP::MPi"
+            >>> gen3 = grammar.do_action(gen2, "Q")  # Add a new component
+            >>> print(gen3)
+            "MPQ::MPi"
+            >>> gen4 = grammar.do_action(gen3, "*terminate*")  # Terminate the assembly
+            >>> grammar.is_terminal(gen4)
+            True
+        """
         if action == "*terminate*":
             new_genotype = "*" + genotype
         else:
@@ -231,20 +323,32 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
     @staticmethod
     def is_terminal(genotype: str) -> bool:
+        """Checks if the given assembly state (``genotype``) is a terminal state. A
+        terminal state starts with an asterisk ``*``.
+
+        Args:
+            genotype (str): An assembly state.
+
+        Returns:
+            bool: Whether the state is terminal.
+        """
         return genotype.startswith("*")
 
     @cached_property
     def _recolor(self):
+        """List of dictionaries representing all possible permutations of components"""
         return [
-            dict(zip(self.recolorable_components, p))
-            for p in permutations(self.recolorable_components)
+            dict(zip(self._recolorable_components, p))
+            for p in permutations(self._recolorable_components)
         ]
 
     @staticmethod
     def _recolor_string(mapping: dict[str, str], string: str):
+        """Recolors a state string (renames components) using a given mapping."""
         return "".join([mapping.get(c, c) for c in string])
 
     def _get_interaction_recolorings(self, interactions: str) -> list[str]:
+        """Returns all possible recolorings of the interactions in a given state."""
         interaction_recolorings = []
         for mapping in self._recolor:
             recolored_interactions = sorted(
@@ -256,6 +360,7 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
     @lru_cache
     def get_component_recolorings(self, components: str) -> list[str]:
+        """Returns all possible recolorings of the components in a given state."""
         component_recolorings = []
         for mapping in self._recolor:
             recolored_components = "".join(
@@ -266,6 +371,8 @@ class SimpleNetworkGrammar(CircuitGrammar):
         return component_recolorings
 
     def get_recolorings(self, genotype: str) -> Iterable[str]:
+        """Returns all possible recolorings (equivalent string representations) of a
+        given state."""
         prefix = "*" if self.is_terminal(genotype) else ""
         components, interactions = genotype.strip("*").split("::")
         rcs = self.get_component_recolorings(components)
@@ -275,9 +382,42 @@ class SimpleNetworkGrammar(CircuitGrammar):
         return recolorings
 
     def get_unique_state(self, genotype: str) -> str:
+        """Returns a unique representation of a given state.
+
+        This method is used to determine whether two ``state`` IDs represent the same
+        topology, after accounting for component renaming and reording of the
+        interactions. For example, different sequences of actions may lead to different
+        ``state`` IDs that are isomorphic mirror images, or "recolorings" of each other.
+        This method picks the alphabetically first representation over all possible
+        recolorings.
+
+        Args:
+            genotype (str): The current state.
+
+        Returns:
+            str: The unique representation of the state.
+        """
         return min(self.get_recolorings(genotype))
 
     def has_pattern(self, state: str, pattern: str):
+        """Checks if a given state contains a particular sub-pattern.
+
+        The ``pattern`` should be a string that contains only interactions (separated by
+        underscores) and no components. This method checks if the interactions in the
+        ``pattern`` are a subset of the interactions in the given ``state``.
+
+        Args:
+            state (str): The current state.
+            pattern (str): The sub-pattern to search for.
+
+        Returns:
+            bool: Whether the state contains the given pattern.
+
+        Raises:
+            ValueError: If the pattern contains components or if the state does not
+                contain both components and interactions.
+        """
+
         if ("::" in pattern) or ("*" in pattern):
             raise ValueError(
                 "Pattern code should only contain interactions, no components"
@@ -300,6 +440,23 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
     @staticmethod
     def parse_genotype(genotype: str, nonterminal_ok: bool = False):
+        """Parses a genotype string into its components, activations, and inhibitions.
+
+        Args:
+            genotype (str): The genotype string to parse.
+            nonterminal_ok (bool, optional): Whether to allow non-terminal genotypes.
+                Defaults to False.
+
+        Returns:
+            tuple[str, np.ndarray, np.ndarray]: The components, activations, and
+                inhibitions in the genotype. The activations and inhibitions are
+                represented as numpy arrays with two columns, where each row is a pair of
+                indices representing the interacting components.
+
+        Raises:
+            ValueError: If the genotype is nonterminal and ``nonterminal_ok`` is False.
+        """
+
         if not genotype.startswith("*") and not nonterminal_ok:
             raise ValueError(
                 f"Assembly incomplete. Genotype {genotype} is not a terminal genotype."
@@ -324,23 +481,9 @@ class SimpleNetworkGrammar(CircuitGrammar):
 
 
 class SimpleNetworkTree(CircuiTree):
-    """
-    Models a circuit as a set of components and strictly pairwise interactions between them.
-    The circuit topology (also referred to as the "state" during search) is encoded using a
-    string representation with the following rules:
-        - Components are represented by a single uppercase character
-        - Interactions are represented by a three-character string
-            - The first two characters are the components involved. Order is assumed to
-                matter.
-            - The third character (lowercase) is the type of interaction. A common use case
-                would have "a" for activation and "i" for inhibition.
-        - Multiple interactions are separated by underscores ``_``
-        - Components and interactions are separated by double colons ``::``
-        - A terminal assembly is denoted with a leading asterisk ``*``
+    """A convenience subclass of CircuiTree that uses SimpleNetworkGrammar by default.
 
-        For example, the following string represents a terminally assembled circuit
-        that encodes an incoherent feed-forward loop:
-            ``*ABC::ABa_ACa_BCi``
+    See CircuiTree and SimpleNetworkGrammar for more details.
     """
 
     def __init__(
@@ -379,7 +522,39 @@ class SimpleNetworkTree(CircuiTree):
 
 
 class DimersGrammar(CircuitGrammar):
-    """A grammar class for circuits consisting of dimerizing molecules."""
+    """**(Experimental)** A grammar class for the design space of dimerizing TF networks.
+    Intended to represent dimerizing regulatory networks such as the MultiFate system.
+
+    Each circuit consists of transcriptional ``components`` and ``regulators``.
+    Components are TFs that may be regulated by other TFs, while regulators are TFs that
+    are never regulated themselves. Any pair of components or regulators could
+    potentially form a dimer to regulate a third component. Therefore, each interaction
+    in this circuit is a "triplet" of two monomer TFs and a target TF.
+
+    The state ID string for a circuit topology is similar to ``SimpleNetworkGrammar``,
+    with some modifications.
+
+    * Components and regulators are represented by single uppercase characters
+    * Interactions are represented by a 4-character string
+        - Characters 1-2 (uppercase): the dimerizing species (components and/or
+          regulators). Order does not matter.
+        - Character 3 (lowercase): the type of regulation upon binding (for example,
+          ``a`` for activation)
+        - Character 4 (uppercase): the target of regulation (a component)
+    * Multiple interactions are separated by underscores ``_``
+    * The ``state`` is a three-part string: ``<components>+<regulators>::<interactions>``
+    * A terminal assembly state is denoted with a leading asterisk ``*``
+
+    For example, the ``state`` string ``*AB+R::ARiB_BBaB`` represents a system of three
+    TFs, ``A``, ``B``, and ``R`` where ``A-R`` heterodimers inhibit transcription of
+    ``B`` and ``B-B`` homodimers activate transcription of ``B``. The asterisk ``*`` at
+    the beginning means that the assembly process has finished.
+
+    The number of distinct dimers that can regulate a given component is limited using
+    the ``max_interactions_per_promoter`` argument (default of 2), and the total number
+    of interactions in the circuit is limited by the ``max_interactions`` argument (no
+    limit by default).
+    """
 
     def __init__(
         self,
@@ -388,91 +563,108 @@ class DimersGrammar(CircuitGrammar):
         interactions: Iterable[str],
         max_interactions: Optional[int] = None,
         max_interactions_per_promoter: int = 2,
-        root: Optional[str] = None,
-        cache_maxsize: int | None = 128,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
-        if len(set(c[0] for c in components)) < len(components):
+        if len(set(c[0].upper() for c in components)) < len(components):
             raise ValueError("First character of each component must be unique")
-        if len(set(c[0] for c in regulators)) < len(regulators):
-            raise ValueError("First character of each component must be unique")
-        if len(set(c[0] for c in interactions)) < len(interactions):
+        if len(set(r[0].upper() for r in regulators)) < len(regulators):
+            raise ValueError("First character of each regulator must be unique")
+        if len(set(ixn[0].lower() for ixn in interactions)) < len(interactions):
             raise ValueError("First character of each interaction must be unique")
 
-        self.components = components
-        self.component_map = {c[0]: c for c in self.components}
-        self.regulators = regulators
-        self.regulator_map = {r[0]: r for r in self.regulators}
-        self.interactions = interactions
-        self.interaction_map = {ixn[0]: ixn for ixn in self.interactions}
+        self.components = list(components)
+        self.regulators = list(regulators)
+        self.interactions = list(interactions)
 
-        self.max_interactions = max_interactions or np.inf
+        if max_interactions is None:
+            self.max_interactions = (
+                len(components) * (len(components) + len(regulators)) ** 2
+            )
+        else:
+            self.max_interactions = max_interactions
         self.max_interactions_per_promoter = max_interactions_per_promoter
-
-        self.root = root
-
-        # Allow user to specify a cache size for the get_interaction_recolorings method.
-        # This method is called frequently during search, and evaluation can become a
-        # bottleneck for large spaces. Caching the results of this method can
-        # significantly speed up search, but cache size is limited by system memory.
-        self.get_interaction_recolorings: Callable[[str], list[str]] = lru_cache(
-            maxsize=cache_maxsize
-        )(self._get_interaction_recolorings)
 
         # The following attributes/cached properties should not be serialized when
         # saving the object to file
         self._non_serializable_attrs.extend(
             [
-                "component_map",
-                "regulator_map",
-                "interaction_map",
-                "component_codes",
-                "regulator_codes",
-                "dimer_options",
+                "_component_codes",
+                "_regulator_codes",
                 "edge_options",
-                "_recolor_components",
-                "_recolor_regulators",
-                "get_interaction_recolorings",
             ]
         )
 
     @cached_property
-    def component_codes(self) -> set[str]:
-        return set(c[0] for c in self.components)
+    def _component_codes(self) -> set[str]:
+        return set(c[0].upper() for c in self.components)
 
     @cached_property
-    def regulator_codes(self) -> set[str]:
-        return set(c[0] for c in self.regulators)
+    def _regulator_codes(self) -> set[str]:
+        return set(r[0].upper() for r in self.regulators)
 
     @cached_property
-    def dimer_options(self):
-        dimers = set()
-        monomers = self.components + self.regulators
-        for c1, c2 in product(monomers, monomers):
-            if c1 in self.regulators and c2 in self.regulators:
-                continue
-            dimers.add("".join(sorted([c1[0], c2[0]])))
-        return list(dimers)
+    def _interaction_codes(self) -> set[str]:
+        return set(r[0].lower() for r in self.interactions)
 
     @property
-    def edges(self):
-        return product(self.dimer_options, self.components)
+    def dimer_options(self):
+        """List of possible dimers (two-character codes) of components and regulators."""
+
+        # Homodimers
+        dimers = list(zip(self._component_codes, self._component_codes))
+
+        # Component-component heterodimers
+        dimers.extend(combinations(sorted(self._component_codes), 2))
+
+        # Component-regulator heterodimers
+        dimers.extend(product(self._regulator_codes, self._component_codes))
+
+        # Order of the monomers doesn't matter, so OK to sort them
+        dimers = ["".join(sorted(d)) for d in dimers]
+
+        return sorted(dimers)
 
     @cached_property
     def edge_options(self):
+        """List-of-list of all possible 4-character interactions. The first level
+        of the list is the triplet (which dimer regulating which target), and the
+        second level is the nature of the regulation."""
         return [
-            [d + ixn[0] + c[0] for ixn in self.interactions]
-            for d, c in product(self.dimer_options, self.components)
+            [d + ixn + c for ixn in self._interaction_codes]
+            for d, c in product(self.dimer_options, self._component_codes)
         ]
 
     @staticmethod
     def is_terminal(genotype: str) -> bool:
+        """Checks if the given assembly state (``genotype``) is a terminal state. A
+        terminal state starts with an asterisk ``*``.
+
+        Args:
+            genotype (str): An assembly state.
+
+        Returns:
+            bool: Whether the state is terminal.
+        """
         return genotype.startswith("*")
 
     def get_actions(self, genotype: str) -> Iterable[str]:
+        """Returns the actions that can be taken from a given ``state``, or ``genotype``.
+
+        Possible actions include adding a new component/regulator, adding a new
+        interaction between a dimer and a target component, or terminating the assembly
+        process. Checks to make sure the necessary pieces are present and the circuit
+        would remain fully connected after taking the action.
+
+        Args:
+            genotype (str): The current state of the circuit assembly.
+
+        Returns:
+            Iterable[str]: A list of valid actions that can be taken. Each action is a
+            4-character code.
+        """
         # If terminal already, no actions can be taken
         if self.is_terminal(genotype):
             return list()
@@ -482,88 +674,69 @@ class DimersGrammar(CircuitGrammar):
 
         # Get the components and interactions in the current genotype
         (
-            components_joined,
-            regulators_joined,
+            components,
+            regulators,
             interactions_joined,
         ) = self.get_genotype_parts(genotype)
         # components_joined, interactions_joined = genotype.strip("*").split("::")
-        components = set(components_joined)
-        regulators = set(regulators_joined)
-        components_and_regulators = components | regulators
-        interactions = set(
+        components_and_regulators = set(components + regulators)
+        interaction_triplets = set(
             ixn[:2] + ixn[3] for ixn in interactions_joined.split("_") if ixn
         )
-        n_interactions = len(interactions)
+        n_interactions = len(interaction_triplets)
 
         # If we have reached the limit on interactions, only termination is an option
         if n_interactions >= self.max_interactions:
             return actions
 
-        # We can add a molecule not already in the genotype
-        if len(components) < len(self.components):
-            actions.append(next(c for c in self.component_codes if c not in components))
-        if len(regulators) < len(self.regulators):
-            actions.append(
-                next("+" + r for r in self.regulator_codes if r not in regulators)
-            )
+        # We can add TFs not already in the genotype
+        actions.extend([c for c in self._component_codes if c not in components])
+        actions.extend(["+" + r for r in self._regulator_codes if r not in regulators])
 
         # If we have no interactions yet, don't need to check for connectedness
-        elif n_interactions == 0:
+        if n_interactions == 0:
             possible_edge_options = [
-                options
-                for (dimer, promoter), options in zip(self.edges, self.edge_options)
-                if set(dimer + promoter).issubset(components_and_regulators)
+                grp
+                for grp in self.edge_options
+                if grp and set(grp[:2] + grp[3]).issubset(components_and_regulators)
             ]
             return list(chain.from_iterable(possible_edge_options))
 
         # Otherwise, add all valid interactions
-        n_ixn_per_promoter = Counter(
+        currently_in_use = set(chain.from_iterable(interaction_triplets))
+        n_regulators_per_promoter = Counter(
             ixn[3] for ixn in interactions_joined.split("_") if ixn
         )
-        for (dimer, promoter), edge_options in zip(self.edges, self.edge_options):
-            if edge_options:
-                # Add the interaction the necessary components are present, that edge
-                # isn't already taken, and the added edge would be contiguous with the
-                # existing edges (i.e. the circuit should be fully connected)
-                edge = dimer + promoter
-                edge_set = set(edge)
-                has_necessary_components = edge_set.issubset(components_and_regulators)
-                connected_to_current_edges = (
-                    len(edge_set & components_and_regulators) > 0
-                )
-                no_existing_edge = edge not in interactions
-                promoter_not_saturated = (
-                    n_ixn_per_promoter[promoter] < self.max_interactions_per_promoter
-                )
-                if (
-                    has_necessary_components
-                    and connected_to_current_edges
-                    and no_existing_edge
-                    and promoter_not_saturated
-                ):
-                    actions.extend(edge_options)
+        promoters_with_max_regulation = set(
+            p
+            for p in components
+            if n_regulators_per_promoter[p] >= self.max_interactions_per_promoter
+        )
+        for group in self.edge_options:
+            if group:
+                dimer = group[0][:2]
+                target = group[0][3]
+                triplet = dimer + target
+
+                # Check if the promoter has reached the limit for the # of regulators
+                if target in promoters_with_max_regulation:
+                    continue
+
+                # Check if the dimer already regulates the target
+                if triplet in interaction_triplets:
+                    continue
+
+                # Check if the necessary components/regulators exist
+                if not set(triplet).issubset(components_and_regulators):
+                    continue
+
+                # Check if the proposed dimer + promoter would maintain connectedness
+                if len(set(triplet) & currently_in_use) == 0:
+                    continue
+
+                actions.extend(group)
 
         return actions
-
-    # def get_actions(self, genotype: str) -> Iterable[str]:
-    #     if self.is_terminal(genotype):
-    #         return list()
-
-    #     # Terminating assembly is always an option
-    #     actions = ["*terminate*"]
-
-    #     components, regulators, interactions_joined = self.get_genotype_parts(genotype)
-    #     actions.extend(list(set(self.components) - set(components)))
-    #     regulators_to_add = set(self.regulators) - set(regulators)
-    #     actions.extend([f"+{r}" for r in regulators_to_add])
-    #     n_bound = Counter(ixn[3] for ixn in interactions_joined.split("_") if ixn)
-    #     for action_group in self.edge_options:
-    #         if action_group:
-    #             promoter = action_group[0][-1]
-    #             if n_bound[promoter] < self.max_interactions_per_promoter:
-    #                 actions.extend(action_group)
-
-    #     return actions
 
     def do_action(self, genotype: str, action: str) -> str:
         action_len = len(action)
@@ -575,60 +748,128 @@ class DimersGrammar(CircuitGrammar):
         elif action_len == 2 and action[0] == "+":
             regulators = regulators + action[1]
         elif action_len == 4:
-            ixn_list = interactions.split("_") if interactions else []
-            interactions = "_".join(ixn_list + [action])
+            if interactions:
+                interactions += f"_{action}"
+            else:
+                interactions = action
+        else:
+            raise ValueError(f"Invalid action: {action}")
         return components + "+" + regulators + "::" + interactions
 
-    @staticmethod
-    def get_unique_state(genotype: str) -> str:
-        components_and_regulators, interactions = genotype.split("::")
-        components, regulators = components_and_regulators.split("+")
-        if components.startswith("*"):
+    def get_unique_state(self, genotype: str) -> str:
+        """Returns a unique representation of a given state.
+
+        This method is used to determine whether two ``state`` IDs represent the same
+        topology, after accounting for
+
+        - Reording of the interactions
+        - Renaming of components and regulators (swapping labels)
+
+        For example, different sequences of actions may lead to different
+        ``state`` IDs that are isomorphic mirror images, or "recolorings" of each other.
+        This method picks the alphabetically first representation over all possible
+        recolorings.
+
+        Args:
+            genotype (str): The current state.
+
+        Returns:
+            str: The unique representation of the state.
+        """
+        if genotype.startswith("*"):
             prefix = "*"
-            components = components[1:]
+            genotype = genotype[1:]
         else:
             prefix = ""
-        unique_components = "".join(sorted(components))
-        unique_regulators = "".join(sorted(regulators))
-        unique_interaction_list = []
-        for ixn in interactions.split("_"):
-            *monomers, logic, promoter = ixn
-            unique_ixn = "".join(sorted(monomers)) + logic + promoter
-            unique_interaction_list.append(unique_ixn)
-        unique_interactions = "_".join(sorted(unique_interaction_list))
-        unique_genotype = "".join(
-            [
-                prefix,
-                unique_components,
-                "+",
-                unique_regulators,
-                "::",
-                unique_interactions,
-            ]
-        )
-        return unique_genotype
+
+        components, regulators = genotype.split("::")[0].split("+")
+
+        # Sort components/regulators alphabetically
+        components = "".join(sorted(components))
+        regulators = "".join(sorted(regulators))
+
+        # Compute the unique way to represent the set of interactions
+        interactions_unique = self._get_interactions_unique(genotype)
+
+        genotype_unique = f"{prefix}{components}+{regulators}::{interactions_unique}"
+        return genotype_unique
+
+    @lru_cache
+    def _get_interactions_unique(self, genotype: str) -> str:
+        return min(self._get_interaction_recolorings(genotype))
 
     @staticmethod
-    def get_genotype_parts(genotype: str):
+    def _get_interaction_recolorings(genotype: str) -> Generator[str]:
+        preamble, interactions = genotype.split("::")
+        components, regulators = preamble.strip("*").split("+")
+        for component_recoloring in permutations(components):
+            for regulator_recoloring in permutations(regulators):
+                preamble_recoloring = "".join(
+                    component_recoloring + regulator_recoloring
+                )
+                recoloring = str.maketrans(preamble, preamble_recoloring)
+                recolored_interactions = interactions.translate(recoloring)
+                recolored_and_sorted = DimersGrammar._sort_interactions(
+                    recolored_interactions
+                )
+                yield recolored_and_sorted
+
+    @staticmethod
+    def _sort_interactions(interactions: str) -> str:
+        interactions_arr = np.array(
+            [list(triplet) for triplet in interactions.split("_")]
+        )
+        dimers_arr = np.sort(interactions_arr[:, :2], axis=1)
+        interactions_arr = np.hstack([dimers_arr, interactions_arr[:, 2:]])
+        interactions_arr = np.sort(interactions_arr, axis=0)
+        sorted_interactions = "_".join("".join(row) for row in interactions_arr)
+        return sorted_interactions
+
+    @staticmethod
+    def get_genotype_parts(genotype: str) -> tuple[str, str, str]:
+        """Parses the state string (genotype) into its three parts: components,
+        regulators, and interactions.
+
+        Args:
+            genotype (str): An assembly state.
+
+        Returns:
+            tuple[str, str, str]: the components, regulators, and interactions
+            in the state.
+        """
         components_and_regulators, interactions = genotype.strip("*").split("::")
         components, regulators = components_and_regulators.split("+")
         return components, regulators, interactions
 
     @staticmethod
     def parse_genotype(genotype: str):
+        """Parses a genotype string into its components, regulators, activation
+        interactions, and inhibition interactions.
+
+        Args:
+            genotype (str): The genotype string to parse.
+
+        Returns:
+            tuple[str, str, np.ndarray, np.ndarray]: The components, regulators,
+            activations, and inhibitions. Components and regulators are provided as
+            strings. The activations and inhibitions are represented as NumPy arrays with
+            three columns, the indices of the two monomers involved in the interaction
+            and the index of the target TF. The indices are determined by concatenating
+            ``components`` and ``regulators``.
+        """
         components_and_regulators, interaction_codes = genotype.strip("*").split("::")
         components, regulators = components_and_regulators.split("+")
-        component_indices = {c: i for i, c in enumerate(components + regulators)}
+        indices = {c: i for i, c in enumerate(components + regulators)}
 
         interactions = interaction_codes.split("_") if interaction_codes else []
         activations = []
         inhbitions = []
-        for *monomers, regulation_type, promoter in interactions:
+        for *monomers, regulation_type, target in interactions:
             m1, m2 = sorted(monomers)
             ixn_tuple = (
-                component_indices[m1],
-                component_indices[m2],
-                component_indices[promoter],
+                indices[m1],
+                indices[m2],
+                indices[target],
             )
             if regulation_type.lower() == "a":
                 activations.append(ixn_tuple)
@@ -642,145 +883,66 @@ class DimersGrammar(CircuitGrammar):
         inhbitions = np.array(inhbitions, dtype=np.int_)
         return components, regulators, activations, inhbitions
 
-    @cached_property
-    def _recolor_components(self):
-        return [dict(zip(self.components, p)) for p in permutations(self.components)]
-
-    @cached_property
-    def _recolor_regulators(self):
-        return [dict(zip(self.regulators, p)) for p in permutations(self.regulators)]
-
-    @property
-    def _recolorings(self):
-        return (
-            rc | rr
-            for rc, rr in product(self._recolor_components, self._recolor_regulators)
-        )
-
     @staticmethod
-    def _recolor(mapping, code):
-        return "".join([mapping.get(char, char) for char in code])
+    def has_pattern(state, pattern):
+        """Checks if a given state contains a particular sub-pattern.
 
-    def _get_interaction_recolorings(self, interactions: str) -> list[str]:
-        interaction_recolorings = (
-            "_".join(
-                sorted([self._recolor(mapping, ixn) for ixn in interactions.split("_")])
-            ).strip("_")
-            for mapping in self._recolorings
-        )
-        return interaction_recolorings
+        This method checks if the interactions in the given ``pattern`` are a subset of
+        the interactions in the given ``state``, taking into account all possible
+        renamings of components and regulators. The ``pattern`` should be a string that
+        contains only interactions (separated by underscores).
 
-    @lru_cache
-    def get_component_recolorings(self, components: str) -> list[str]:
-        component_recolorings = (
-            "".join(sorted(self._recolor(mapping, components)))
-            for mapping in self._recolor_components
-        )
-        return component_recolorings
+        Args:
+            state (str): The current state.
+            pattern (str): The sub-pattern to search for.
 
-    @lru_cache
-    def get_regulator_recolorings(self, regulators: str) -> list[str]:
-        regulator_recolorings = (
-            "".join(sorted(self._recolor(mapping, regulators)))
-            for mapping in self._recolor_components
-        )
-        return regulator_recolorings
+        Returns:
+            bool: Whether the state contains the given pattern.
 
-    def get_recolorings(self, genotype: str) -> Iterable[str]:
-        prefix = "*" if self.is_terminal(genotype) else ""
+        Raises:
+            ValueError: If the pattern is empty or contains components/regulators or if
+            the state does not contain both components and interactions.
+        """
 
-        components, regulators, interactions = self.get_genotype_parts(genotype)
-        if regulators:
-            return (
-                f"{prefix}{c}+{r}::{i}"
-                for c, r, i in zip(
-                    self.get_component_recolorings(components),
-                    self.get_regulator_recolorings(regulators),
-                    self.get_interaction_recolorings(interactions),
+        if ("::" in pattern) or ("*" in pattern):
+            raise ValueError(
+                "pattern should only contain interactions, no components or regulators"
+            )
+        if "::" not in state or "+" not in state:
+            raise ValueError(
+                "state should contain components, regulators and interactions"
+            )
+        if pattern == "":
+            raise ValueError("pattern should be non-empty")
+
+        preamble, interactions = state.split("::")
+
+        for ixn in pattern.split("_"):
+            if any(char not in preamble for char in ixn[:2] + ixn[3]):
+                raise ValueError(
+                    "All components and regulators in the pattern should also be "
+                    "present in the state."
                 )
-            )
-        else:
-            return (
-                f"{prefix}{c}::{i}"
-                for c, i in zip(
-                    self.get_component_recolorings(components),
-                    self.get_interaction_recolorings(interactions),
-                )
-            )
 
-    def get_unique_state(self, genotype: str) -> str:
-        return min(self.get_recolorings(genotype))
-
-    @lru_cache
-    def _pattern_recolorings(self, motif: str) -> list[set[str]]:
-        if ("+" in motif) or ("::" in motif) or ("*" in motif):
-            raise ValueError(
-                "Motif code should only contain interactions, no components or "
-                "regulators"
-            )
-
-        return [
-            set(recoloring.split("_"))
-            for recoloring in self.get_interaction_recolorings(motif)
-        ]
-
-    def has_pattern(self, state, motif):
-        if ("::" in motif) or ("*" in motif):
-            raise ValueError(
-                "Motif code should only contain interactions, no components"
-            )
-        if "::" not in state:
-            raise ValueError(
-                "State code should contain both components and interactions"
-            )
-
-        interaction_code = state.split("::")[1]
-        if not interaction_code:
+        if not interactions:
             return False
 
-        state_interactions = set(interaction_code.split("_"))
-        for motif_interactions_set in self._pattern_recolorings(motif):
-            if motif_interactions_set.issubset(state_interactions):
+        state_triplets = set(ixn[:2] + ixn[3] for ixn in interactions.split("_"))
+        for pattern_recoloring in DimersGrammar._get_interaction_recolorings(
+            preamble + pattern
+        ):
+            pattern_triplets = set(
+                ixn[:2] + ixn[3] for ixn in pattern_recoloring.split("_")
+            )
+            if pattern_triplets.issubset(state_triplets):
                 return True
         return False
 
 
 class DimerNetworkTree(CircuiTree):
-    """
-    A CircuiTree for the design space of dimerizing TF networks. Intended to recapitulate
-    the dimerization of zinc-finger proteins.
+    """A convenience subclass of CircuiTree that uses DimersGrammar by default.
 
-    Models a system of dimerizing transcription factors (e.g. zinc-fingers) that regulate
-    each other's transcription. The circuit consists a set of ``components``, which
-    represent transcription factors that are being regulated. Components can form homo-
-    or heterodimers that bind to a component's promoter region and regulate
-    transcription. There is also a set of ``regulators``, which can dimerize and regulate
-    transcription but are not themselves regulated. Regulator-regulator homodimers and
-    regulator-component heterodimers can act as TFs, but regulator-regulator homodimers
-    are assumed to be inactive.
-
-    The circuit topology (also referred to as the "state" during search) is encoded using
-    a string representation (aka "genotype") with the following rules:
-        - Components and regulators are represented by single uppercase characters
-        - Interactions are represented by a 4-character string
-            - Characters 1-2 (uppercase): the dimerizing species (components/regulators)
-            - Character 3 (lowercase): the type of regulation upon binding
-            - Character 4 (uppercase): the target of regulation (a component)
-        - Components are separated from regulators by a ``+``
-        - Components/regulators are separated from interactions by a ``::``
-        - Interactions are separated from one another by underscores ``_``
-        - A terminal assembly is denoted with a leading asterisk ``*``
-
-        For example, the following string represents a 2-component MultiFate system that
-        has not been fully assembled (lacks the terminal asterisk):
-
-            ``AB+::AAa_BBa``
-
-        While the following string represents a terminally assembled 2-component
-        MultiFate system with a regulator L that flips the system into the A state:
-
-            ``*AB+L::AAa_ALa_BBa_BLi``
-
+    See CircuiTree and DimersGrammar for more details.
     """
 
     def __init__(
