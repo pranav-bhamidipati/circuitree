@@ -4,6 +4,9 @@ scratch/
 # VS Code
 .vscode/
 
+# Redis dump file
+dump.rdb
+
 # Line profiler
 .lprof/
 
