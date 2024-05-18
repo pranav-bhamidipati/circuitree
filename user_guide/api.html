@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Reference &mdash; CircuiTree 0.12.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=22ddcdb3" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=61ccb1f1"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="circuitree.circuitree.CircuiTree" href="generated/circuitree/circuitree.circuitree.CircuiTree.html" />
+    <link rel="prev" title="Defining custom Grammars using CircuitGrammar" href="defining_search_spaces/custom_grammars.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #F0F0F0" >
+
+          
+          
+          <a href="../index.html">
+            
+              <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tutorial_2_mcts_in_parallel.html">Parallel MCTS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="defining_search_spaces/index.html">Defining search spaces</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#circuitree">CircuiTree</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/circuitree/circuitree.circuitree.CircuiTree.html">circuitree.circuitree.CircuiTree</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/circuitree/circuitree.circuitree.ucb_score.html">circuitree.circuitree.ucb_score</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#built-in-grammars">Built-in Grammars</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/models/circuitree.models.SimpleNetworkGrammar.html">circuitree.models.SimpleNetworkGrammar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/models/circuitree.models.SimpleNetworkTree.html">circuitree.models.SimpleNetworkTree</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/models/circuitree.models.DimersGrammar.html">circuitree.models.DimersGrammar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/models/circuitree.models.DimerNetworkTree.html">circuitree.models.DimerNetworkTree</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#low-level-circuitgrammar-api">Low-level CircuitGrammar API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/grammar/circuitree.grammar.CircuitGrammar.html">circuitree.grammar.CircuitGrammar</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#visualisation">Visualisation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/viz/circuitree.viz.rgb2hex.html">circuitree.viz.rgb2hex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/viz/circuitree.viz.complexity_layout.html">circuitree.viz.complexity_layout</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/viz/circuitree.viz.plot_complexity.html">circuitree.viz.plot_complexity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/viz/circuitree.viz.plot_network.html">circuitree.viz.plot_network</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#utility-functions-and-classes">Utility functions and classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="generated/utils/circuitree.utils.merge_overlapping_sets.html">circuitree.utils.merge_overlapping_sets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/utils/circuitree.utils.ManagedEvent.html">circuitree.utils.ManagedEvent</a></li>
+<li class="toctree-l3"><a class="reference internal" href="generated/utils/circuitree.utils.AtomicCounter.html">circuitree.utils.AtomicCounter</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #F0F0F0" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CircuiTree</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+<li><a href="https://github.com/pranav-bhamidipati/circuitree">CircuiTree repo on GitHub</a></li>
+
+<li class="wy-breadcrumbs-aside">
+  
+  
+  
+  <a href="../_sources/user_guide/api.rst.txt" rel="nofollow"> View page source</a>
+  
+  
+  
+</li>
+
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-reference">
+<span id="api"></span><h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
+<section id="circuitree">
+<h2>CircuiTree<a class="headerlink" href="#circuitree" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/circuitree/circuitree.circuitree.CircuiTree.html#circuitree.circuitree.CircuiTree" title="circuitree.circuitree.CircuiTree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CircuiTree</span></code></a></p></td>
+<td><p>A base class for implementing the Monte Carlo Tree Search (MCTS) algorithm for circuit topologies.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/circuitree/circuitree.circuitree.ucb_score.html#circuitree.circuitree.ucb_score" title="circuitree.circuitree.ucb_score"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ucb_score</span></code></a></p></td>
+<td><p>Compute the UCB score for a node in the search graph.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="built-in-grammars">
+<span id="models"></span><h2>Built-in Grammars<a class="headerlink" href="#built-in-grammars" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/models/circuitree.models.SimpleNetworkGrammar.html#circuitree.models.SimpleNetworkGrammar" title="circuitree.models.SimpleNetworkGrammar"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SimpleNetworkGrammar</span></code></a></p></td>
+<td><p>A Grammar class for pairwise interaction networks.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/models/circuitree.models.SimpleNetworkTree.html#circuitree.models.SimpleNetworkTree" title="circuitree.models.SimpleNetworkTree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SimpleNetworkTree</span></code></a></p></td>
+<td><p>A convenience subclass of CircuiTree that uses SimpleNetworkGrammar by default.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/models/circuitree.models.DimersGrammar.html#circuitree.models.DimersGrammar" title="circuitree.models.DimersGrammar"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DimersGrammar</span></code></a></p></td>
+<td><p><strong>(Experimental)</strong> A grammar class for the design space of dimerizing TF networks.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/models/circuitree.models.DimerNetworkTree.html#circuitree.models.DimerNetworkTree" title="circuitree.models.DimerNetworkTree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DimerNetworkTree</span></code></a></p></td>
+<td><p>A convenience subclass of CircuiTree that uses DimersGrammar by default.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="low-level-circuitgrammar-api">
+<span id="grammar"></span><h2>Low-level CircuitGrammar API<a class="headerlink" href="#low-level-circuitgrammar-api" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/grammar/circuitree.grammar.CircuitGrammar.html#circuitree.grammar.CircuitGrammar" title="circuitree.grammar.CircuitGrammar"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CircuitGrammar</span></code></a></p></td>
+<td><p>Abstract class for Grammars.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="visualisation">
+<span id="viz"></span><h2>Visualisation<a class="headerlink" href="#visualisation" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/viz/circuitree.viz.rgb2hex.html#circuitree.viz.rgb2hex" title="circuitree.viz.rgb2hex"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rgb2hex</span></code></a></p></td>
+<td><p>Converts rgb colors to hex</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/viz/circuitree.viz.complexity_layout.html#circuitree.viz.complexity_layout" title="circuitree.viz.complexity_layout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">complexity_layout</span></code></a></p></td>
+<td><p>Returns the depth and xy coordinates of each node in the search graph when visualized based on complexity.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/viz/circuitree.viz.plot_complexity.html#circuitree.viz.plot_complexity" title="circuitree.viz.plot_complexity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot_complexity</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/viz/circuitree.viz.plot_network.html#circuitree.viz.plot_network" title="circuitree.viz.plot_network"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot_network</span></code></a></p></td>
+<td><p>Plot an N-component network as a circular diagram.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="utility-functions-and-classes">
+<span id="utils"></span><h2>Utility functions and classes<a class="headerlink" href="#utility-functions-and-classes" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/utils/circuitree.utils.merge_overlapping_sets.html#circuitree.utils.merge_overlapping_sets" title="circuitree.utils.merge_overlapping_sets"><code class="xref py py-obj docutils literal notranslate"><span class="pre">merge_overlapping_sets</span></code></a></p></td>
+<td><p>Given an iterable of non-empty sets, merges any sets that have non-empty intersection</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/utils/circuitree.utils.ManagedEvent.html#circuitree.utils.ManagedEvent" title="circuitree.utils.ManagedEvent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ManagedEvent</span></code></a></p></td>
+<td><p>Event object that also provides a context manager.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/utils/circuitree.utils.AtomicCounter.html#circuitree.utils.AtomicCounter" title="circuitree.utils.AtomicCounter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AtomicCounter</span></code></a></p></td>
+<td><p>A simple thread-safe counter.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="defining_search_spaces/custom_grammars.html" class="btn btn-neutral float-left" title="Defining custom Grammars using CircuitGrammar" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="generated/circuitree/circuitree.circuitree.CircuiTree.html" class="btn btn-neutral float-right" title="circuitree.circuitree.CircuiTree" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+   <jinja2.runtime.BlockReference object at 0x7f92cc824700>
+
+<p>© 2024 Pranav Bhamidipati.</p>
+
+<p>This document was prepared at <a rel="caltech" href="http://www.caltech.edu">Caltech</a>.</p>
+<!-- with financial support from the <a rel="rosen" href="http://rosen.caltech.edu">Donna and Benjamin M. Rosen Bioengineering Center</a>.</p> -->
+
+<br />
+
+<p>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a
+        href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org/">Read
+        the Docs</a>.
+
+    
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-166791717-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-166791717-1', {
+          'anonymize_ip': false,
+      });
+    </script>  
+
+  <style>
+         .wy-nav-content { max-width: none; }
+  </style>
+
+
+
+</body>
+</html>

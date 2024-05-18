@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parallel MCTS &mdash; CircuiTree 0.12.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=22ddcdb3" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=61ccb1f1"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Defining search spaces" href="defining_search_spaces/index.html" />
+    <link rel="prev" title="Getting started tutorial" href="../getting_started/tutorial_1_getting_started.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #F0F0F0" >
+
+          
+          
+          <a href="../index.html">
+            
+              <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Parallel MCTS</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Parallel-search-on-a-single-machine">Parallel search on a single machine</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Database-installation">1. Database installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Making-a-celery-app-with-the-reward-function">2. Making a <code class="docutils literal notranslate"><span class="pre">celery</span></code> app with the reward function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Calling-the-reward-function-as-a-celery-task">3. Calling the reward function as a <code class="docutils literal notranslate"><span class="pre">celery</span></code> task</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Launching-a-worker-node">4. Launching a worker node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Running-a-parallel-search">5. Running a parallel search</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#Distributed-search-in-the-cloud">Distributed search in the cloud</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="defining_search_spaces/index.html">Defining search spaces</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #F0F0F0" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CircuiTree</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+<li><a href="https://github.com/pranav-bhamidipati/circuitree">CircuiTree repo on GitHub</a></li>
+
+<li class="wy-breadcrumbs-aside">
+  
+  
+  
+  <a href="../_sources/user_guide/tutorial_2_mcts_in_parallel.ipynb.txt" rel="nofollow"> Download notebook</a>
+  
+  
+  
+</li>
+
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Parallel-MCTS">
+<h1>Parallel MCTS<a class="headerlink" href="#Parallel-MCTS" title="Link to this heading"></a></h1>
+<p>MCTS is an iterative sampling algorithm, where the reward found in each iteration affects sampling in later iterations. While perfect parallel execution isn’t possible, we can achieve quite good performance using the so-called lock-free method <a class="reference external" href="https://doi.org/10.1007/978-3-642-12993-3_2">[1]</a>, where multiple multiple search threads in the same CPU (the <em>main node</em>) are running MCTS concurrently, each one taking turns editing the search graph. We will implement this in detail later in the
+tutorial, but in brief, instead of computing the (usually expensive) reward function, each search thread on the main node sends a request to a group of worker CPUs (the <em>worker node</em>) somewhere else that will do the actual computation, and while that thread is waiting for the result, other search threads can use the main CPU. As long as our execution time is significantly longer than the time spent sending and receiving those signals, we should see a performance boost!</p>
+<section id="Parallel-search-on-a-single-machine">
+<h2>Parallel search on a single machine<a class="headerlink" href="#Parallel-search-on-a-single-machine" title="Link to this heading"></a></h2>
+<p>In order to parallelize the search on a local machine, we can nominate a group of CPUs in our own computer to be the worker node that performs reward function evaluations. We can coordinate the main and worker nodes using a <em>producer-consumer</em> queue. The main node will produce tasks (calls to the reward function) that get added to the queue, and the worker node will consume tasks from the queue and return the result to a shared database where the main node can look up the result. We’ll manage
+this task queue with the Python utility <code class="docutils literal notranslate"><span class="pre">celery</span></code>.</p>
+<p>Here’s a schematic of how that infrastructure looks.</p>
+<p><img alt="Local-Infrastructure" src="user_guide/local_parallel_infrastructure.png" /></p>
+<p><strong>Steps to running a parallel search</strong> 1) Set up an in-memory database. 2) Package the reward function into a <code class="docutils literal notranslate"><span class="pre">celery</span></code> app. 3) Define a <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> subclass that calls the reward function in (2). 4) Launch some workers. 5) Run the search script.</p>
+<section id="1.-Database-installation">
+<h3>1. Database installation<a class="headerlink" href="#1.-Database-installation" title="Link to this heading"></a></h3>
+<p>For instance, we can a lightweight database called Redis (<a class="reference external" href="https://redis.io/">https://redis.io/</a>). Follow the instructions <a class="reference external" href="https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/">here</a> to install the database and command line utility, and test your installation by running</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>redis-cli ping
+</pre></div>
+</div>
+<p>If you are using a Redis server hosted somewhere other than the default location (<code class="docutils literal notranslate"><span class="pre">redis://localhost:6379/</span></code>), you can set the <code class="docutils literal notranslate"><span class="pre">CELERY_BROKER_URL</span></code> environment variable to point to your server.</p>
+</section>
+<section id="2.-Making-a-celery-app-with-the-reward-function">
+<h3>2. Making a <code class="docutils literal notranslate"><span class="pre">celery</span></code> app with the reward function<a class="headerlink" href="#2.-Making-a-celery-app-with-the-reward-function" title="Link to this heading"></a></h3>
+<p>The app is a Python script that tells <code class="docutils literal notranslate"><span class="pre">celery</span></code> where the database is and which tasks it will be managing. For instance, here is an app script for the bistability design problem in the Getting Started tutorial.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># bistability_app.py
+
+from celery import Celery
+from circuitree.models import SimpleNetworkGrammar
+import numpy as np
+import redis
+import os
+from bistability import get_bistability_reward
+
+# Address of the database Celery should use
+database_url = os.environ.get(&quot;CELERY_BROKER_URL&quot;, &quot;redis://localhost:6379/0&quot;)
+database = redis.Redis.from_url(database_url)
+if database.ping():
+    print(f&quot;Connected to Redis database at {database_url}&quot;)
+else:
+    raise ConnectionError(f&quot;Could not connect to Redis database at {database_url}&quot;)
+
+# Create the app
+app = Celery(&quot;bistability&quot;, broker=database_url, backend=database_url)
+
+grammar = SimpleNetworkGrammar([&quot;A&quot;, &quot;B&quot;], [&quot;activates&quot;, &quot;inhibits&quot;])
+
+
+@app.task
+def get_reward_celery(state: str, seed: int, expensive: bool = False) -&gt; float:
+    &quot;&quot;&quot;Returns a reward value for the given state based on how many types of positive
+    feedback loops (PFLs) it contains. Same as `BistabilityTree.get_reward()`,
+    except this function is evaluated by a Celery worker.&quot;&quot;&quot;
+
+    # Celery cannot pass Numpy random generators as arguments, so we pass a unique
+    # integer and use it to seed a high-quality random generator
+    hq_seed = np.random.SeedSequence(seed).generate_state(1)[0]
+    rg = np.random.default_rng(hq_seed)
+
+    return get_bistability_reward(state, grammar, rg, expensive)
+</pre></div>
+</div>
+<p>We use the <code class="docutils literal notranslate"><span class="pre">Celery</span></code> command to create an app that uses the <code class="docutils literal notranslate"><span class="pre">Redis</span></code> database to pass messages (the <code class="docutils literal notranslate"><span class="pre">broker</span></code> option) and store results (the <code class="docutils literal notranslate"><span class="pre">backend</span></code> argument). The URL here points to the default location for a local database (port <code class="docutils literal notranslate"><span class="pre">6379</span></code> on the <code class="docutils literal notranslate"><span class="pre">localhost</span></code> network). Any function with the <code class="docutils literal notranslate"><span class="pre">&#64;app.task</span></code> decorator becomes a <code class="docutils literal notranslate"><span class="pre">celery</span></code> <em>task</em> that can be executed by a worker - we’ll see how this looks in the next section.</p>
+</section>
+<section id="3.-Calling-the-reward-function-as-a-celery-task">
+<h3>3. Calling the reward function as a <code class="docutils literal notranslate"><span class="pre">celery</span></code> task<a class="headerlink" href="#3.-Calling-the-reward-function-as-a-celery-task" title="Link to this heading"></a></h3>
+<p>Unlike a normal function call, a call to a <code class="docutils literal notranslate"><span class="pre">celery</span></code> task is <em>asynchronous</em>. This means that when the main node calls the function, it dispatches a task to the workers, and the result can be requested later. This uses different syntax - instead of running <code class="docutils literal notranslate"><span class="pre">reward</span> <span class="pre">=</span> <span class="pre">get_reward(...)</span></code> directly, we run <code class="docutils literal notranslate"><span class="pre">result</span> <span class="pre">=</span> <span class="pre">get_reward_celery.delay(...)</span></code> to dispatch the task from the main node to the workers. This immediately returns an <code class="docutils literal notranslate"><span class="pre">AsyncResult</span></code> object that can be inspected to monitor progress. Then,
+once we need the result, we call <code class="docutils literal notranslate"><span class="pre">future.get()</span></code> and wait for the reward to arrive. While one thread is waiting for the reply, another thread can take over the main node and run a search iteration.</p>
+<p>All we need to do in this step is make a Python file declaring a new subclass of <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> that uses the app. Here’s what that looks like in our bistability example - we’ll call it <code class="docutils literal notranslate"><span class="pre">bistability_parallel.py</span></code>.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># bistability_parallel.py
+
+from gevent import monkey
+
+monkey.patch_all()
+
+from bistability import BistabilityTree
+from bistability_app import get_reward_celery
+
+
+class ParallelBistabilityTree(BistabilityTree):
+    &quot;&quot;&quot;This class is identical to BistabilityTree except that it uses Celery to compute
+    rewards in parallel. This allows other threads to continue performing MCTS steps
+    while one thread waits for its reward calculation to finish.&quot;&quot;&quot;
+
+    def get_reward(self, state, expensive=True):
+        # Generate a random seed and run the task in a Celery worker
+        seed = int(self.rg.integers(0, 2**32))
+        result = get_reward_celery.delay(state, seed, expensive=expensive)
+        reward = result.get()
+        return reward
+</pre></div>
+</div>
+<p>Rather than use the built-in <code class="docutils literal notranslate"><span class="pre">threading</span></code> module, which can only manage up to a few dozen threads, we will use the <code class="docutils literal notranslate"><span class="pre">gevent</span></code> module, which can support thousands. To achieve this <code class="docutils literal notranslate"><span class="pre">gevent</span></code> re-defines (“monkey-patches”) many of the built-in Python commands in order to support highly scalable “green threads.”</p>
+<p><strong>WARNING:</strong> Monkey-patching can have some sharp corners when combined with Celery. The lines <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">gevent</span> <span class="pre">import</span> <span class="pre">monkey</span></code> and <code class="docutils literal notranslate"><span class="pre">monkey.patch_all()</span></code> have to be the first lines in the file where we define the class, but they <em>cannot</em> be in the same file where we define the Celery app. For this reason, we make a separate file just for this class.</p>
+</section>
+<section id="4.-Launching-a-worker-node">
+<h3>4. Launching a worker node<a class="headerlink" href="#4.-Launching-a-worker-node" title="Link to this heading"></a></h3>
+<p>We can launch a worker node using <code class="docutils literal notranslate"><span class="pre">celery</span></code>’s command line interface. To do so, open a separate terminal, activate your virtual environment if you have one, <code class="docutils literal notranslate"><span class="pre">cd</span></code> to the folder with the app, and run the following command, replacing the <code class="docutils literal notranslate"><span class="pre">XX</span></code> with the number of CPUs to use. It’s good practice to use one or two fewer CPUs than the total number on your machine, since performance can paradoxically degrade if you try to use every single CPU at once.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># Launch a worker called &#39;worker1&#39; with &#39;XX&#39; CPUs, specifying the app with the &#39;.app&#39; suffix.
+# If you supply the &#39;logfile&#39; flag, the worker will write its logs to there
+celery --app bistability_app.app multi start &quot;worker1&quot; --concurrency=XX --loglevel=INFO #--logfile=&quot;./worker1.log&quot;
+</pre></div>
+</div>
+<p>You can specify logging information like the log level and location of the log file as shown. You can alos use the flag <code class="docutils literal notranslate"><span class="pre">--detach</span></code> to run the worker as a background process, but beware that <strong>Celery will not monitor it</strong>. You will need to find and kill the process yourself (on Linux, you can run <code class="docutils literal notranslate"><span class="pre">ps</span> <span class="pre">aux</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">'celery'</span></code>, note the process ID (<code class="docutils literal notranslate"><span class="pre">pid</span></code>) of any running workers, and kill them with <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">kill</span> <span class="pre">-9</span> <span class="pre">{pid}</span></code>).</p>
+</section>
+<section id="5.-Running-a-parallel-search">
+<h3>5. Running a parallel search<a class="headerlink" href="#5.-Running-a-parallel-search" title="Link to this heading"></a></h3>
+<p>Now we can run the search in parallel by running a script from the main node. For the bistability example, you could run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">./run_search_parallel.py</span></code></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># run_search_parallel.py
+
+from datetime import datetime
+from pathlib import Path
+from bistability_parallel import ParallelBistabilityTree
+
+
+def main(
+    n_steps: int = 10_000,
+    n_threads: int = 8,
+    expensive: bool = True,
+    save_dir: str | Path = Path(&quot;./tree-backups&quot;),
+):
+    &quot;&quot;&quot;Finds bistable circuit designs using parallel MCTS.&quot;&quot;&quot;
+
+    # Make a folder for backups
+    save_dir = Path(save_dir)
+    save_dir.mkdir(exist_ok=True)
+
+    print(&quot;Running an MCTS search in parallel (see tutorial notebook #2)...&quot;)
+    tree = ParallelBistabilityTree(root=&quot;ABC::&quot;)
+    tree.search_mcts_parallel(
+        n_steps=n_steps, n_threads=n_threads, run_kwargs={&quot;expensive&quot;: expensive}
+    )
+    print(&quot;Search complete!&quot;)
+
+    # Save the search graph to a GML file and the other attributes to a JSON file
+    today = datetime.now().strftime(&quot;%y%m%d&quot;)
+    save_stem = save_dir.joinpath(f&quot;{today}_parallel_bistability_search_step{n_steps}&quot;)
+
+    print(f&quot;Saving final tree to {save_stem}.{{gml,json}}&quot;)
+    tree.to_file(save_stem + &quot;.gml&quot;, save_stem + &quot;.json&quot;)
+
+    print(&quot;Done&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</pre></div>
+</div>
+<p>That’s it! To analyze the results, we can read the object from the saved files using <code class="docutils literal notranslate"><span class="pre">CircuiTree.from_file()</span></code>.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>from circuitree import SimpleNetworkGrammar
+from bistability import BistabilityTree
+
+# Get the file paths for the data
+data_dir = Path(&quot;./tree-backups&quot;)
+gml_file = list(data_dir.glob(&quot;*parallel_bistability_search*.gml&quot;))[0]
+json_file = list(data_dir.glob(&quot;*parallel_bistability_search*.json&quot;))[0]
+
+# Read from file. Note that we need to specify the class of the grammar
+tree = BistabilityTree.from_file(gml_file, json_file, grammar_cls=SimpleNetworkGrammar)
+</pre></div>
+</div>
+<hr class="docutils" />
+</section>
+</section>
+<section id="Distributed-search-in-the-cloud">
+<h2>Distributed search in the cloud<a class="headerlink" href="#Distributed-search-in-the-cloud" title="Link to this heading"></a></h2>
+<p>The same framework we use to run the search in parallel on a local machine can be used to run a search across many machines, in the cloud!</p>
+<p><img alt="Distributed-Infrastructure" src="user_guide/distributed_infrastructure.png" /></p>
+<p>There are a few differences. Notably, the in-memory database now lives in a remote machine. The communication between main and worker nodes can be a bottleneck in scaling up this infrastructure, so it is important that your database has fast, high-bandwidth networking and is on the same network as the main and worker nodes. Most cloud providers already have a solution for this (for example, as of May 2024, Amazon Elasticache + EC2). The main node has the search graph and makes backups, so it
+will generally need higher memory, while worker nodes should have higher computing resources. Also, because Celery does not make it obvious where each task is run, you should take care that your backups are being saved to the correct location on the correct machine. Celery generally provides very robust logging as well, so be sure to specify the <code class="docutils literal notranslate"><span class="pre">--logfile</span></code> option in the <code class="docutils literal notranslate"><span class="pre">celery</span> <span class="pre">worker</span></code> command to take advantage of it.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../getting_started/tutorial_1_getting_started.html" class="btn btn-neutral float-left" title="Getting started tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="defining_search_spaces/index.html" class="btn btn-neutral float-right" title="Defining search spaces" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+   <jinja2.runtime.BlockReference object at 0x7f92cc9f9240>
+
+<p>© 2024 Pranav Bhamidipati.</p>
+
+<p>This document was prepared at <a rel="caltech" href="http://www.caltech.edu">Caltech</a>.</p>
+<!-- with financial support from the <a rel="rosen" href="http://rosen.caltech.edu">Donna and Benjamin M. Rosen Bioengineering Center</a>.</p> -->
+
+<br />
+
+<p>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a
+        href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org/">Read
+        the Docs</a>.
+
+    
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-166791717-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-166791717-1', {
+          'anonymize_ip': false,
+      });
+    </script>  
+
+  <style>
+         .wy-nav-content { max-width: none; }
+  </style>
+
+
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+﻿circuitree.circuitree.ucb\_score
+================================
+
+.. currentmodule:: circuitree.circuitree
+
+.. autofunction:: ucb_score

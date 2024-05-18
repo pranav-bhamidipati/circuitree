@@ -1,0 +1,6 @@
+﻿circuitree.viz.plot\_complexity
+===============================
+
+.. currentmodule:: circuitree.viz
+
+.. autofunction:: plot_complexity

@@ -1,0 +1,6 @@
+﻿circuitree.utils.merge\_overlapping\_sets
+=========================================
+
+.. currentmodule:: circuitree.utils
+
+.. autofunction:: merge_overlapping_sets

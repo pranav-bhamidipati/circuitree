@@ -1,0 +1,39 @@
+﻿circuitree.models.DimersGrammar
+===============================
+
+.. currentmodule:: circuitree.models
+
+.. autoclass:: DimersGrammar
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DimersGrammar.__init__
+      ~DimersGrammar.do_action
+      ~DimersGrammar.get_actions
+      ~DimersGrammar.get_genotype_parts
+      ~DimersGrammar.get_undo_actions
+      ~DimersGrammar.get_unique_state
+      ~DimersGrammar.has_pattern
+      ~DimersGrammar.is_terminal
+      ~DimersGrammar.parse_genotype
+      ~DimersGrammar.to_dict
+      ~DimersGrammar.undo_action
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~DimersGrammar.dimer_options
+      ~DimersGrammar.edge_options
+   
+   

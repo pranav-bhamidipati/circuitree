@@ -1,0 +1,56 @@
+﻿circuitree.models.DimerNetworkTree
+==================================
+
+.. currentmodule:: circuitree.models
+
+.. autoclass:: DimerNetworkTree
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DimerNetworkTree.__init__
+      ~DimerNetworkTree.backpropagate_reward
+      ~DimerNetworkTree.backpropagate_visit
+      ~DimerNetworkTree.bfs_iterator
+      ~DimerNetworkTree.copy_graph
+      ~DimerNetworkTree.enumerate_terminal_states
+      ~DimerNetworkTree.expand_edge
+      ~DimerNetworkTree.from_file
+      ~DimerNetworkTree.generate_gml
+      ~DimerNetworkTree.get_attributes
+      ~DimerNetworkTree.get_random_terminal_descendant
+      ~DimerNetworkTree.get_reward
+      ~DimerNetworkTree.get_ucb_score
+      ~DimerNetworkTree.grow_tree
+      ~DimerNetworkTree.grow_tree_from_leaves
+      ~DimerNetworkTree.is_success
+      ~DimerNetworkTree.sample_successful_circuits_by_enumeration
+      ~DimerNetworkTree.sample_successful_circuits_by_rejection
+      ~DimerNetworkTree.sample_terminal_states
+      ~DimerNetworkTree.search_bfs
+      ~DimerNetworkTree.search_mcts
+      ~DimerNetworkTree.search_mcts_parallel
+      ~DimerNetworkTree.select_and_expand
+      ~DimerNetworkTree.test_pattern_significance
+      ~DimerNetworkTree.to_complexity_graph
+      ~DimerNetworkTree.to_file
+      ~DimerNetworkTree.to_string
+      ~DimerNetworkTree.traverse
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~DimerNetworkTree.default_attrs
+      ~DimerNetworkTree.terminal_states
+   
+   

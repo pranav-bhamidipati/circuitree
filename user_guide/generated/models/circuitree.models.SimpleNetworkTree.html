@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>circuitree.models.SimpleNetworkTree &mdash; CircuiTree 0.12.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=22ddcdb3" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=61ccb1f1"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="circuitree.models.DimersGrammar" href="circuitree.models.DimersGrammar.html" />
+    <link rel="prev" title="circuitree.models.SimpleNetworkGrammar" href="circuitree.models.SimpleNetworkGrammar.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #F0F0F0" >
+
+          
+          
+          <a href="../../../index.html">
+            
+              <img src="../../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../tutorial_2_mcts_in_parallel.html">Parallel MCTS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../defining_search_spaces/index.html">Defining search spaces</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../api.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#circuitree">CircuiTree</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../api.html#built-in-grammars">Built-in Grammars</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="circuitree.models.SimpleNetworkGrammar.html">circuitree.models.SimpleNetworkGrammar</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">circuitree.models.SimpleNetworkTree</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#circuitree.models.SimpleNetworkTree"><code class="docutils literal notranslate"><span class="pre">SimpleNetworkTree</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="circuitree.models.DimersGrammar.html">circuitree.models.DimersGrammar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuitree.models.DimerNetworkTree.html">circuitree.models.DimerNetworkTree</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#low-level-circuitgrammar-api">Low-level CircuitGrammar API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#visualisation">Visualisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#utility-functions-and-classes">Utility functions and classes</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #F0F0F0" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CircuiTree</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+<li><a href="https://github.com/pranav-bhamidipati/circuitree">CircuiTree repo on GitHub</a></li>
+
+<li class="wy-breadcrumbs-aside">
+  
+  
+  
+  <a href="../../../_sources/user_guide/generated/models/circuitree.models.SimpleNetworkTree.rst.txt" rel="nofollow"> View page source</a>
+  
+  
+  
+</li>
+
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="circuitree-models-simplenetworktree">
+<h1>circuitree.models.SimpleNetworkTree<a class="headerlink" href="#circuitree-models-simplenetworktree" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">circuitree.models.</span></span><span class="sig-name descname"><span class="pre">SimpleNetworkTree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grammar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="circuitree.models.SimpleNetworkGrammar.html#circuitree.models.SimpleNetworkGrammar" title="circuitree.models.SimpleNetworkGrammar"><span class="pre">SimpleNetworkGrammar</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exploration_constant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2023</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">graph</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DiGraph</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tree_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'tree'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'dag'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compute_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree" title="Link to this definition"></a></dt>
+<dd><p>A convenience subclass of CircuiTree that uses SimpleNetworkGrammar by default.</p>
+<p>See CircuiTree and SimpleNetworkGrammar for more details.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grammar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="circuitree.models.SimpleNetworkGrammar.html#circuitree.models.SimpleNetworkGrammar" title="circuitree.models.SimpleNetworkGrammar"><span class="pre">SimpleNetworkGrammar</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exploration_constant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2023</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">graph</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DiGraph</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tree_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'tree'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'dag'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compute_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.__init__" title="circuitree.models.SimpleNetworkTree.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([grammar, components, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.backpropagate_reward" title="circuitree.models.SimpleNetworkTree.backpropagate_reward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">backpropagate_reward</span></code></a>(selection_path, reward)</p></td>
+<td><p>Update the reward for each node and edge in <code class="docutils literal notranslate"><span class="pre">selection_path</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.backpropagate_visit" title="circuitree.models.SimpleNetworkTree.backpropagate_visit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">backpropagate_visit</span></code></a>(selection_path)</p></td>
+<td><p>Increment the visit count for each node and edge in <code class="docutils literal notranslate"><span class="pre">selection_path</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.bfs_iterator" title="circuitree.models.SimpleNetworkTree.bfs_iterator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bfs_iterator</span></code></a>([root, shuffle])</p></td>
+<td><p>Iterate over all terminal nodes in breadth-first (BFS) order starting from a root node.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.copy_graph" title="circuitree.models.SimpleNetworkTree.copy_graph"><code class="xref py py-obj docutils literal notranslate"><span class="pre">copy_graph</span></code></a>()</p></td>
+<td><p>Return a shallow copy of the search graph (the <code class="docutils literal notranslate"><span class="pre">graph</span></code> attribute).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.enumerate_terminal_states" title="circuitree.models.SimpleNetworkTree.enumerate_terminal_states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enumerate_terminal_states</span></code></a>([root, progress, ...])</p></td>
+<td><p>Enumerate all terminal states reachable from the given root state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.expand_edge" title="circuitree.models.SimpleNetworkTree.expand_edge"><code class="xref py py-obj docutils literal notranslate"><span class="pre">expand_edge</span></code></a>(parent, child)</p></td>
+<td><p>Expands the search graph by adding the child node and/or the parent-child edge to the search graph if they do not already exist.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.from_file" title="circuitree.models.SimpleNetworkTree.from_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_file</span></code></a>(graph_gml, attrs_json[, ...])</p></td>
+<td><p>Load a CircuiTree object from a JSON file/string containing the object's attributes and an optional GML file/string of the search graph.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.generate_gml" title="circuitree.models.SimpleNetworkTree.generate_gml"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_gml</span></code></a>()</p></td>
+<td><p>Convert the <code class="docutils literal notranslate"><span class="pre">graph</span></code> attribute to a GML formatted string.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.get_attributes" title="circuitree.models.SimpleNetworkTree.get_attributes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_attributes</span></code></a>(attrs_copy)</p></td>
+<td><p>Returns a dictionary of the object's attributes.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.get_random_terminal_descendant" title="circuitree.models.SimpleNetworkTree.get_random_terminal_descendant"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_random_terminal_descendant</span></code></a>(start[, rg])</p></td>
+<td><p>Sample a random terminal state by following random actions from a given start state.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.get_reward" title="circuitree.models.SimpleNetworkTree.get_reward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_reward</span></code></a>(state, **kwargs)</p></td>
+<td><p>Abstract method that calculates the reward for a given state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.get_ucb_score" title="circuitree.models.SimpleNetworkTree.get_ucb_score"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_ucb_score</span></code></a>(parent, child)</p></td>
+<td><p>Calculates the UCB score for a child node given its parent.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.grow_tree" title="circuitree.models.SimpleNetworkTree.grow_tree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">grow_tree</span></code></a>([root, n_visits, print_updates, ...])</p></td>
+<td><p>Exhaustively expand the search tree from a root node (not recommended for large spaces).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.grow_tree_from_leaves" title="circuitree.models.SimpleNetworkTree.grow_tree_from_leaves"><code class="xref py py-obj docutils literal notranslate"><span class="pre">grow_tree_from_leaves</span></code></a>(leaves)</p></td>
+<td><p>Returns the tree (or DAG) of all paths that start at the root and ending at a node in <code class="docutils literal notranslate"><span class="pre">leaves</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.is_success" title="circuitree.models.SimpleNetworkTree.is_success"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_success</span></code></a>(terminal_state)</p></td>
+<td><p>Determines whether a state represents a successful outcome in the search.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_enumeration" title="circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_enumeration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample_successful_circuits_by_enumeration</span></code></a>(...)</p></td>
+<td><p>Sample a random successful state by first creating a new graph that contains all possible paths from the root to a successful terminal state.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_rejection" title="circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_rejection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample_successful_circuits_by_rejection</span></code></a>(...)</p></td>
+<td><p>Sample a random successful state with rejection sampling.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.sample_terminal_states" title="circuitree.models.SimpleNetworkTree.sample_terminal_states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample_terminal_states</span></code></a>(n_samples[, ...])</p></td>
+<td><p>Sample n_samples random terminal states from the grammar.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.search_bfs" title="circuitree.models.SimpleNetworkTree.search_bfs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">search_bfs</span></code></a>([n_steps, n_repeats, n_cycles, ...])</p></td>
+<td><p>Performs a breadth-first search (BFS) traversal of the search graph.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.search_mcts" title="circuitree.models.SimpleNetworkTree.search_mcts"><code class="xref py py-obj docutils literal notranslate"><span class="pre">search_mcts</span></code></a>(n_steps[, callback_every, ...])</p></td>
+<td><p>Performs a Monte Carlo Tree Search (MCTS) traversal of circuit topology space.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.search_mcts_parallel" title="circuitree.models.SimpleNetworkTree.search_mcts_parallel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">search_mcts_parallel</span></code></a>(n_steps, n_threads[, ...])</p></td>
+<td><p>Performs a Monte Carlo Tree Search (MCTS) in parallel using multiple threads.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.select_and_expand" title="circuitree.models.SimpleNetworkTree.select_and_expand"><code class="xref py py-obj docutils literal notranslate"><span class="pre">select_and_expand</span></code></a>([rg])</p></td>
+<td><p>Selects a path through the search graph using the UCB score.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.test_pattern_significance" title="circuitree.models.SimpleNetworkTree.test_pattern_significance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">test_pattern_significance</span></code></a>(patterns, n_samples)</p></td>
+<td><p>Test whether a pattern is successful by sampling random paths from the design space.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.to_complexity_graph" title="circuitree.models.SimpleNetworkTree.to_complexity_graph"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_complexity_graph</span></code></a>([successes])</p></td>
+<td><p>Generates a directed acyclic graph (DAG) representing the search graph as a &quot;complexity atlas&quot;.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.to_file" title="circuitree.models.SimpleNetworkTree.to_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_file</span></code></a>(gml_file[, json_file, save_attrs, ...])</p></td>
+<td><p>Save the <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> object to a gml file and optionally a JSON file containing the object's attributes.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.to_string" title="circuitree.models.SimpleNetworkTree.to_string"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_string</span></code></a>()</p></td>
+<td><p>Return a a GML-formatted string of the <code class="docutils literal notranslate"><span class="pre">graph</span></code> attribute and a JSON-formatted string of the other serializable attributes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.traverse" title="circuitree.models.SimpleNetworkTree.traverse"><code class="xref py py-obj docutils literal notranslate"><span class="pre">traverse</span></code></a>(**kwargs)</p></td>
+<td><p>Performs a single iteration of the MCTS algorithm.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.default_attrs" title="circuitree.models.SimpleNetworkTree.default_attrs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_attrs</span></code></a></p></td>
+<td><p>Default attributes for nodes and edges in the search graph.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.SimpleNetworkTree.terminal_states" title="circuitree.models.SimpleNetworkTree.terminal_states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">terminal_states</span></code></a></p></td>
+<td><p>Generator that yields terminal states in the search graph.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.backpropagate_reward">
+<span class="sig-name descname"><span class="pre">backpropagate_reward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">selection_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reward</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.backpropagate_reward" title="Link to this definition"></a></dt>
+<dd><p>Update the reward for each node and edge in <code class="docutils literal notranslate"><span class="pre">selection_path</span></code>.</p>
+<p>Notes:</p>
+<ul class="simple">
+<li><p>The reward function (<code class="docutils literal notranslate"><span class="pre">get_reward</span></code>) is called after <code class="docutils literal notranslate"><span class="pre">backpropagate_visit</span></code> and
+before <code class="docutils literal notranslate"><span class="pre">backpropagate_reward</span></code>.</p></li>
+<li><p>In parallel mode, each node and edge in the selection path incurs “virtual loss”
+until the reward is computed and backpropagated. This is because the visit
+count is incremented before the actual reward is known.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>selection_path</strong> (<em>list</em>) – The list of nodes in the selection path.</p></li>
+<li><p><strong>reward</strong> (<em>float</em><em> | </em><em>int</em>) – The reward value to add to each node and edge.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.backpropagate_visit">
+<span class="sig-name descname"><span class="pre">backpropagate_visit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">selection_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.backpropagate_visit" title="Link to this definition"></a></dt>
+<dd><p>Increment the visit count for each node and edge in <code class="docutils literal notranslate"><span class="pre">selection_path</span></code>.</p>
+<p>Notes:</p>
+<ul class="simple">
+<li><p>The reward function (<code class="docutils literal notranslate"><span class="pre">get_reward</span></code>) is called after <code class="docutils literal notranslate"><span class="pre">backpropagate_visit</span></code> and
+before <code class="docutils literal notranslate"><span class="pre">backpropagate_reward</span></code>.</p></li>
+<li><p>In parallel mode, each node and edge in the selection path incurs “virtual loss”
+until the reward is computed and backpropagated. This is because the visit
+count is incremented before the actual reward is known.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>selection_path</strong> (<em>list</em>) – The list of nodes in the selection path.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.bfs_iterator">
+<span class="sig-name descname"><span class="pre">bfs_iterator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.bfs_iterator" title="Link to this definition"></a></dt>
+<dd><p>Iterate over all terminal nodes in breadth-first (BFS) order starting from
+a root node.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.copy_graph">
+<span class="sig-name descname"><span class="pre">copy_graph</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DiGraph</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.copy_graph" title="Link to this definition"></a></dt>
+<dd><p>Return a shallow copy of the search graph (the <code class="docutils literal notranslate"><span class="pre">graph</span></code> attribute). Use
+<code class="docutils literal notranslate"><span class="pre">copy.deepcopy()</span></code> for a deep copy.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.enumerate_terminal_states">
+<span class="sig-name descname"><span class="pre">enumerate_terminal_states</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.enumerate_terminal_states" title="Link to this definition"></a></dt>
+<dd><p>Enumerate all terminal states reachable from the given root state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.expand_edge">
+<span class="sig-name descname"><span class="pre">expand_edge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">child</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.expand_edge" title="Link to this definition"></a></dt>
+<dd><p>Expands the search graph by adding the child node and/or the parent-child
+edge to the search graph if they do not already exist.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>Hashable</em>) – The parent node of the edge.</p></li>
+<li><p><strong>child</strong> (<em>Hashable</em>) – The child node.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.from_file">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">graph_gml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attrs_json</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grammar_cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../grammar/circuitree.grammar.CircuitGrammar.html#circuitree.grammar.CircuitGrammar" title="circuitree.grammar.CircuitGrammar"><span class="pre">CircuitGrammar</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grammar_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.from_file" title="Link to this definition"></a></dt>
+<dd><p>Load a CircuiTree object from a JSON file/string containing the object’s
+attributes and an optional GML file/string of the search graph.</p>
+<p>These files are typically saved with the <code class="docutils literal notranslate"><span class="pre">to_file()</span></code> method.</p>
+<p>The grammar attribute is loaded by looking for a key “grammar” in the JSON file,
+whose value should be a dict <code class="docutils literal notranslate"><span class="pre">grammar_kwargs</span></code> used to create a grammar object.
+The <code class="docutils literal notranslate"><span class="pre">grammar_cls</span></code> keyword argument can be used to directly specify the grammar class
+constructor. Alternatively, the JSON file can include a key “<code class="docutils literal notranslate"><span class="pre">__grammar_cls__</span></code>” that
+specifies the class name string (which will be looked up in <code class="docutils literal notranslate"><span class="pre">globals()</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>graph_gml</strong> (<em>str</em><em> | </em><em>Path</em><em> | </em><em>None</em><em>, </em><em>optional</em>) – The path to the GML file or the
+serialized GML string (optional).</p></li>
+<li><p><strong>attrs_json</strong> (<em>str</em><em> | </em><em>Path</em>) – The path to the JSON file containing the object’s
+attributes or the serialized JSON string.</p></li>
+<li><p><strong>grammar_cls</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="../grammar/circuitree.grammar.CircuitGrammar.html#circuitree.grammar.CircuitGrammar" title="circuitree.grammar.CircuitGrammar"><em>CircuitGrammar</em></a><em>]</em><em>, </em><em>optional</em>) – The grammar class constructor
+to use. If None, the class is loaded from the JSON file. Defaults to None.</p></li>
+<li><p><strong>grammar_kwargs</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em><em>, </em><em>optional</em>) – Keyword arguments used to create the
+grammar object.</p></li>
+<li><p><strong>**kwargs</strong> – Keyword arguments to pass to the CircuiTree constructor.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A CircuiTree object loaded from the provided files or strings.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="../circuitree/circuitree.circuitree.CircuiTree.html#circuitree.circuitree.CircuiTree" title="circuitree.circuitree.CircuiTree">CircuiTree</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.generate_gml">
+<span class="sig-name descname"><span class="pre">generate_gml</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.generate_gml" title="Link to this definition"></a></dt>
+<dd><p>Convert the <code class="docutils literal notranslate"><span class="pre">graph</span></code> attribute to a GML formatted string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The GML representation of <code class="docutils literal notranslate"><span class="pre">self.graph</span></code>.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.get_attributes">
+<span class="sig-name descname"><span class="pre">get_attributes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attrs_copy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.get_attributes" title="Link to this definition"></a></dt>
+<dd><p>Returns a dictionary of the object’s attributes.</p>
+<p>This method allows controlled access to the object’s attributes, potentially
+excluding ones that should not be serialized when writing to a JSON file. For
+any attribute with a <code class="docutils literal notranslate"><span class="pre">to_dict()</span></code> method, the output of that method is used.
+Otherwise, the attribute is copied directly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>attrs_copy</strong> (<em>Optional</em><em>[</em><em>Iterable</em><em>[</em><em>str</em><em>]</em><em>]</em>) – An optional list of attribute names
+to include. If None, all attributes except those in
+<code class="docutils literal notranslate"><span class="pre">_non_serializable_attrs</span></code> are returned.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">attrs_copy</span></code> contains attributes from <code class="docutils literal notranslate"><span class="pre">_non_serializable_attrs</span></code>.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary containing the requested attributes. Attributes with a
+<code class="docutils literal notranslate"><span class="pre">to_dict()</span></code> method are converted using that method, otherwise they are
+copied directly.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.get_random_terminal_descendant">
+<span class="sig-name descname"><span class="pre">get_random_terminal_descendant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Generator</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Hashable</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.get_random_terminal_descendant" title="Link to this definition"></a></dt>
+<dd><p>Sample a random terminal state by following random actions from a given start
+state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start</strong> (<em>Hashable</em>) – The starting state from which to begin the random walk.</p></li>
+<li><p><strong>rg</strong> (<em>Optional</em><em>[</em><em>np.random.Generator</em><em>]</em><em>, </em><em>optional</em>) – Defaults to None, in which</p></li>
+<li><p><strong>used.</strong> (<em>case the rg attribute</em><em> of </em><em>the CircuiTree instance is</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The randomly sampled terminal state.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Hashable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.get_reward">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_reward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.get_reward" title="Link to this definition"></a></dt>
+<dd><p>Abstract method that calculates the reward for a given state.</p>
+<p>This method must be implemented by a subclass of <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code>. It defines
+the interface for reward calculation within the framework.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>state</strong> (<em>Hashable</em>) – The state for which to calculate the reward.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The reward for the given state. Reward values can be</dt><dd><p>deterministic or stochastic. The range of possible outputs should be
+finite and ideally normalized to the range [0, 1].</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float | int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.get_ucb_score">
+<span class="sig-name descname"><span class="pre">get_ucb_score</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">child</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.get_ucb_score" title="Link to this definition"></a></dt>
+<dd><p>Calculates the UCB score for a child node given its parent.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>Hashable</em>) – The parent node.</p></li>
+<li><p><strong>child</strong> (<em>Hashable</em>) – The child node.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The UCB score of the child node.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.grow_tree">
+<span class="sig-name descname"><span class="pre">grow_tree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_visits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_updates</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">print_every</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.grow_tree" title="Link to this definition"></a></dt>
+<dd><p>Exhaustively expand the search tree from a root node (not recommended for large spaces).</p>
+<p>This method performs a depth-first search expansion of the search graph,
+adding all possible nodes and edges based on the grammar until no new states
+can be reached.</p>
+<p><strong>Warning:</strong> This method can be computationally expensive and memory-intensive
+for large search spaces.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>root</strong> (<em>Hashable</em><em>, </em><em>optional</em>) – The starting node for the expansion. Defaults to None.</p></li>
+<li><p><strong>n_visits</strong> (<em>int</em><em>, </em><em>optional</em>) – The initial visit count for all added nodes. Defaults to 0.</p></li>
+<li><p><strong>print_updates</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to print information about the number of
+added nodes during growth. Defaults to False.</p></li>
+<li><p><strong>print_every</strong> (<em>int</em><em>, </em><em>optional</em>) – The frequency at which to print updates
+(if print_updates is True). Defaults to 1000.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.grow_tree_from_leaves">
+<span class="sig-name descname"><span class="pre">grow_tree_from_leaves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">leaves</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DiGraph</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.grow_tree_from_leaves" title="Link to this definition"></a></dt>
+<dd><p>Returns the tree (or DAG) of all paths that start at the root and ending at
+a node in <code class="docutils literal notranslate"><span class="pre">leaves</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.is_success">
+<span class="sig-name descname"><span class="pre">is_success</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">terminal_state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.is_success" title="Link to this definition"></a></dt>
+<dd><p>Determines whether a state represents a successful outcome in the search.</p>
+<p>Designed to be implemented in a subclass, since the definition of success
+depends on the specific search problem. It takes a terminal state as input, which
+represents a potential solution for the design problem.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>terminal_state</strong> (<em>Hashable</em>) – The state to evaluate for success.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>NotImplementedError</strong> – This base class implementation is intended to be</p></li>
+<li><p><strong>overridden in subclasses.</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Whether the provided state represents a successful outcome (True) or
+not (False).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_enumeration">
+<span class="sig-name descname"><span class="pre">sample_successful_circuits_by_enumeration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nprocs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunksize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_enumeration" title="Link to this definition"></a></dt>
+<dd><p>Sample a random successful state by first creating a new graph that contains
+all possible paths from the root to a successful terminal state. Then, sample
+paths by random traversal from the root.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_rejection">
+<span class="sig-name descname"><span class="pre">sample_successful_circuits_by_rejection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10000000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nprocs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunksize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.sample_successful_circuits_by_rejection" title="Link to this definition"></a></dt>
+<dd><p>Sample a random successful state with rejection sampling. Starts from the
+root state, selects random actions until termination, and accepts the sample if
+it is successful.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.sample_terminal_states">
+<span class="sig-name descname"><span class="pre">sample_terminal_states</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nprocs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunksize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.sample_terminal_states" title="Link to this definition"></a></dt>
+<dd><p>Sample n_samples random terminal states from the grammar.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.search_bfs">
+<span class="sig-name descname"><span class="pre">search_bfs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_repeats</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_cycles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback_every</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.search_bfs" title="Link to this definition"></a></dt>
+<dd><p>Performs a breadth-first search (BFS) traversal of the search graph.</p>
+<p>This method iterates over the search graph in a breadth-first manner, visiting
+nodes layer by layer. The number of iterations can be controlled using various
+parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">n_steps</span></code>: Stop the search after a fixed number of total iterations over all
+explored nodes (considering repeats and cycles).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">n_repeats</span></code>: For each node encountered during BFS traversal, repeat the visit
+<code class="docutils literal notranslate"><span class="pre">n_repeats</span></code> times before moving on to the next node in the layer.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">n_cycles</span></code>: Repeat the entire BFS traversal <cite>n_cycles</cite> times.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_steps</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Number of total iterations (repeats and
+cycles considered). Defaults to None.</p></li>
+<li><p><strong>n_repeats</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Number of repeats per node. Defaults to
+None.</p></li>
+<li><p><strong>n_cycles</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Number of BFS traversal cycles. Defaults
+to None.</p></li>
+<li><p><strong>callback</strong> (<em>Optional</em><em>[</em><em>Callable</em><em>]</em><em>, </em><em>optional</em>) – <p>A callback function to be executed
+at specific points during the search. Defaults to None. The callback is
+called with three arguments:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">tree</span></code>: The <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> instance calling the callback.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">node</span></code>: The current node being visited (value is None during
+initialization).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reward</span></code>: The reward obtained from the node (value is None during
+initialization).</p></li>
+</ul>
+</p></li>
+<li><p><strong>callback_every</strong> (<em>int</em><em>, </em><em>optional</em>) – How often to call the callback (in terms of
+iterations). Defaults to 1.</p></li>
+<li><p><strong>shuffle</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, shuffles the order of nodes within each
+BFS layer. Defaults to False.</p></li>
+<li><p><strong>progress</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, displays a progress bar during the
+search. Defaults to False.</p></li>
+<li><p><strong>run_kwargs</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em><em>, </em><em>optional</em>) – A dictionary of additional keyword
+arguments passed to the <code class="docutils literal notranslate"><span class="pre">get_reward</span></code> method during node evaluation.
+Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If both <code class="docutils literal notranslate"><span class="pre">n_steps</span></code> and <code class="docutils literal notranslate"><span class="pre">n_cycles</span></code> are specified (exactly one should be provided).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.search_mcts">
+<span class="sig-name descname"><span class="pre">search_mcts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback_every</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_bar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback_before_start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.search_mcts" title="Link to this definition"></a></dt>
+<dd><p>Performs a Monte Carlo Tree Search (MCTS) traversal of circuit topology space.</p>
+<p>This method implements the core MCTS algorithm for exploring and exploiting the
+search tree. It performs a sequence of <code class="docutils literal notranslate"><span class="pre">n_steps</span></code> iterations, each consisting of
+selection, expansion, simulation, and backpropagation steps. If provided, a
+callback function is called at specific points during the search. This can be
+used for various purposes:</p>
+<ul class="simple">
+<li><p>Logging search progress</p></li>
+<li><p>Backing up intermediate results</p></li>
+<li><p>Recording search statistics</p></li>
+<li><p>Checking for convergence or early stopping conditions</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_steps</strong> (<em>int</em>) – The total number of MCTS iterations to perform.</p></li>
+<li><p><strong>callback_every</strong> (<em>int</em><em>, </em><em>optional</em>) – How often to call the callback function
+(in terms of iterations). Defaults to 1 (every iteration).</p></li>
+<li><p><strong>callback</strong> (<em>Optional</em><em>[</em><em>Callable</em><em>]</em><em>, </em><em>optional</em>) – <p>A callback function to be executed
+at specific points during the search. Defaults to None. The callback is
+called with five arguments:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">tree</span></code>: The <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> instance calling the callback.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">step</span></code>: The current MCTS iteration (0-based index).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">path</span></code>: A list of nodes representing the selected path in the tree.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sim_node</span></code>: The state used for the simulation step. Chosen by
+following random actions from the last node in the path until
+a terminal state is reached.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reward</span></code>: The reward obtained from the simulation step.</p></li>
+</ul>
+</p></li>
+<li><p><strong>progress_bar</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, displays a progress bar during the
+search. Defaults to False. Requires the <code class="docutils literal notranslate"><span class="pre">tqdm</span></code> package.</p></li>
+<li><p><strong>run_kwargs</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em><em>, </em><em>optional</em>) – A dictionary of additional keyword
+arguments passed to the <code class="docutils literal notranslate"><span class="pre">get_reward</span></code> method during node evaluation.
+Defaults to None.</p></li>
+<li><p><strong>callback_before_start</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to call the callback before
+starting the search. If so, the callback is called with <code class="docutils literal notranslate"><span class="pre">step</span> <span class="pre">=</span> <span class="pre">-1</span></code>.
+Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.search_mcts_parallel">
+<span class="sig-name descname"><span class="pre">search_mcts_parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback_every</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback_before_start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.search_mcts_parallel" title="Link to this definition"></a></dt>
+<dd><p>Performs a Monte Carlo Tree Search (MCTS) in parallel using multiple threads.
+This method leverages the <code class="docutils literal notranslate"><span class="pre">gevent</span></code> library (included with
+<code class="docutils literal notranslate"><span class="pre">circuitree[distributed]</span></code>) to execute the MCTS search algorithm across multiple
+execution threads on the same search graph.</p>
+<p>Key differences from <code class="docutils literal notranslate"><span class="pre">search_mcts</span></code>:</p>
+<ul class="simple">
+<li><p>This function utilizes multiple threads for parallel execution, whereas
+<code class="docutils literal notranslate"><span class="pre">search_mcts</span></code> runs sequentially on a single thread</p></li>
+<li><p>For intended performance, reward computations should be performed by a separate
+pool of worker processes (see User Guide &gt; Parallelization)</p></li>
+<li><p>Requires the <code class="docutils literal notranslate"><span class="pre">gevent</span></code> library</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_steps</strong> (<em>int</em>) – The total number of MCTS iterations to perform (divided among threads).</p></li>
+<li><p><strong>n_threads</strong> (<em>int</em>) – The number of threads to use for parallel MCTS. Must be at least 1.</p></li>
+<li><p><strong>callback</strong> (<em>Optional</em><em>[</em><em>Callable</em><em>]</em><em>, </em><em>optional</em>) – A callback function to be executed
+at specific points during the search. Defaults to None. (See <code class="docutils literal notranslate"><span class="pre">search_mcts</span></code> docstring for details).</p></li>
+<li><p><strong>callback_every</strong> (<em>int</em><em>, </em><em>optional</em>) – How often to call the callback function
+(in terms of iterations). Defaults to 1 (every iteration).</p></li>
+<li><p><strong>callback_before_start</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to call the callback before
+starting the search (step=-1). Defaults to True.</p></li>
+<li><p><strong>run_kwargs</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em><em>, </em><em>optional</em>) – A dictionary of additional keyword arguments
+passed to the <code class="docutils literal notranslate"><span class="pre">get_reward</span></code> method during node evaluation. Defaults to None.</p></li>
+<li><p><strong>logger</strong> (<em>Optional</em><em>[</em><em>Any</em><em>]</em><em>, </em><em>optional</em>) – A logger object to be used for logging messages
+during the search. Can be useful for monitoring progress. Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ImportError</strong> – If <code class="docutils literal notranslate"><span class="pre">gevent</span></code> is not installed.</p></li>
+<li><p><strong>ValueError</strong> – If the number of threads is less than 1.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.select_and_expand">
+<span class="sig-name descname"><span class="pre">select_and_expand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Generator</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.select_and_expand" title="Link to this definition"></a></dt>
+<dd><p>Selects a path through the search graph using the UCB score. Adds the last
+node to the graph if it is not already present.</p>
+<p>This method implements the core selection and expansion step of the UCB algorithm.
+It iteratively selects the child node with the highest UCB score until a terminal
+state or an unexpanded edge is encountered.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rg</strong> (<em>Optional</em><em>[</em><em>np.random.Generator</em><em>]</em><em>, </em><em>optional</em>) – Random number generator.
+Defaults to None, in which case the <code class="docutils literal notranslate"><span class="pre">rg</span></code> attribute of the <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code>
+instance is used.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of states representing the selected path through the
+search graph.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[Hashable]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.test_pattern_significance">
+<span class="sig-name descname"><span class="pre">test_pattern_significance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">confidence</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">correction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">null_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">succ_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'rejection'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'enumeration'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'rejection'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nprocs_sampling</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nprocs_testing</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10000000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">null_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">succ_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">barnard_ok</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.test_pattern_significance" title="Link to this definition"></a></dt>
+<dd><p>Test whether a pattern is successful by sampling random paths from the
+design space. Returns the contingency table (a Pandas DataFrame) containing
+test statistics and p-values.</p>
+<p>Samples <code class="docutils literal notranslate"><span class="pre">n_samples</span></code> paths from the overall design space and uses rejection
+sampling to sample <code class="docutils literal notranslate"><span class="pre">n_samples</span></code> paths that terminate in a successful circuit as
+determined by the <code class="docutils literal notranslate"><span class="pre">is_success</span></code> method.</p>
+<p>if <code class="docutils literal notranslate"><span class="pre">exclude_self</span></code> is True, the pattern being tested is excluded from the null
+and successful samples. This is to properly evaluate the significance of rare
+patterns.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.to_complexity_graph">
+<span class="sig-name descname"><span class="pre">to_complexity_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">successes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DiGraph</span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.to_complexity_graph" title="Link to this definition"></a></dt>
+<dd><p>Generates a directed acyclic graph (DAG) representing the search graph as a
+“complexity atlas”.</p>
+<p>A complexity atlas <a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> is a subgraph of the search graph that includes only certain
+terminal states (determined by the <code class="docutils literal notranslate"><span class="pre">successes</span></code> argument) and their parent nodes.
+The returned graph can be used to visualize the search space and identify
+clusters of topologically similar solutions that occur, for example, due to
+motifs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>successes</strong> (<em>bool</em><em> | </em><em>Iterable</em><em>[</em><em>Hashable</em><em>]</em><em>, </em><em>optional</em>) – <p>A flag or an iterable of
+states representing successful terminal states.</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code> (default), the <code class="docutils literal notranslate"><span class="pre">is_success</span></code> method is used to identify the
+successful states, and only these are included.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">False</span></code>, all terminal states are included.</p></li>
+<li><p>If an iterable, the states in the iterable are included.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If an invalid value is provided for <code class="docutils literal notranslate"><span class="pre">successes</span></code>.</p></li>
+<li><p><strong>NotImplementedError</strong> – If <code class="docutils literal notranslate"><span class="pre">successes</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code> and <code class="docutils literal notranslate"><span class="pre">is_success</span></code> is not
+    implemented. The intended usage is to subclass <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> and implement
+    the <code class="docutils literal notranslate"><span class="pre">is_success</span></code> method.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A directed acyclic graph representing the complexity atlas.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>nx.DiGraph</p>
+</dd>
+</dl>
+<p class="rubric">References</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Cotterell J, Sharpe J. <em>An atlas of gene regulatory networks reveals
+multiple three-gene mechanisms for interpreting morphogen gradients</em>. Mol
+Syst Biol. 2010 Nov 2;6:425. doi: 10.1038/msb.2010.74. PMID: 21045819;
+PMCID: PMC3010108.</p>
+</aside>
+</aside>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.to_file">
+<span class="sig-name descname"><span class="pre">to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gml_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">json_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_attrs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.to_file" title="Link to this definition"></a></dt>
+<dd><p>Save the <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> object to a gml file and optionally a JSON file
+containing the object’s attributes.</p>
+<p>This method allows saving the CircuiTree object to disk in a GML format for the
+graph and optionally a JSON format for the serializable attributes. The saved
+object can be loaded later using the <code class="docutils literal notranslate"><span class="pre">from_file</span></code> class method (see
+<code class="docutils literal notranslate"><span class="pre">CircuiTree.from_file</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>gml_file</strong> (<em>str</em><em> | </em><em>Path</em>) – The path to the GML file as a <code class="docutils literal notranslate"><span class="pre">str</span></code> or <code class="docutils literal notranslate"><span class="pre">Path</span></code> object.</p></li>
+<li><p><strong>json_file</strong> (<em>Optional</em><em>[</em><em>str</em><em> | </em><em>Path</em><em>]</em><em>, </em><em>optional</em>) – The path to the optional JSON file
+for saving other attributes. Defaults to None.</p></li>
+<li><p><strong>save_attrs</strong> (<em>Optional</em><em>[</em><em>Iterable</em><em>[</em><em>str</em><em>]</em><em>]</em><em>, </em><em>optional</em>) – An optional list of attribute
+names to include in the JSON file. If None, all attributes except those in
+<code class="docutils literal notranslate"><span class="pre">_non_serializable_attrs</span></code> are saved. Defaults to None.</p></li>
+<li><p><strong>compress</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, the GML file will be compressed with gzip.
+Defaults to False.</p></li>
+<li><p><strong>**kwargs</strong> – Additional keyword arguments passed to <code class="docutils literal notranslate"><span class="pre">networkx.write_gml</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Returns the path to the saved GML file and,
+optionally, the JSON file.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path | Tuple[Path, Path]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.to_string">
+<span class="sig-name descname"><span class="pre">to_string</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.to_string" title="Link to this definition"></a></dt>
+<dd><p>Return a a GML-formatted string of the <code class="docutils literal notranslate"><span class="pre">graph</span></code> attribute and a JSON-formatted
+string of the other serializable attributes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.traverse">
+<span class="sig-name descname"><span class="pre">traverse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.traverse" title="Link to this definition"></a></dt>
+<dd><p>Performs a single iteration of the MCTS algorithm.</p>
+<p>This method implements the core traversal step of the UCB algorithm. It selects
+a path through the search tree using UCB scores, expands the tree if necessary,
+obtains a reward estimate by simulating a random downstream terminal state, and
+updates the search graph based on the reward value.</p>
+<p>Notes:</p>
+<ul class="simple">
+<li><p>The reward function (<code class="docutils literal notranslate"><span class="pre">get_reward</span></code>) is called after <code class="docutils literal notranslate"><span class="pre">backpropagate_visit</span></code> and
+before <code class="docutils literal notranslate"><span class="pre">backpropagate_reward</span></code>.</p></li>
+<li><p>In parallel mode, each node and edge in the selection path incurs “virtual loss”
+until the reward is computed and backpropagated. This is because the visit
+count is incremented before the actual reward is known.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – Additional keyword arguments passed to the :func:<code class="docutils literal notranslate"><span class="pre">get_reward</span></code> method.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>selection_path (list): The selected path through the search graph.</p></li>
+<li><p>reward (float | int): The reward obtained from the simulation.</p></li>
+<li><p>sim_node (Hashable): The simulated terminal state.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[list[Hashable], float | int, Hashable]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.default_attrs">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_attrs</span></span><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.default_attrs" title="Link to this definition"></a></dt>
+<dd><p>Default attributes for nodes and edges in the search graph.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="circuitree.models.SimpleNetworkTree.terminal_states">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">terminal_states</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">Hashable</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#circuitree.models.SimpleNetworkTree.terminal_states" title="Link to this definition"></a></dt>
+<dd><p>Generator that yields terminal states in the search graph.</p>
+<p>This property provides an iterator that traverses the terminal states
+present in the search graph associated with the <code class="docutils literal notranslate"><span class="pre">CircuiTree</span></code> instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Yields<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Hashable</em> – Each element returned by the iterator represents a terminal
+state within the search graph (see <code class="docutils literal notranslate"><span class="pre">CircuitGrammar.is_terminal</span></code>).</p>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Find terminal states with mean reward &gt; 0.5</span>
+<span class="k">for</span> <span class="n">state</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">terminal_states</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">tree</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">state</span><span class="p">][</span><span class="s2">&quot;reward&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">tree</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">state</span><span class="p">][</span><span class="s2">&quot;visits&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="circuitree.models.SimpleNetworkGrammar.html" class="btn btn-neutral float-left" title="circuitree.models.SimpleNetworkGrammar" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="circuitree.models.DimersGrammar.html" class="btn btn-neutral float-right" title="circuitree.models.DimersGrammar" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+   <jinja2.runtime.BlockReference object at 0x7f92cc8d3970>
+
+<p>© 2024 Pranav Bhamidipati.</p>
+
+<p>This document was prepared at <a rel="caltech" href="http://www.caltech.edu">Caltech</a>.</p>
+<!-- with financial support from the <a rel="rosen" href="http://rosen.caltech.edu">Donna and Benjamin M. Rosen Bioengineering Center</a>.</p> -->
+
+<br />
+
+<p>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a
+        href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org/">Read
+        the Docs</a>.
+
+    
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-166791717-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-166791717-1', {
+          'anonymize_ip': false,
+      });
+    </script>  
+
+  <style>
+         .wy-nav-content { max-width: none; }
+  </style>
+
+
+
+</body>
+</html>

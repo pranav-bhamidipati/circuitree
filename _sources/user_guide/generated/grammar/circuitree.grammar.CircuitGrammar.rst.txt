@@ -1,0 +1,30 @@
+﻿circuitree.grammar.CircuitGrammar
+=================================
+
+.. currentmodule:: circuitree.grammar
+
+.. autoclass:: CircuitGrammar
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~CircuitGrammar.__init__
+      ~CircuitGrammar.do_action
+      ~CircuitGrammar.get_actions
+      ~CircuitGrammar.get_undo_actions
+      ~CircuitGrammar.get_unique_state
+      ~CircuitGrammar.has_pattern
+      ~CircuitGrammar.is_terminal
+      ~CircuitGrammar.to_dict
+      ~CircuitGrammar.undo_action
+   
+   
+
+   
+   
+   

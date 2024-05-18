@@ -1,0 +1,39 @@
+﻿circuitree.models.SimpleNetworkGrammar
+======================================
+
+.. currentmodule:: circuitree.models
+
+.. autoclass:: SimpleNetworkGrammar
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SimpleNetworkGrammar.__init__
+      ~SimpleNetworkGrammar.do_action
+      ~SimpleNetworkGrammar.get_actions
+      ~SimpleNetworkGrammar.get_component_recolorings
+      ~SimpleNetworkGrammar.get_recolorings
+      ~SimpleNetworkGrammar.get_undo_actions
+      ~SimpleNetworkGrammar.get_unique_state
+      ~SimpleNetworkGrammar.has_pattern
+      ~SimpleNetworkGrammar.is_terminal
+      ~SimpleNetworkGrammar.parse_genotype
+      ~SimpleNetworkGrammar.to_dict
+      ~SimpleNetworkGrammar.undo_action
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SimpleNetworkGrammar.component_codes
+   
+   

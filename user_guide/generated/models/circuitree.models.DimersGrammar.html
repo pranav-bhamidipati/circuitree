@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>circuitree.models.DimersGrammar &mdash; CircuiTree 0.12.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=22ddcdb3" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=61ccb1f1"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="circuitree.models.DimerNetworkTree" href="circuitree.models.DimerNetworkTree.html" />
+    <link rel="prev" title="circuitree.models.SimpleNetworkTree" href="circuitree.models.SimpleNetworkTree.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #F0F0F0" >
+
+          
+          
+          <a href="../../../index.html">
+            
+              <img src="../../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../tutorial_2_mcts_in_parallel.html">Parallel MCTS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../defining_search_spaces/index.html">Defining search spaces</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../api.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#circuitree">CircuiTree</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../api.html#built-in-grammars">Built-in Grammars</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="circuitree.models.SimpleNetworkGrammar.html">circuitree.models.SimpleNetworkGrammar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuitree.models.SimpleNetworkTree.html">circuitree.models.SimpleNetworkTree</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">circuitree.models.DimersGrammar</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#circuitree.models.DimersGrammar"><code class="docutils literal notranslate"><span class="pre">DimersGrammar</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="circuitree.models.DimerNetworkTree.html">circuitree.models.DimerNetworkTree</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#low-level-circuitgrammar-api">Low-level CircuitGrammar API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#visualisation">Visualisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#utility-functions-and-classes">Utility functions and classes</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #F0F0F0" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">CircuiTree</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+<li><a href="https://github.com/pranav-bhamidipati/circuitree">CircuiTree repo on GitHub</a></li>
+
+<li class="wy-breadcrumbs-aside">
+  
+  
+  
+  <a href="../../../_sources/user_guide/generated/models/circuitree.models.DimersGrammar.rst.txt" rel="nofollow"> View page source</a>
+  
+  
+  
+</li>
+
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="circuitree-models-dimersgrammar">
+<h1>circuitree.models.DimersGrammar<a class="headerlink" href="#circuitree-models-dimersgrammar" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">circuitree.models.</span></span><span class="sig-name descname"><span class="pre">DimersGrammar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regulators</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interactions_per_promoter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.DimersGrammar" title="Link to this definition"></a></dt>
+<dd><p><strong>(Experimental)</strong> A grammar class for the design space of dimerizing TF networks.
+Intended to represent dimerizing regulatory networks such as the MultiFate system.</p>
+<p>Each circuit consists of transcriptional <code class="docutils literal notranslate"><span class="pre">components</span></code> and <code class="docutils literal notranslate"><span class="pre">regulators</span></code>.
+Components are TFs that may be regulated by other TFs, while regulators are TFs that
+are never regulated themselves. Any pair of components or regulators could
+potentially form a dimer to regulate a third component. Therefore, each interaction
+in this circuit is a “triplet” of two monomer TFs and a target TF.</p>
+<p>The state ID string for a circuit topology is similar to <code class="docutils literal notranslate"><span class="pre">SimpleNetworkGrammar</span></code>,
+with some modifications.</p>
+<ul class="simple">
+<li><p>Components and regulators are represented by single uppercase characters</p></li>
+<li><dl class="simple">
+<dt>Interactions are represented by a 4-character string</dt><dd><ul>
+<li><p>Characters 1-2 (uppercase): the dimerizing species (components and/or
+regulators). Order does not matter.</p></li>
+<li><p>Character 3 (lowercase): the type of regulation upon binding (for example,
+<code class="docutils literal notranslate"><span class="pre">a</span></code> for activation)</p></li>
+<li><p>Character 4 (uppercase): the target of regulation (a component)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Multiple interactions are separated by underscores <code class="docutils literal notranslate"><span class="pre">_</span></code></p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">state</span></code> is a three-part string: <code class="docutils literal notranslate"><span class="pre">&lt;components&gt;+&lt;regulators&gt;::&lt;interactions&gt;</span></code></p></li>
+<li><p>A terminal assembly state is denoted with a leading asterisk <code class="docutils literal notranslate"><span class="pre">*</span></code></p></li>
+</ul>
+<p>For example, the <code class="docutils literal notranslate"><span class="pre">state</span></code> string <code class="docutils literal notranslate"><span class="pre">*AB+R::ARiB_BBaB</span></code> represents a system of three
+TFs, <code class="docutils literal notranslate"><span class="pre">A</span></code>, <code class="docutils literal notranslate"><span class="pre">B</span></code>, and <code class="docutils literal notranslate"><span class="pre">R</span></code> where <code class="docutils literal notranslate"><span class="pre">A-R</span></code> heterodimers inhibit transcription of
+<code class="docutils literal notranslate"><span class="pre">B</span></code> and <code class="docutils literal notranslate"><span class="pre">B-B</span></code> homodimers activate transcription of <code class="docutils literal notranslate"><span class="pre">B</span></code>. The asterisk <code class="docutils literal notranslate"><span class="pre">*</span></code> at
+the beginning means that the assembly process has finished.</p>
+<p>The number of distinct dimers that can regulate a given component is limited using
+the <code class="docutils literal notranslate"><span class="pre">max_interactions_per_promoter</span></code> argument (default of 2), and the total number
+of interactions in the circuit is limited by the <code class="docutils literal notranslate"><span class="pre">max_interactions</span></code> argument (no
+limit by default).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regulators</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interactions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interactions_per_promoter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.DimersGrammar.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.__init__" title="circuitree.models.DimersGrammar.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(components, regulators, interactions)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.do_action" title="circuitree.models.DimersGrammar.do_action"><code class="xref py py-obj docutils literal notranslate"><span class="pre">do_action</span></code></a>(genotype, action)</p></td>
+<td><p>Given a state and an action, return the new state that results.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.get_actions" title="circuitree.models.DimersGrammar.get_actions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_actions</span></code></a>(genotype)</p></td>
+<td><p>Returns the actions that can be taken from a given <code class="docutils literal notranslate"><span class="pre">state</span></code>, or <code class="docutils literal notranslate"><span class="pre">genotype</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.get_genotype_parts" title="circuitree.models.DimersGrammar.get_genotype_parts"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_genotype_parts</span></code></a>(genotype)</p></td>
+<td><p>Parses the state string (genotype) into its three parts: components, regulators, and interactions.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.get_undo_actions" title="circuitree.models.DimersGrammar.get_undo_actions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_undo_actions</span></code></a>(state)</p></td>
+<td><p>(Experimental) Get all actions that can be undone from the given state.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.get_unique_state" title="circuitree.models.DimersGrammar.get_unique_state"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_unique_state</span></code></a>(genotype)</p></td>
+<td><p>Returns a unique representation of a given state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.has_pattern" title="circuitree.models.DimersGrammar.has_pattern"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has_pattern</span></code></a>(state, pattern)</p></td>
+<td><p>Checks if a given state contains a particular sub-pattern.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.is_terminal" title="circuitree.models.DimersGrammar.is_terminal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_terminal</span></code></a>(genotype)</p></td>
+<td><p>Checks if the given assembly state (<code class="docutils literal notranslate"><span class="pre">genotype</span></code>) is a terminal state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.parse_genotype" title="circuitree.models.DimersGrammar.parse_genotype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parse_genotype</span></code></a>(genotype)</p></td>
+<td><p>Parses a genotype string into its components, regulators, activation interactions, and inhibition interactions.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.to_dict" title="circuitree.models.DimersGrammar.to_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_dict</span></code></a>()</p></td>
+<td><p>Convert the grammar to a dictionary that can be serialized to JSON.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.undo_action" title="circuitree.models.DimersGrammar.undo_action"><code class="xref py py-obj docutils literal notranslate"><span class="pre">undo_action</span></code></a>(state, action)</p></td>
+<td><p>(Experimental) Undo one action from the given state.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.dimer_options" title="circuitree.models.DimersGrammar.dimer_options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimer_options</span></code></a></p></td>
+<td><p>List of possible dimers (two-character codes) of components and regulators.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#circuitree.models.DimersGrammar.edge_options" title="circuitree.models.DimersGrammar.edge_options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">edge_options</span></code></a></p></td>
+<td><p>List-of-list of all possible 4-character interactions.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.do_action">
+<span class="sig-name descname"><span class="pre">do_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.do_action" title="Link to this definition"></a></dt>
+<dd><p>Given a state and an action, return the new state that results. Should be
+deterministic. The resulting state ID does not need to be unique (for example, it
+may not take symmetries into account).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>state</strong> (<em>Hashable</em>) – The current state of the game.</p></li>
+<li><p><strong>action</strong> (<em>Any</em>) – The action to take.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The new state.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Hashable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.get_actions">
+<span class="sig-name descname"><span class="pre">get_actions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.get_actions" title="Link to this definition"></a></dt>
+<dd><p>Returns the actions that can be taken from a given <code class="docutils literal notranslate"><span class="pre">state</span></code>, or <code class="docutils literal notranslate"><span class="pre">genotype</span></code>.</p>
+<p>Possible actions include adding a new component/regulator, adding a new
+interaction between a dimer and a target component, or terminating the assembly
+process. Checks to make sure the necessary pieces are present and the circuit
+would remain fully connected after taking the action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>genotype</strong> (<em>str</em>) – The current state of the circuit assembly.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of valid actions that can be taken. Each action is a
+4-character code.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Iterable[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.get_genotype_parts">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_genotype_parts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.get_genotype_parts" title="Link to this definition"></a></dt>
+<dd><p>Parses the state string (genotype) into its three parts: components,
+regulators, and interactions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>genotype</strong> (<em>str</em>) – An assembly state.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the components, regulators, and interactions
+in the state.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[str, str, str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.get_undo_actions">
+<span class="sig-name descname"><span class="pre">get_undo_actions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.get_undo_actions" title="Link to this definition"></a></dt>
+<dd><p>(Experimental) Get all actions that can be undone from the given state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.get_unique_state">
+<span class="sig-name descname"><span class="pre">get_unique_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.get_unique_state" title="Link to this definition"></a></dt>
+<dd><p>Returns a unique representation of a given state.</p>
+<p>This method is used to determine whether two <code class="docutils literal notranslate"><span class="pre">state</span></code> IDs represent the same
+topology, after accounting for</p>
+<ul class="simple">
+<li><p>Reording of the interactions</p></li>
+<li><p>Renaming of components and regulators (swapping labels)</p></li>
+</ul>
+<p>For example, different sequences of actions may lead to different
+<code class="docutils literal notranslate"><span class="pre">state</span></code> IDs that are isomorphic mirror images, or “recolorings” of each other.
+This method picks the alphabetically first representation over all possible
+recolorings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>genotype</strong> (<em>str</em>) – The current state.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The unique representation of the state.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.has_pattern">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">has_pattern</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pattern</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.DimersGrammar.has_pattern" title="Link to this definition"></a></dt>
+<dd><p>Checks if a given state contains a particular sub-pattern.</p>
+<p>This method checks if the interactions in the given <code class="docutils literal notranslate"><span class="pre">pattern</span></code> are a subset of
+the interactions in the given <code class="docutils literal notranslate"><span class="pre">state</span></code>, taking into account all possible
+renamings of components and regulators. The <code class="docutils literal notranslate"><span class="pre">pattern</span></code> should be a string that
+contains only interactions (separated by underscores).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>state</strong> (<em>str</em>) – The current state.</p></li>
+<li><p><strong>pattern</strong> (<em>str</em>) – The sub-pattern to search for.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Whether the state contains the given pattern.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If the pattern is empty or contains components/regulators or if</p></li>
+<li><p><strong>the state does not contain both components and interactions.</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.is_terminal">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_terminal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.is_terminal" title="Link to this definition"></a></dt>
+<dd><p>Checks if the given assembly state (<code class="docutils literal notranslate"><span class="pre">genotype</span></code>) is a terminal state. A
+terminal state starts with an asterisk <code class="docutils literal notranslate"><span class="pre">*</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>genotype</strong> (<em>str</em>) – An assembly state.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Whether the state is terminal.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.parse_genotype">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">parse_genotype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#circuitree.models.DimersGrammar.parse_genotype" title="Link to this definition"></a></dt>
+<dd><p>Parses a genotype string into its components, regulators, activation
+interactions, and inhibition interactions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>genotype</strong> (<em>str</em>) – The genotype string to parse.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The components, regulators,
+activations, and inhibitions. Components and regulators are provided as
+strings. The activations and inhibitions are represented as NumPy arrays with
+three columns, the indices of the two monomers involved in the interaction
+and the index of the target TF. The indices are determined by concatenating
+<code class="docutils literal notranslate"><span class="pre">components</span></code> and <code class="docutils literal notranslate"><span class="pre">regulators</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[str, str, np.ndarray, np.ndarray]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.to_dict" title="Link to this definition"></a></dt>
+<dd><p>Convert the grammar to a dictionary that can be serialized to JSON. Useful for
+saving the grammar to a file or for transferring it over a network.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">__grammar_cls__</span></code> key is added to the dictionary to indicate the name of the
+class that should be used to re-instantiate the grammar.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary representation of the grammar.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.undo_action">
+<span class="sig-name descname"><span class="pre">undo_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Hashable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Hashable</span></span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.undo_action" title="Link to this definition"></a></dt>
+<dd><p>(Experimental) Undo one action from the given state.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.dimer_options">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dimer_options</span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.dimer_options" title="Link to this definition"></a></dt>
+<dd><p>List of possible dimers (two-character codes) of components and regulators.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="circuitree.models.DimersGrammar.edge_options">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">edge_options</span></span><a class="headerlink" href="#circuitree.models.DimersGrammar.edge_options" title="Link to this definition"></a></dt>
+<dd><p>List-of-list of all possible 4-character interactions. The first level
+of the list is the triplet (which dimer regulating which target), and the
+second level is the nature of the regulation.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="circuitree.models.SimpleNetworkTree.html" class="btn btn-neutral float-left" title="circuitree.models.SimpleNetworkTree" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="circuitree.models.DimerNetworkTree.html" class="btn btn-neutral float-right" title="circuitree.models.DimerNetworkTree" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+   <jinja2.runtime.BlockReference object at 0x7f92cce26ec0>
+
+<p>© 2024 Pranav Bhamidipati.</p>
+
+<p>This document was prepared at <a rel="caltech" href="http://www.caltech.edu">Caltech</a>.</p>
+<!-- with financial support from the <a rel="rosen" href="http://rosen.caltech.edu">Donna and Benjamin M. Rosen Bioengineering Center</a>.</p> -->
+
+<br />
+
+<p>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a
+        href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org/">Read
+        the Docs</a>.
+
+    
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-166791717-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-166791717-1', {
+          'anonymize_ip': false,
+      });
+    </script>  
+
+  <style>
+         .wy-nav-content { max-width: none; }
+  </style>
+
+
+
+</body>
+</html>

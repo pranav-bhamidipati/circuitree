@@ -1,0 +1,6 @@
+﻿circuitree.viz.rgb2hex
+======================
+
+.. currentmodule:: circuitree.viz
+
+.. autofunction:: rgb2hex

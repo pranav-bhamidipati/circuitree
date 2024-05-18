@@ -1,0 +1,6 @@
+﻿circuitree.viz.complexity\_layout
+=================================
+
+.. currentmodule:: circuitree.viz
+
+.. autofunction:: complexity_layout

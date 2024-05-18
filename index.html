@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CircuiTree: Biochemical circuit design using RL &mdash; CircuiTree 0.12.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=22ddcdb3" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=61ccb1f1"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="getting_started/installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #F0F0F0" >
+
+          
+          
+          <a href="#">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/tutorial_2_mcts_in_parallel.html">Parallel MCTS</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/defining_search_spaces/index.html">Defining search spaces</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #F0F0F0" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">CircuiTree</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+<li><a href="https://github.com/pranav-bhamidipati/circuitree">CircuiTree repo on GitHub</a></li>
+
+<li class="wy-breadcrumbs-aside">
+  
+  
+  
+  <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+  
+  
+  
+</li>
+
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="circuitree-biochemical-circuit-design-using-rl">
+<h1>CircuiTree: Biochemical circuit design using RL<a class="headerlink" href="#circuitree-biochemical-circuit-design-using-rl" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">circuitree</span></code> is a Python package for optimizing the architecture, or topology, of a biochemical network
+for a particular behavior using reinforcement learning (RL), specifically Monte carlo Tree Search
+(MCTS). Once the user defines a space of topologies they want to search and supplies a reward function,
+<code class="docutils literal notranslate"><span class="pre">circuitree</span></code> will search for the best topologies.</p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/tutorial_2_mcts_in_parallel.html">Parallel MCTS</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/tutorial_2_mcts_in_parallel.html#Parallel-search-on-a-single-machine">Parallel search on a single machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/tutorial_2_mcts_in_parallel.html#Distributed-search-in-the-cloud">Distributed search in the cloud</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/defining_search_spaces/index.html">Defining search spaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/defining_search_spaces/built_in_grammars.html">Built-in Grammars</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/defining_search_spaces/custom_grammars.html">Custom Grammars</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/api.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/api.html#circuitree">CircuiTree</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/api.html#built-in-grammars">Built-in Grammars</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/api.html#low-level-circuitgrammar-api">Low-level CircuitGrammar API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/api.html#visualisation">Visualisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/api.html#utility-functions-and-classes">Utility functions and classes</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="getting_started/installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+   <jinja2.runtime.BlockReference object at 0x7f92cc096f50>
+
+<p>© 2024 Pranav Bhamidipati.</p>
+
+<p>This document was prepared at <a rel="caltech" href="http://www.caltech.edu">Caltech</a>.</p>
+<!-- with financial support from the <a rel="rosen" href="http://rosen.caltech.edu">Donna and Benjamin M. Rosen Bioengineering Center</a>.</p> -->
+
+<br />
+
+<p>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a
+        href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org/">Read
+        the Docs</a>.
+
+    
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-166791717-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-166791717-1', {
+          'anonymize_ip': false,
+      });
+    </script>  
+
+  <style>
+         .wy-nav-content { max-width: none; }
+  </style>
+
+
+
+</body>
+</html>

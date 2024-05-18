@@ -1,0 +1,28 @@
+﻿circuitree.utils.ManagedEvent
+=============================
+
+.. currentmodule:: circuitree.utils
+
+.. autoclass:: ManagedEvent
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ManagedEvent.__init__
+      ~ManagedEvent.backup_context
+      ~ManagedEvent.clear
+      ~ManagedEvent.isSet
+      ~ManagedEvent.is_set
+      ~ManagedEvent.set
+      ~ManagedEvent.wait
+   
+   
+
+   
+   
+   

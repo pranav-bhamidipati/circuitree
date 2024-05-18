@@ -1,0 +1,6 @@
+﻿circuitree.viz.plot\_network
+============================
+
+.. currentmodule:: circuitree.viz
+
+.. autofunction:: plot_network

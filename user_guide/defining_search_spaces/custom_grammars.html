@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Defining custom Grammars using CircuitGrammar &mdash; CircuiTree 0.12.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=22ddcdb3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=61ccb1f1"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="API Reference" href="../api.html" />
+    <link rel="prev" title="Built-in Grammars" href="built_in_grammars.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #F0F0F0" >
+
+          
+          
+          <a href="../../index.html">
+            
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/tutorial_1_getting_started.html">Getting started tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../tutorial_2_mcts_in_parallel.html">Parallel MCTS</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Defining search spaces</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="built_in_grammars.html">Built-in Grammars</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Custom Grammars</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #F0F0F0" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CircuiTree</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+<li><a href="https://github.com/pranav-bhamidipati/circuitree">CircuiTree repo on GitHub</a></li>
+
+<li class="wy-breadcrumbs-aside">
+  
+  
+  
+  <a href="../../_sources/user_guide/defining_search_spaces/custom_grammars.ipynb.txt" rel="nofollow"> Download notebook</a>
+  
+  
+  
+</li>
+
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">%</span><span class="k">pip</span> install -q -U circuitree[distributed]==0.11.1
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Note: you may need to restart the kernel to use updated packages.
+</pre></div></div>
+</div>
+<section id="Defining-custom-Grammars-using-CircuitGrammar">
+<h1>Defining custom Grammars using <code class="docutils literal notranslate"><span class="pre">CircuitGrammar</span></code><a class="headerlink" href="#Defining-custom-Grammars-using-CircuitGrammar" title="Link to this heading"></a></h1>
+<p>For search spaces that can’t expressed using a grammar in <code class="docutils literal notranslate"><span class="pre">circuitree.models</span></code>, you can make a custom grammar. A grammar will have rules for how to represent each distinct <code class="docutils literal notranslate"><span class="pre">state</span></code> in the design space and how different <code class="docutils literal notranslate"><span class="pre">actions</span></code> affect the <code class="docutils literal notranslate"><span class="pre">state</span></code>.</p>
+<p>You can define a grammar by subclassing <code class="docutils literal notranslate"><span class="pre">CircuitGrammar</span></code>. <code class="docutils literal notranslate"><span class="pre">CircuitGrammar</span></code> is an <em>abstract</em> class, which means that we must define certain methods in order to use it. Here’s a description of each method’s call signature and what it should do.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>is_terminal(state) -&gt; bool       # Return whether or not this state is terminal
+get_actions(state) -&gt; list[str]  # Return a list of actions that can be taken from this state
+do_action(state, action) -&gt; str  # Return a new state as a result of making this move
+get_unique_state(state) -&gt; str   # Return a unique representation of this state
+</pre></div>
+</div>
+<p>Together, these functions allow us to explore the space of possible circuits on-the-fly, without needing to enumerate every possibility.</p>
+<p>As an example, let’s consider an existing design space, explored by Angela Chau and colleagues in <a class="reference external" href="https://dx.doi.org/10.1016/j.cell.2012.08.040">this seminal paper</a> in their study of single-cell polarization circuits. The authors were studying all possible network topologies that could be made with two membrane-bound enzymes A and B that have active and inactive forms. Each species can catalyze either the forward or reverse reaction of the other species and of itself (autocatalysis). In
+other words, any of the four pairwise interactions can be present, and they can be either activating or inactivating (inhibiting).</p>
+<p>First, let’s decide how we could represent a circuit assembly as a string of characters that we will call the <code class="docutils literal notranslate"><span class="pre">state</span></code> string. (Any <code class="docutils literal notranslate"><span class="pre">Hashable</span></code> representation can be used, but strings are convenient.) Let’s use the following convention, which is the same one used by <code class="docutils literal notranslate"><span class="pre">SimpleNetworkGrammar</span></code>: * Each component is an uppercase letter. <code class="docutils literal notranslate"><span class="pre">A</span></code> refers to enzyme A and <code class="docutils literal notranslate"><span class="pre">B</span></code> refers to enzyme B. * Each pairwise interaction is represented by three characters, two uppercase letters for the components
+and one lowercase letter referring to the type of interaction. - For instance, <code class="docutils literal notranslate"><span class="pre">ABa</span></code> means “A activates B”, and <code class="docutils literal notranslate"><span class="pre">BBi</span></code> means “B inhibits B”. * The <code class="docutils literal notranslate"><span class="pre">state</span></code> string consists of two parts. separated by <code class="docutils literal notranslate"><span class="pre">::</span></code>. - The left side says which components are present (<code class="docutils literal notranslate"><span class="pre">AB</span></code>). - The right side says which interactions are present, separated by underscores (<code class="docutils literal notranslate"><span class="pre">ABa_BBi</span></code>). - A terminal <code class="docutils literal notranslate"><span class="pre">state</span></code> starts with <code class="docutils literal notranslate"><span class="pre">*</span></code>, denoting that assembly is complete and the game is over. * The allowed <code class="docutils literal notranslate"><span class="pre">action</span></code>s are -
+Adding a new interaction - Terminating * When adding multiple interactions, the order does not matter</p>
+<p>For instance, a circuit where A and B both inhibit each other can be written as the state string <code class="docutils literal notranslate"><span class="pre">*AB::ABi_BAi</span></code> - a fully assembled circuit (<code class="docutils literal notranslate"><span class="pre">*</span></code>) with components <code class="docutils literal notranslate"><span class="pre">A</span></code> and <code class="docutils literal notranslate"><span class="pre">B</span></code> (<code class="docutils literal notranslate"><span class="pre">AB</span></code>) that inhibit each other (<code class="docutils literal notranslate"><span class="pre">ABi_BAi</span></code>). Since order does not matter, we want <code class="docutils literal notranslate"><span class="pre">get_unique_state(&quot;*AB::ABi_BAi&quot;)</span></code> and <code class="docutils literal notranslate"><span class="pre">get_unique_state(&quot;*AB::BAi_ABi&quot;)</span></code> to return the same string. We can achieve this by sorting the interactions alphabetically.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">circuitree</span> <span class="kn">import</span> <span class="n">CircuitGrammar</span>
+
+<span class="k">class</span> <span class="nc">PolarizationGrammar</span><span class="p">(</span><span class="n">CircuitGrammar</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">is_terminal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">state</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="c1"># If termination hasn&#39;t happened yet, it&#39;s always a possibiilty</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_terminal</span><span class="p">(</span><span class="n">state</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="n">actions</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;*terminate*&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Get the part of the string that contains the interactions</span>
+        <span class="n">interactions</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;::&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># We can add an interaction between any unused pair</span>
+        <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;AA&quot;</span><span class="p">,</span> <span class="s2">&quot;AB&quot;</span><span class="p">,</span> <span class="s2">&quot;BA&quot;</span><span class="p">,</span> <span class="s2">&quot;BB&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">pair</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">interactions</span><span class="p">:</span>
+                <span class="n">actions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pair</span> <span class="o">+</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span>
+                <span class="n">actions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pair</span> <span class="o">+</span> <span class="s2">&quot;i&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">actions</span>
+
+    <span class="k">def</span> <span class="nf">do_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s2">&quot;*terminate*&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;*&quot;</span> <span class="o">+</span> <span class="n">state</span>
+
+        <span class="n">prefix</span><span class="p">,</span> <span class="n">interactions</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;::&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">interactions</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">::</span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">::</span><span class="si">{</span><span class="n">interactions</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">def</span> <span class="nf">get_unique_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="n">prefix</span><span class="p">,</span> <span class="n">interactions</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;::&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">interactions</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">state</span> <span class="c1"># No interactions to sort</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">interactions_list</span> <span class="o">=</span> <span class="n">interactions</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
+            <span class="n">interactions</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">interactions_list</span><span class="p">))</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">::</span><span class="si">{</span><span class="n">interactions</span><span class="si">}</span><span class="s2">&quot;</span>
+</pre></div>
+</div>
+</div>
+<p>Here are some example inputs to each function and the expected outputs.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&gt;&gt;&gt; grammar = PolarizationGrammar()
+&gt;&gt;&gt; grammar.is_terminal(&quot;*AB::AAa&quot;)              # True
+&gt;&gt;&gt; grammar.get_actions(&quot;AB::ABa_BAi&quot;)           # [&#39;*terminate*&#39;, &#39;AAa&#39;, &#39;AAi&#39;, &#39;BBa&#39;, &#39;BBi&#39;]
+&gt;&gt;&gt; grammar.do_action(&quot;AB::ABa_BAi&quot;, &quot;AAa&quot;)      # &#39;AB::ABa_BAi_AAa&#39;
+&gt;&gt;&gt; grammar.get_unique_state(&quot;*AB::ABa_BAi_AAa&quot;) # &#39;*AB::AAa_ABa_BAi&#39;
+</pre></div>
+</div>
+<p>The original paper enumerated all the possible topologies in this space and found 81. We can check our work by expanding all the possible <code class="docutils literal notranslate"><span class="pre">state</span></code> strings and printing the terminal ones. There should be 81. To do this, we can use the function <code class="docutils literal notranslate"><span class="pre">CircuiTree.grow_tree()</span></code>, which recursively builds the entire decision tree of possible states.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">circuitree</span> <span class="kn">import</span> <span class="n">CircuiTree</span>
+
+<span class="k">class</span> <span class="nc">PolarizationTree</span><span class="p">(</span><span class="n">CircuiTree</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+
+        <span class="c1"># Specify the required keyword arguments</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;grammar&quot;</span><span class="p">:</span> <span class="n">PolarizationGrammar</span><span class="p">(),</span> <span class="s2">&quot;root&quot;</span><span class="p">:</span> <span class="s2">&quot;AB::&quot;</span><span class="p">}</span> <span class="o">|</span> <span class="n">kwargs</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_reward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span> <span class="c1"># no need to implement this</span>
+
+
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
+
+<span class="n">tree</span> <span class="o">=</span> <span class="n">PolarizationTree</span><span class="p">()</span>
+<span class="n">tree</span><span class="o">.</span><span class="n">grow_tree</span><span class="p">()</span>
+
+<span class="n">terminal_states</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tree</span><span class="o">.</span><span class="n">terminal_states</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;# terminal states: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">terminal_states</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;All terminal topologies:&quot;</span><span class="p">)</span>
+<span class="n">pprint</span><span class="p">(</span><span class="n">terminal_states</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+# terminal states: 81
+
+All terminal topologies:
+[&#39;*AB::AAi_ABi_BAi_BBi&#39;,
+ &#39;*AB::AAa_ABi_BAi_BBi&#39;,
+ &#39;*AB::ABi_BAi_BBi&#39;,
+ &#39;*AB::AAi_ABa_BAi_BBi&#39;,
+ &#39;*AB::AAa_ABa_BAi_BBi&#39;,
+ &#39;*AB::ABa_BAi_BBi&#39;,
+ &#39;*AB::AAi_BAi_BBi&#39;,
+ &#39;*AB::AAa_BAi_BBi&#39;,
+ &#39;*AB::BAi_BBi&#39;,
+ &#39;*AB::AAi_ABi_BAa_BBi&#39;,
+ &#39;*AB::AAa_ABi_BAa_BBi&#39;,
+ &#39;*AB::ABi_BAa_BBi&#39;,
+ &#39;*AB::AAi_ABa_BAa_BBi&#39;,
+ &#39;*AB::AAa_ABa_BAa_BBi&#39;,
+ &#39;*AB::ABa_BAa_BBi&#39;,
+ &#39;*AB::AAi_BAa_BBi&#39;,
+ &#39;*AB::AAa_BAa_BBi&#39;,
+ &#39;*AB::BAa_BBi&#39;,
+ &#39;*AB::AAi_ABi_BBi&#39;,
+ &#39;*AB::AAa_ABi_BBi&#39;,
+ &#39;*AB::ABi_BBi&#39;,
+ &#39;*AB::AAi_ABa_BBi&#39;,
+ &#39;*AB::AAa_ABa_BBi&#39;,
+ &#39;*AB::ABa_BBi&#39;,
+ &#39;*AB::AAi_BBi&#39;,
+ &#39;*AB::AAa_BBi&#39;,
+ &#39;*AB::BBi&#39;,
+ &#39;*AB::AAi_ABi_BAi_BBa&#39;,
+ &#39;*AB::AAa_ABi_BAi_BBa&#39;,
+ &#39;*AB::ABi_BAi_BBa&#39;,
+ &#39;*AB::AAi_ABa_BAi_BBa&#39;,
+ &#39;*AB::AAa_ABa_BAi_BBa&#39;,
+ &#39;*AB::ABa_BAi_BBa&#39;,
+ &#39;*AB::AAi_BAi_BBa&#39;,
+ &#39;*AB::AAa_BAi_BBa&#39;,
+ &#39;*AB::BAi_BBa&#39;,
+ &#39;*AB::AAi_ABi_BAa_BBa&#39;,
+ &#39;*AB::AAa_ABi_BAa_BBa&#39;,
+ &#39;*AB::ABi_BAa_BBa&#39;,
+ &#39;*AB::AAi_ABa_BAa_BBa&#39;,
+ &#39;*AB::AAa_ABa_BAa_BBa&#39;,
+ &#39;*AB::ABa_BAa_BBa&#39;,
+ &#39;*AB::AAi_BAa_BBa&#39;,
+ &#39;*AB::AAa_BAa_BBa&#39;,
+ &#39;*AB::BAa_BBa&#39;,
+ &#39;*AB::AAi_ABi_BBa&#39;,
+ &#39;*AB::AAa_ABi_BBa&#39;,
+ &#39;*AB::ABi_BBa&#39;,
+ &#39;*AB::AAi_ABa_BBa&#39;,
+ &#39;*AB::AAa_ABa_BBa&#39;,
+ &#39;*AB::ABa_BBa&#39;,
+ &#39;*AB::AAi_BBa&#39;,
+ &#39;*AB::AAa_BBa&#39;,
+ &#39;*AB::BBa&#39;,
+ &#39;*AB::AAi_ABi_BAi&#39;,
+ &#39;*AB::AAa_ABi_BAi&#39;,
+ &#39;*AB::ABi_BAi&#39;,
+ &#39;*AB::AAi_ABa_BAi&#39;,
+ &#39;*AB::AAa_ABa_BAi&#39;,
+ &#39;*AB::ABa_BAi&#39;,
+ &#39;*AB::AAi_BAi&#39;,
+ &#39;*AB::AAa_BAi&#39;,
+ &#39;*AB::BAi&#39;,
+ &#39;*AB::AAi_ABi_BAa&#39;,
+ &#39;*AB::AAa_ABi_BAa&#39;,
+ &#39;*AB::ABi_BAa&#39;,
+ &#39;*AB::AAi_ABa_BAa&#39;,
+ &#39;*AB::AAa_ABa_BAa&#39;,
+ &#39;*AB::ABa_BAa&#39;,
+ &#39;*AB::AAi_BAa&#39;,
+ &#39;*AB::AAa_BAa&#39;,
+ &#39;*AB::BAa&#39;,
+ &#39;*AB::AAi_ABi&#39;,
+ &#39;*AB::AAa_ABi&#39;,
+ &#39;*AB::ABi&#39;,
+ &#39;*AB::AAi_ABa&#39;,
+ &#39;*AB::AAa_ABa&#39;,
+ &#39;*AB::ABa&#39;,
+ &#39;*AB::AAi&#39;,
+ &#39;*AB::AAa&#39;,
+ &#39;*AB::&#39;]
+</pre></div></div>
+</div>
+<p>Note that if your design space is large, <code class="docutils literal notranslate"><span class="pre">grow_tree()</span></code> can take an extremely long time and/or cause an out-of-memory error.</p>
+<hr class="docutils" />
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">%</span><span class="k">load_ext</span> watermark
+<span class="o">%</span><span class="k">watermark</span> -v -p circuitree,jupyterlab,watermark
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Python implementation: CPython
+Python version       : 3.10.8
+IPython version      : 8.24.0
+
+circuitree: 0.11.1
+jupyterlab: 4.1.8
+watermark : 2.4.3
+
+</pre></div></div>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="built_in_grammars.html" class="btn btn-neutral float-left" title="Built-in Grammars" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../api.html" class="btn btn-neutral float-right" title="API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+   <jinja2.runtime.BlockReference object at 0x7f92c7b52e30>
+
+<p>© 2024 Pranav Bhamidipati.</p>
+
+<p>This document was prepared at <a rel="caltech" href="http://www.caltech.edu">Caltech</a>.</p>
+<!-- with financial support from the <a rel="rosen" href="http://rosen.caltech.edu">Donna and Benjamin M. Rosen Bioengineering Center</a>.</p> -->
+
+<br />
+
+<p>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a
+        href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org/">Read
+        the Docs</a>.
+
+    
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-166791717-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-166791717-1', {
+          'anonymize_ip': false,
+      });
+    </script>  
+
+  <style>
+         .wy-nav-content { max-width: none; }
+  </style>
+
+
+
+</body>
+</html>
