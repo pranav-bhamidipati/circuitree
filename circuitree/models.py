@@ -799,7 +799,7 @@ class DimersGrammar(CircuitGrammar):
         return min(self._get_interaction_recolorings(genotype))
 
     @staticmethod
-    def _get_interaction_recolorings(genotype: str) -> Generator[str]:
+    def _get_interaction_recolorings(genotype: str) -> Generator[str, None, None]:
         preamble, interactions = genotype.split("::")
         components, regulators = preamble.strip("*").split("+")
         for component_recoloring in permutations(components):
