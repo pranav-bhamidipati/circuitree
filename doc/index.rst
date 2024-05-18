@@ -17,11 +17,16 @@ for a particular behavior using reinforcement learning (RL), specifically Monte 
    :maxdepth: 2
    :caption: User guide
 
-   user_guide/core_concepts
-   user_guide/conventions
    user_guide/tutorial_2_mcts_in_parallel
    user_guide/defining_search_spaces/index
    user_guide/api
+   
+   .. 
+      user_guide/core_concepts
+
+   .. 
+      user_guide/conventions
+
 
 .. toctree::
    :maxdepth: 1
