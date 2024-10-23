@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Hashable, Iterable
+from typing import Any, Generator, Hashable, Iterable
 
 __all__ = ["CircuitGrammar"]
 
@@ -109,6 +109,48 @@ class CircuitGrammar(ABC):
             bool: Whether the pattern is present.
         """
         raise NotImplementedError
+
+    def iter_states(
+        self, root: Hashable, terminal_only: bool = True
+    ) -> Generator[Hashable, None, None]:
+        """Returns a generator over all states (possible circuit topologies) reachable from the
+        given root state in the grammar, in a depth-first manner.
+
+        Args:
+            root (Hashable): The starting state.
+            terminal_only (bool): Whether to iterate over terminal states only.
+
+        Yields:
+            Hashable: The next state in the space of possible topologies.
+        """
+        return self._iter_states(root, terminal_only)
+
+    def _iter_states(
+        self, root: Hashable, terminal_only: bool = True
+    ) -> Generator[Hashable, None, None]:
+        """Iterates over all states (possible circuit topologies) reachable from the
+        given root state in the grammar, in a depth-first manner.
+
+        Args:
+            root (Hashable): The starting state.
+            terminal_only (bool): Whether to iterate over terminal states only.
+
+        Yields:
+            Hashable: The next state in the space of possible topologies.
+        """
+        visited = set()
+        stack = [root]
+        while stack:
+            state = stack.pop()
+            if state not in visited:
+                if not terminal_only or self.is_terminal(state):
+                    visited.add(state)
+                    yield state
+                actions = self.get_actions(state)
+                next_states = [
+                    self.get_unique_state(self.do_action(state, a)) for a in actions
+                ]
+                stack.extend(next_states)
 
     def get_undo_actions(self, state: Hashable) -> Iterable[Any]:
         """(Experimental) Get all actions that can be undone from the given state."""
