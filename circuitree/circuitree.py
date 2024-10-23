@@ -57,6 +57,10 @@ def ucb_score(
     return ucb
 
 
+class ExhaustionError(RuntimeError):
+    """Raised when the entire search tree is exhaustively sampled."""
+
+
 class CircuiTree(ABC):
     """A base class for implementing the Monte Carlo Tree Search (MCTS) algorithm for
     circuit topologies. The class defines the basic structure of the search tree and
@@ -76,6 +80,7 @@ class CircuiTree(ABC):
         root: str,
         exploration_constant: Optional[float] = None,
         seed: int = 2023,
+        n_exhausted: Optional[int | float] = None,
         graph: Optional[nx.DiGraph] = None,
         tree_shape: Optional[Literal["tree", "dag"]] = None,
         compute_unique: bool = True,
@@ -116,6 +121,9 @@ class CircuiTree(ABC):
             self.exploration_constant = np.sqrt(2)
         else:
             self.exploration_constant = exploration_constant
+
+        # Optionally mark terminal nodes as exhausted if they have been visited enough
+        self.n_exhausted = n_exhausted
 
         # Attributes that should not be serialized to JSON
         self._non_serializable_attrs = [
@@ -336,6 +344,16 @@ class CircuiTree(ABC):
             rg.shuffle(actions)
             for action in actions:
                 child = self._do_action(node, action)
+
+                # Skip this child if it has been exhausted (i.e. all of its terminal
+                # descendants have been expanded and simulated >= n_exhausted times)
+                if (
+                    self.n_exhausted is not None
+                    and child in self.graph.nodes
+                    and self.graph.nodes[child].get("is_exhausted", False)
+                ):
+                    continue
+
                 ucb = self.get_ucb_score(node, child)
 
                 # An unexpanded edge has UCB score of infinity.
@@ -355,7 +373,51 @@ class CircuiTree(ABC):
             actions = self.grammar.get_actions(node)
 
         # If no actions can be taken, we have reached a terminal state.
+
+        # Mark a terminal state "exhausted" if it has been visited n_exhausted times.
+        # An exhausted state is considered to have been simulated to sufficient depth.
+        # Its results are not updated further, its parent nodes are modified to
+        # forget results from this node, and it is skipped during subsequent selection.
+        if self.graph.nodes[node].get("visits", 0) >= self.n_exhausted - 1:
+            self.mark_as_exhausted(node)
+
         return selection_path
+
+    def mark_as_exhausted(self, node: str) -> None:
+        """Marks a terminal node as exhausted by setting its attribute "is_exhausted" to
+        True in the search graph. Its parent nodes are modified to forget results from
+        this node (i.e. the visits are decremented and the reward is subtracted from the
+        total reward). If all nodes of the parent are exhausted, the parent is also
+        marked as exhausted - this is done recursively up the tree.
+
+        Args:
+            node (str): The terminal node to mark as exhausted.
+
+        Raises:
+            ExhaustionError: If all nodes in the tree have been visited to exhaustion.
+        """
+        self.graph.nodes[node]["is_exhausted"] = True
+
+        # If the whole tree is exhausted, we are done
+        if node == self.root:
+            raise ExhaustionError(
+                "Every node in the tree has been visited to exhaustion."
+            )
+
+        # Forget results from this node
+        for parent in self.graph.predecessors(node):
+            edge_visits = self.graph.edges[parent, node]["visits"]
+            edge_reward = self.graph.edges[parent, node]["reward"]
+            self.graph.nodes[parent]["visits"] -= edge_visits
+            self.graph.nodes[parent]["reward"] -= edge_reward
+
+        # Recursively mark parent nodes as exhausted
+        for parent in self.graph.predecessors(node):
+            if all(
+                self.graph.nodes[c].get("is_exhausted", False)
+                for c in self.graph.successors(parent)
+            ):
+                self.mark_as_exhausted(parent)
 
     def expand_edge(self, parent: Hashable, child: Hashable):
         """Expands the search graph by adding the child node and/or the parent-child
@@ -702,7 +764,7 @@ class CircuiTree(ABC):
 
     @staticmethod
     def _run_mcts(tree: "CircuiTree", iterator: Iterable[int], **kwargs) -> None:
-        """(Internal) Runs an MCTS searcht."""
+        """(Internal) Runs an MCTS search."""
         # Performs MCTS iterations on the tree using the provided iterator
         for _ in iterator:
             tree.traverse(**kwargs)
@@ -776,6 +838,7 @@ class CircuiTree(ABC):
         if n_threads < 1:
             raise ValueError("Number of threads must be at least 1.")
         if n_threads == 1:
+            print("Detected n_threads==1. Running MCTS with a single thread.")
             self.search_mcts(
                 n_steps=n_steps,
                 callback_every=callback_every,
