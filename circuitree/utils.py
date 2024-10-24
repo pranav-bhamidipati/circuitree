@@ -13,7 +13,10 @@ except ImportError:
 
 __all__ = [
     "merge_overlapping_sets",
-    "ManagedEvent",
+    "BackupContext",
+    "DatabaseBackupManager",
+    "ThreadsafeCounter",
+    "ThreadsafeCountTable",
     "AtomicCounter",
 ]
 
