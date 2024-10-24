@@ -79,7 +79,7 @@ class CircuiTree(ABC):
         grammar: CircuitGrammar,
         root: str,
         exploration_constant: Optional[float] = None,
-        seed: int = 2023,
+        seed: Optional[int] = None,
         n_exhausted: Optional[int | float] = None,
         graph: Optional[nx.DiGraph] = None,
         tree_shape: Optional[Literal["tree", "dag"]] = None,
@@ -88,7 +88,7 @@ class CircuiTree(ABC):
     ):
         # Initialize RNG
         self.rg = np.random.default_rng(seed)
-        self.seed = self.rg.bit_generator._seed_seq.entropy
+        self.seed: int = self.rg.bit_generator._seed_seq.entropy
 
         # Initialize search graph
         self.root = root
@@ -693,8 +693,8 @@ class CircuiTree(ABC):
     def search_mcts(
         self,
         n_steps: int,
-        callback_every: int = 1,
         callback: Optional[Callable] = None,
+        callback_every: int = 1,
         progress_bar: bool = False,
         run_kwargs: Optional[dict] = None,
         callback_before_start: bool = True,
